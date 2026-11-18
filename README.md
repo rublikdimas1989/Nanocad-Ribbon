@@ -4,13 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.5.zip`](nanocad-test-ribbon-v1.2.5.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.5.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.6.zip`](nanocad-test-ribbon-v1.2.6.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.6.zip
 - Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
 
 Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Что внутри (v1.2.5)
+## Что внутри (v1.2.6)
 
 UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
 

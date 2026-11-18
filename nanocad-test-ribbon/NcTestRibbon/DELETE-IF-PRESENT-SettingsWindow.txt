@@ -1,0 +1,12 @@
+If Visual Studio reports SettingsWindow defined twice (CS0111/CS0260/CS0121):
+
+Delete these leftover files from NcTestRibbon\Shell\ (from older zips):
+  SettingsWindow.xaml
+  SettingsWindow.xaml.cs
+  InitialData.xaml
+  InitialData.xaml.cs
+
+Keep only:
+  SettingsWindow.cs
+
+Then Rebuild. INSTALL.bat also removes these leftovers automatically.

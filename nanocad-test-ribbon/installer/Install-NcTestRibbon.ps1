@@ -251,6 +251,21 @@ function Resolve-TestRibbonFiles {
 
 $requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
 
+# Leftovers from unzip-over-old-folder cause CS0111 (SettingsWindow twice).
+$shellDir = Join-Path $pkgRoot 'NcTestRibbon\Shell'
+foreach ($legacy in @(
+        'SettingsWindow.xaml',
+        'SettingsWindow.xaml.cs',
+        'InitialData.xaml',
+        'InitialData.xaml.cs'
+    )) {
+    $legacyPath = Join-Path $shellDir $legacy
+    if (Test-Path $legacyPath) {
+        Remove-Item -LiteralPath $legacyPath -Force
+        Write-Host "Removed leftover: $legacyPath"
+    }
+}
+
 if (Get-Process nCad -ErrorAction SilentlyContinue) {
     throw 'nanoCAD is running. Close all nanoCAD windows and retry.'
 }
