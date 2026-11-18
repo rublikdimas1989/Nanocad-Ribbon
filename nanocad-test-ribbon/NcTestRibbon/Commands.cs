@@ -1,8 +1,3 @@
-//
-// Две тестовые команды ленты «Тест».
-// Имена [CommandMethod] должны совпадать с intername / command в NC_TestRibbon.json.
-//
-
 namespace NcTestRibbon
 {
   using System;
@@ -12,6 +7,7 @@ namespace NcTestRibbon
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
   using Teigha.Runtime;
+  using CadApp = HostMgd.ApplicationServices.Application;
 
   public class TestCommands
   {
@@ -20,18 +16,18 @@ namespace NcTestRibbon
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
     {
-      Document doc = Application.DocumentManager.MdiActiveDocument;
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
 
       const string text = "Тест 1: Hello";
       ed?.WriteMessage("\n" + text);
-      Application.ShowAlertDialog(text);
+      CadApp.ShowAlertDialog(text);
     }
 
     [CommandMethod("NcTestHttp")]
     public void NcTestHttp()
     {
-      Document doc = Application.DocumentManager.MdiActiveDocument;
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
 
       using (HttpTestForm form = new HttpTestForm(DefaultHttpUrl))
@@ -51,11 +47,11 @@ namespace NcTestRibbon
           string preview = Truncate(body, 2000);
           ed?.WriteMessage("\nNcTestHttp: OK, длина ответа "
             + body.Length + " символов.");
-          Application.ShowAlertDialog(
+          CadApp.ShowAlertDialog(
             "NcTestHttp — успех\n\nURL: " + url
             + "\n\nОтвет (обрезан):\n" + preview);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
           ed?.WriteMessage("\nNcTestHttp: ошибка — " + ex.Message);
           MessageBox.Show(

@@ -19,7 +19,12 @@
 nanocad-test-ribbon/
   README.md
   NC_TestRibbon.json          ← манифест панели «Тест»
-  dev-deploy.ps1              ← копирование DLL+JSON в LoadFile
+  dev-deploy.ps1              ← быстрое копирование DLL+JSON в LoadFile
+  installer/                  ← полный локальный установщик (NcBootstrap + лента)
+    INSTALL.bat / Install-NcTestRibbon.ps1
+    UNINSTALL.bat / Uninstall-NcTestRibbon.ps1
+    NcBootstrap.dll / .json / .deps.json
+    icons/load_chart.ico
   NcTestRibbon/
     NcTestRibbon.sln
     NcTestRibbon.csproj
@@ -28,6 +33,30 @@ nanocad-test-ribbon/
     icons/hello.ico
     icons/http.ico            ← embedded как NC_ICONS.*
 ```
+
+---
+
+## Установка после переустановки nanoCAD
+
+После переустановки (или новой версии) nanoCAD профиль `Cfg.ini` создаётся заново — автозагрузку нужно прописать снова.
+
+1. Закройте все окна nanoCAD.
+2. Соберите плагин (раздел «Сборка» ниже), если ещё нет `NC_TestRibbon.dll`.
+3. Запустите **один раз** нужную версию nanoCAD и сразу закройте её  
+   (чтобы появился `%APPDATA%\Nanosoft\nanoCAD*\Config\Cfg.ini`).
+4. Из каталога `installer\` запустите `INSTALL.bat`  
+   (или `Install-NcTestRibbon.ps1`).
+
+Что делает установщик:
+
+- копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
+- копирует `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
+  (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе `installer\payload\`);
+- добавляет Startup и для `NC_TestRibbon.dll`.
+
+Удаление: `installer\UNINSTALL.bat`.
+
+Альтернатива без NcBootstrap: только `.\dev-deploy.ps1` / `.\dev-deploy.ps1 -RegisterStartup`.
 
 ---
 

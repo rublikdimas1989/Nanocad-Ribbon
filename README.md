@@ -4,7 +4,7 @@
 
 ## Содержимое репозитория
 
-- [`nanocad-test-ribbon.zip`](nanocad-test-ribbon.zip) — архив пакета
+- [`nanocad-test-ribbon.zip`](nanocad-test-ribbon.zip) — архив пакета (включая `installer/`)
 - [`nanocad-test-ribbon/`](nanocad-test-ribbon/) — исходники VS-проекта (то же содержимое)
 
 Подробности — в [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
@@ -25,14 +25,18 @@ dotnet build NcTestRibbon.csproj -c Release
 
 DLL: `bin\Release\net6.0-windows\NC_TestRibbon.dll`.
 
-## Локальный деплой без ASDC
+## Установка (после сборки или после переустановки nanoCAD)
 
-Закройте nanoCAD, затем из `nanocad-test-ribbon`:
+Закройте nanoCAD. Если nanoCAD только что переустановили — один раз запустите и закройте его (создаётся `Cfg.ini`), затем:
 
-```powershell
-.\dev-deploy.ps1
-# или с автозагрузкой в Cfg.ini:
-.\dev-deploy.ps1 -RegisterStartup
+```text
+nanocad-test-ribbon\installer\INSTALL.bat
 ```
 
-Файлы копируются в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\`. После перезапуска nanoCAD: `NETLOAD` DLL (если не зарегистрировали Startup) и команды `NcTestHello` / `NcTestHttp`.
+Установщик ставит **NcBootstrap** + копирует `NC_TestRibbon` в LoadFile и прописывает Startup во всех найденных профилях.
+
+Удаление: `nanocad-test-ribbon\installer\UNINSTALL.bat`.
+
+Быстрый деплой без bootstrap: `nanocad-test-ribbon\dev-deploy.ps1` (опция `-RegisterStartup`).
+
+После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp`.

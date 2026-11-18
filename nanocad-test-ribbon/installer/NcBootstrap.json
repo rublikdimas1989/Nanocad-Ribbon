@@ -1,0 +1,7 @@
+﻿{
+  "serverUrl": "http://ink-aae-t:5000/api",
+  "username": "admin",
+  "password": "admin123",
+  "fileType": "file list nanocad",
+  "syncFolder": "%LOCALAPPDATA%\\ASDC\\LoadFile\\NANOCAD"
+}
