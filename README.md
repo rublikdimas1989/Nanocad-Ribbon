@@ -23,7 +23,7 @@ UI-оболочки из End-варианта (WPF), **без** Topology/PipeCal
 | `NcTestHello` / `NcTestHttp` | прежние тесты |
 | `NcTestDemo` | маленький WinForms smoke |
 
-Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Исходные**. Клики в UI → MessageBox «сервер позже».
+Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Настройки** / **Кустовые площадки**. Клики в UI → MessageBox «сервер позже».
 
 ## Быстрый старт
 
