@@ -3,34 +3,21 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.1.1**): `nanocad-test-ribbon-v1.1.1.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.1.zip  
+Актуальный zip с GitHub (версия **1.1.2**): `nanocad-test-ribbon-v1.1.2.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.2.zip  
 
-### Быстрая пересборка (если CS0246 HostMgd / Teigha)
+**`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc:
 
-1. Скачайте **v1.1.1**, распакуйте в **новую** папку (не поверх старой с `DemoWindow.xaml`).
-2. Если в `NcTestRibbon\` остались `DemoWindow.xaml` / `DemoWindow.xaml.cs` — **удалите** их (это старый WPF; сейчас только WinForms в `Commands.cs`).
-3. Укажите путь к SDK (папка, где есть `include-x64\hostmgd.dll`):
+`C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\`
 
-```powershell
-cd NcTestRibbon
-copy Directory.Build.props.example Directory.Build.props
-notepad Directory.Build.props
-```
+### Быстрая пересборка
 
-В `NcSdkDir` впишите свой путь (пробелы в YandexDisk — нормально), например:
+1. Скачайте **v1.1.2**, распакуйте в **новую** папку. Если есть `DemoWindow.xaml` / `.xaml.cs` — удалите.
+2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release` (или Rebuild в VS).
+3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
+4. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
 
-`C:\Users\bublik_da\YandexDisk\...\NC_SDK_RU_24.0.6388.4326.7145\`
-
-Или одной командой (кавычки обязательны при пробелах):
-
-```powershell
-dotnet build NcTestRibbon.csproj -c Release `
-  -p:NcSdkDir="C:\Users\bublik_da\YandexDisk\PATH\NC_SDK_RU_24.0.6388.4326.7145\"
-```
-
-4. `dotnet build NcTestRibbon.csproj -c Release`
-5. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` → nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
+Копировать `Directory.Build.props.example` больше не нужно — props уже в пакете.
 
 | Команда | Что делает |
 |---------|------------|
@@ -61,7 +48,8 @@ nanocad-test-ribbon/
     NcTestRibbon.csproj
     Plugin.cs                 ← IExtensionApplication
     Commands.cs               ← NcTestHello / NcTestHttp / NcTestWpf (DemoForm WinForms)
-    Directory.Build.props.example  ← скопировать в Directory.Build.props и задать NcSdkDir
+    Directory.Build.props     ← NcSdkDir уже задан (UTF-8 BOM)
+    Directory.Build.props.example
     icons/hello.ico
     icons/http.ico
     icons/wpf.ico             ← icon for ribbon «Окно» (NC_ICONS.wpf.ico)
@@ -117,31 +105,14 @@ NcTestWpf
 3. Откройте `NcTestRibbon\NcTestRibbon.sln` двойным щелчком  
    **или** `NcTestRibbon.csproj` → «Open with Visual Studio».
 
-### Путь к SDK (`NcSdkDir`) — устранение CS0246
+### Путь к SDK (`NcSdkDir`)
 
-Ошибки `CS0246: HostMgd / Teigha / CommandMethod / Document / Editor` значат: **Visual Studio не видит SDK**.  
-Нужна папка SDK с файлами `include-x64\hostmgd.dll` и `hostdbmgd.dll`.
+В **v1.1.2** путь уже задан в `Directory.Build.props` + fallback в `.csproj` (как в RibbonExecDoc).  
+Файлы сохранены в **UTF-8 с BOM** — кириллица в пути корректна для MSBuild.
 
-**Рекомендуемый способ** (путь с пробелами / YandexDisk ок):
-
-1. `copy Directory.Build.props.example Directory.Build.props`
-2. В `Directory.Build.props` задайте:
-
-```xml
-<NcSdkDir>C:\Users\bublik_da\YandexDisk\ВАША_ПАПКА\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
-```
-
-3. Reload проекта / Rebuild.
-
-**Альтернатива — командная строка** (кавычки при пробелах):
-
-```powershell
-dotnet build NcTestRibbon.csproj -c Release `
-  -p:NcSdkDir="C:\Users\bublik_da\YandexDisk\PATH\NC_SDK_RU_24.0.6388.4326.7145\"
-```
-
-По умолчанию в `.csproj`: `C:\NC_SDK_RU_24.0\` (если `NcSdkDir` не задан).  
-При сборке скрипт сам добавит `\` в конце пути, если его нет. Если `hostmgd.dll` не найден — сборка остановится с понятным текстом вместо «тихих» CS0246.
+Если CS0246 всё же есть: проверьте наличие  
+`...\NC_SDK_RU_24.0.6388.4326.7145\include-x64\hostmgd.dll`  
+или временно переопределите: `dotnet build -c Release -p:NcSdkDir="D:\OtherSdk\"`.
 
 ---
 

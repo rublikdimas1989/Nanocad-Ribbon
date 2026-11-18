@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- nanoCAD 24 x64: .NET 6 Windows -->
@@ -8,25 +8,21 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
-    <!-- Bump when shipping package/command-set changes. -->
-    <Version>1.1.1</Version>
-    <AssemblyVersion>1.1.1.0</AssemblyVersion>
-    <FileVersion>1.1.1.0</FileVersion>
-    <InformationalVersion>1.1.1+NcTestHello.NcTestHttp.NcTestWpf.WinForms</InformationalVersion>
+    <Version>1.1.2</Version>
+    <AssemblyVersion>1.1.2.0</AssemblyVersion>
+    <FileVersion>1.1.2.0</FileVersion>
+    <InformationalVersion>1.1.2+NcTestHello.NcTestHttp.NcTestWpf.WinForms</InformationalVersion>
     <!-- WinForms only (HttpTestForm + DemoForm). No WPF / no DemoWindow. -->
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>false</UseWPF>
     <!--
-      nanoCAD SDK folder (must contain include-x64\hostmgd.dll).
-      Override via:
-        1) copy Directory.Build.props.example -> Directory.Build.props and edit NcSdkDir
-        2) or: dotnet build -c Release -p:NcSdkDir="C:\Path\With Spaces\NC_SDK_RU_24.0...\"
-      Trailing backslash is added automatically below if missing.
+      Default NcSdkDir matches this machine's RibbonExecDoc.csproj.
+      Also set in Directory.Build.props (UTF-8 BOM). Override with -p:NcSdkDir=... if needed.
     -->
-    <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\NC_SDK_RU_24.0\</NcSdkDir>
+    <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
 
-  <!-- Normalize trailing slash (paths with spaces are fine). -->
+  <!-- Normalize trailing slash (paths with spaces/Cyrillic are fine). -->
   <PropertyGroup>
     <NcSdkDir Condition="'$(NcSdkDir)' != '' and !HasTrailingSlash('$(NcSdkDir)')">$(NcSdkDir)\</NcSdkDir>
   </PropertyGroup>
@@ -43,7 +39,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Icons embedded as NC_ICONS.* -->
     <EmbeddedResource Include="icons\*.ico">
       <LogicalName>NC_ICONS.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
@@ -62,7 +57,7 @@
   <Target Name="ValidateNcSdk" BeforeTargets="ResolveAssemblyReferences">
     <Error
       Condition="!Exists('$(NcSdkDir)include-x64\hostmgd.dll')"
-      Text="nanoCAD SDK not found: '$(NcSdkDir)include-x64\hostmgd.dll'. CS0246 (HostMgd/Teigha) means NcSdkDir is wrong. Copy Directory.Build.props.example to Directory.Build.props and set NcSdkDir to your NC_SDK_RU_24.0... folder (trailing \ ok; spaces ok), or build with -p:NcSdkDir=&quot;C:\Users\...\NC_SDK_RU_24.0...\&quot;" />
+      Text="nanoCAD SDK not found: '$(NcSdkDir)include-x64\hostmgd.dll'. CS0246 (HostMgd/Teigha) means NcSdkDir is wrong. Edit Directory.Build.props or pass -p:NcSdkDir=..." />
   </Target>
 
 </Project>

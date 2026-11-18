@@ -1,47 +1,33 @@
 # Nanocad-Ribbon
 
-Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows): три команды (`NcTestHello`, `NcTestHttp`, `NcTestWpf`) и манифест панели «Тест». Сервер ASDC для локальной проверки **не нужен**.
+Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows): три команды (`NcTestHello`, `NcTestHttp`, `NcTestWpf`) и манифест панели «Тест».
 
-## Содержимое репозитория
+## Скачать
 
-- **Скачать пакет (актуальный):** [`nanocad-test-ribbon-v1.1.1.zip`](nanocad-test-ribbon-v1.1.1.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.1.zip
-- [`nanocad-test-ribbon/`](nanocad-test-ribbon/) — исходники VS-проекта
-- Старые имена zip (`v1.1.0`, `nanocad-test-ribbon.zip`) могут кэшироваться — берите **v1.1.1**
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.1.2.zip`](nanocad-test-ribbon-v1.1.2.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.2.zip
+- Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
+- Старые zip (`v1.1.1` и ранее) могут кэшироваться — берите **v1.1.2**
 
-Подробности — в [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
+Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Быстрый старт (после скачивания v1.1.1)
+## Быстрый старт (v1.1.2)
 
-1. Распаковать в **новую** папку. Если видите `DemoWindow.xaml` — удалить (старый WPF; в v1.1.1 его нет).
-2. Указать SDK (нужен `include-x64\hostmgd.dll`):
+`NcSdkDir` уже прописан в `Directory.Build.props` и в `.csproj` (путь как в RibbonExecDoc):
+
+`C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\`
+
+1. Распаковать **v1.1.2** в новую папку. Если есть `DemoWindow.xaml` — удалить.
+2. Открыть `nanocad-test-ribbon\NcTestRibbon\NcTestRibbon.sln` в VS **или**:
 
 ```powershell
 cd nanocad-test-ribbon\NcTestRibbon
-copy Directory.Build.props.example Directory.Build.props
-notepad Directory.Build.props
-```
-
-В `NcSdkDir` — ваш путь, пробелы (YandexDisk) допустимы, например  
-`C:\Users\bublik_da\YandexDisk\...\NC_SDK_RU_24.0.6388.4326.7145\`
-
-3. Сборка и установка:
-
-```powershell
 dotnet build NcTestRibbon.csproj -c Release
 cd ..\installer
 .\INSTALL.bat
 .\VERIFY.bat
 ```
 
-4. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
+3. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
 
-Если Error List = **CS0246 HostMgd/Teigha** — неверный `NcSdkDir` (см. выше).  
-Если Error List = **Window / RoutedEventArgs / DemoWindow** — удалите старые `DemoWindow.*` и откройте свежий v1.1.1.
-
-## Открыть решение
-
-1. Visual Studio 2022 (.NET Desktop) + **nanoCAD SDK 24**.
-2. `nanocad-test-ribbon/NcTestRibbon/NcTestRibbon.sln`.
-
-SDK: через `Directory.Build.props` или `-p:NcSdkDir="..."`.
+Если CS0246 HostMgd — проверьте, что SDK реально лежит по пути выше (или поправьте `Directory.Build.props`).
