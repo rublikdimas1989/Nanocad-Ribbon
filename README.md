@@ -33,10 +33,11 @@ DLL: `bin\Release\net6.0-windows\NC_TestRibbon.dll`.
 nanocad-test-ribbon\installer\INSTALL.bat
 ```
 
-Установщик ставит **NcBootstrap** + копирует **только** `NC_TestRibbon` в LoadFile и прописывает Startup (nanoCAD **не** запускается автоматически). Панель «Рамки» / `NC_RibbonExecDoc` **не** устанавливается (остатки счищаются; `serverUrl` в bootstrap пустой — без ASDC).
+Установщик ставит **NcBootstrap** + **перезаписывает** `NC_TestRibbon` в LoadFile и прописывает Startup (nanoCAD **не** запускается автоматически). Перед копированием проверяет, что DLL содержит `NcTestHello` / `NcTestHttp` / `NcTestWpf` (иначе отказ — нужна пересборка Release). Панель «Рамки» / `NC_RibbonExecDoc` **не** устанавливается.
 
-Удаление: `nanocad-test-ribbon\installer\UNINSTALL.bat`.
+Удаление: `nanocad-test-ribbon\installer\UNINSTALL.bat`.  
+Проверка DLL: `nanocad-test-ribbon\installer\VERIFY.bat`.
 
 Быстрый деплой без bootstrap: `nanocad-test-ribbon\dev-deploy.ps1` (опция `-RegisterStartup`).
 
-После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp` / `NcTestWpf` (WinForms `ShowDialog`; лента «Окно»). WPF не используется.
+После запуска nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf` (лента «Окно»). Если `NcTestWpf` неизвестна — старая DLL; rebuild + INSTALL.

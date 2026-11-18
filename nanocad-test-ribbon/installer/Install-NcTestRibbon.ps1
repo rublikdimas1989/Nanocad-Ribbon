@@ -130,26 +130,108 @@ function Add-ManagedStartup {
     return $true
 }
 
+function Test-FileContainsText {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Text
+    )
+
+    if (-not (Test-Path $Path)) { return $false }
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    $encodings = @(
+        [Text.Encoding]::Unicode,   # UTF-16LE (typical .NET metadata strings)
+        [Text.Encoding]::UTF8,
+        [Text.Encoding]::ASCII
+    )
+
+    foreach ($enc in $encodings) {
+        $needle = $enc.GetBytes($Text)
+        if ($needle.Length -eq 0) { continue }
+        for ($i = 0; $i -le $bytes.Length - $needle.Length; $i++) {
+            $ok = $true
+            for ($j = 0; $j -lt $needle.Length; $j++) {
+                if ($bytes[$i + $j] -ne $needle[$j]) { $ok = $false; break }
+            }
+            if ($ok) { return $true }
+        }
+    }
+
+    return $false
+}
+
+function Assert-DllHasCommands {
+    param(
+        [Parameter(Mandatory = $true)][string]$DllPath,
+        [Parameter(Mandatory = $true)][string[]]$Commands
+    )
+
+    $missing = @()
+    foreach ($cmd in $Commands) {
+        if (-not (Test-FileContainsText -Path $DllPath -Text $cmd)) {
+            $missing += $cmd
+        }
+    }
+
+    if ($missing.Count -gt 0) {
+        $info = Get-Item $DllPath
+        throw @"
+DLL is missing CommandMethod name(s): $($missing -join ', ')
+File: $($info.FullName)
+LastWriteTime: $($info.LastWriteTime)
+Length: $($info.Length) bytes
+This usually means a STALE build (old Release DLL) while NC_TestRibbon.json already lists new buttons.
+Rebuild, then re-run INSTALL.bat:
+  cd ..\NcTestRibbon
+  dotnet build NcTestRibbon.csproj -c Release
+Required commands: $($Commands -join ', ')
+"@
+    }
+}
+
+function Write-DllInfo {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    if (-not (Test-Path $Path)) {
+        Write-Host ("{0}: MISSING {1}" -f $Label, $Path)
+        return
+    }
+
+    $info = Get-Item $Path
+    $ver = $null
+    try { $ver = $info.VersionInfo.FileVersion } catch { }
+    Write-Host ("{0}: {1}" -f $Label, $info.FullName)
+    Write-Host ("  LastWriteTime: {0}" -f $info.LastWriteTime)
+    Write-Host ("  Length:        {0} bytes" -f $info.Length)
+    if ($ver) { Write-Host ("  FileVersion:   {0}" -f $ver) }
+}
+
 function Resolve-TestRibbonFiles {
+    # Prefer package-root JSON so ribbon always matches this checkout.
+    $pkgJson = Join-Path $pkgRoot 'NC_TestRibbon.json'
+
     $candidates = @(
         @{
             Dll  = Join-Path $pkgRoot 'NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll'
-            Json = Join-Path $pkgRoot 'NC_TestRibbon.json'
+            Json = $pkgJson
             Label = 'build output (Release)'
         },
         @{
             Dll  = Join-Path $pkgRoot 'NcTestRibbon\bin\Debug\net6.0-windows\NC_TestRibbon.dll'
-            Json = Join-Path $pkgRoot 'NC_TestRibbon.json'
+            Json = $pkgJson
             Label = 'build output (Debug)'
         },
         @{
             Dll  = Join-Path $src 'payload\NC_TestRibbon.dll'
-            Json = Join-Path $src 'payload\NC_TestRibbon.json'
+            Json = $(if (Test-Path $pkgJson) { $pkgJson } else { Join-Path $src 'payload\NC_TestRibbon.json' })
             Label = 'installer\payload'
         },
         @{
             Dll  = Join-Path $pkgRoot 'payload\NC_TestRibbon.dll'
-            Json = Join-Path $pkgRoot 'payload\NC_TestRibbon.json'
+            Json = $(if (Test-Path $pkgJson) { $pkgJson } else { Join-Path $pkgRoot 'payload\NC_TestRibbon.json' })
             Label = 'payload'
         }
     )
@@ -166,6 +248,8 @@ function Resolve-TestRibbonFiles {
 
     return $null
 }
+
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf')
 
 if (Get-Process nCad -ErrorAction SilentlyContinue) {
     throw 'nanoCAD is running. Close all nanoCAD windows and retry.'
@@ -197,8 +281,11 @@ Or place files into installer\payload\
 Write-Host '=== Install NcBootstrap + NC_TestRibbon ==='
 Write-Host "Bootstrap source: $src"
 Write-Host "Ribbon source:    $($ribbon.Label)"
-Write-Host "  DLL:  $($ribbon.Dll)"
+Write-DllInfo -Label 'Source DLL' -Path $ribbon.Dll
 Write-Host "  JSON: $($ribbon.Json)"
+
+Assert-DllHasCommands -DllPath $ribbon.Dll -Commands $requiredCommands
+Write-Host ("DLL contains commands: " + ($requiredCommands -join ', '))
 
 # --- NcBootstrap ---
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -246,9 +333,18 @@ foreach ($name in @('NC_RibbonExecDoc.dll', 'NC_RibbonExecDoc.json')) {
 
 $ribbonDllDest = Join-Path $syncFolder 'NC_TestRibbon.dll'
 $ribbonJsonDest = Join-Path $syncFolder 'NC_TestRibbon.json'
+
+# Force overwrite (delete first so a locked/stale file fails loudly).
+foreach ($p in @($ribbonDllDest, $ribbonJsonDest)) {
+    if (Test-Path $p) {
+        Remove-Item $p -Force
+    }
+}
 Copy-Item $ribbon.Dll $ribbonDllDest -Force
 Copy-Item $ribbon.Json $ribbonJsonDest -Force
+Assert-DllHasCommands -DllPath $ribbonDllDest -Commands $requiredCommands
 Write-Host "Copied NC_TestRibbon to: $syncFolder"
+Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {
@@ -334,7 +430,9 @@ Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
 Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf'
+Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
+Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''
 Write-Host 'After reinstalling nanoCAD:'
 Write-Host '1. Start nanoCAD once, then close it (creates Config\Cfg.ini).'
-Write-Host '2. Run installer\INSTALL.bat again.'
+Write-Host '2. Rebuild Release, then run installer\INSTALL.bat again.'

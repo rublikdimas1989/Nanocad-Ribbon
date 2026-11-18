@@ -23,6 +23,7 @@ nanocad-test-ribbon/
   dev-deploy.ps1              ← быстрое копирование DLL+JSON в LoadFile
   installer/                  ← полный локальный установщик (NcBootstrap + лента)
     INSTALL.bat / Install-NcTestRibbon.ps1
+    VERIFY.bat / Verify-NcTestRibbon.ps1
     UNINSTALL.bat / Uninstall-NcTestRibbon.ps1
     NcBootstrap.dll / .json / .deps.json
     icons/load_chart.ico
@@ -43,18 +44,27 @@ nanocad-test-ribbon/
 После переустановки (или новой версии) nanoCAD профиль `Cfg.ini` создаётся заново — автозагрузку нужно прописать снова.
 
 1. Закройте все окна nanoCAD.
-2. Соберите плагин (раздел «Сборка» ниже), если ещё нет `NC_TestRibbon.dll`.
+2. **Обязательно пересоберите** плагин после обновления исходников (раздел «Сборка»).  
+   Zip с GitHub содержит исходники; старый `bin\Release\...\NC_TestRibbon.dll` без `NcTestWpf` даст «неизвестную команду», хотя кнопка «Окно» на ленте уже есть.
 3. Запустите **один раз** нужную версию nanoCAD и сразу закройте её  
    (чтобы появился `%APPDATA%\Nanosoft\nanoCAD*\Config\Cfg.ini`).
 4. Из каталога `installer\` запустите `INSTALL.bat`  
-   (или `Install-NcTestRibbon.ps1`).
-5. Запустите nanoCAD вручную и проверьте команды / ленту «Тест».
+   (или `Install-NcTestRibbon.ps1`). Установщик **откажется** ставить DLL, если в ней нет строк `NcTestHello` / `NcTestHttp` / `NcTestWpf`.
+5. По желанию: `installer\VERIFY.bat` — путь к установленной DLL, LastWriteTime, FileVersion и проверка имён команд внутри файла.
+6. Запустите nanoCAD и в командной строке проверьте:
+
+```
+NcTestHello
+NcTestHttp
+NcTestWpf
+```
 
 Что делает установщик:
 
 - копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
-- копирует **только** `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
-  (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе `installer\payload\`);
+- **принудительно перезаписывает** `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
+  (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе Debug / `installer\payload\`; JSON берётся из корня пакета);
+- проверяет, что DLL содержит имена команд `NcTestHello`, `NcTestHttp`, `NcTestWpf`;
 - **не** ставит панель «Рамки» / `NC_RibbonExecDoc` — при установке удаляет их DLL/JSON из LoadFile, Startup и кэш `.cfg`/`.cuix` профиля;
 - `NcBootstrap.json` с пустым `serverUrl` (локальный режим, без синхронизации ASDC, чтобы «Загрузить» снова не подтянуло «Рамки»);
 - добавляет Startup и для `NC_TestRibbon.dll`.
@@ -62,6 +72,10 @@ nanocad-test-ribbon/
 Удаление: `installer\UNINSTALL.bat` (чистит и остатки `NC_RibbonExecDoc`, если были).
 
 Альтернатива без NcBootstrap: только `.\dev-deploy.ps1` / `.\dev-deploy.ps1 -RegisterStartup`.
+
+Если команда «неизвестна» после установки: закройте nanoCAD → `dotnet build ... -c Release` → `INSTALL.bat` → `VERIFY.bat`.  
+Вручную: команда **NETLOAD** → укажите  
+`%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll`.
 
 ---
 
@@ -187,7 +201,9 @@ NcTestWpf
 
 Ожидание: отдельное **WinForms**-окно «Демо-окно (WinForms)» (кнопка OK / Закрыть). Открыто через `Form.ShowDialog()` с владельцем — главным HWND nanoCAD (**modal**, как `NcTestHttp`). В командную строку пишутся start/HWND/результат и любые исключения. WPF в проекте **нет**.
 
-Если команда «неизвестна» — DLL не загрузилась: проверьте Startup, путь, что сборка `net6.0-windows`, что nanoCAD 24 x64.
+Если **`NcTestHello` / `NcTestHttp` работают, а `NcTestWpf` — «неизвестная команда»**: в LoadFile лежит **старая DLL** (кнопка ленты из нового JSON). Пересоберите Release и снова `INSTALL.bat`, затем `VERIFY.bat`.
+
+Если все три «неизвестны» — DLL не загрузилась: Startup, путь, `net6.0-windows`, nanoCAD 24 x64; либо NETLOAD на файл в LoadFile.
 
 ---
 
