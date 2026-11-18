@@ -10,10 +10,10 @@
     <!-- Product / File version for packages. Keep AssemblyVersion stable:
          CAD NETLOAD + WPF pack URIs break when AssemblyVersion changes
          (lookup becomes /NC_TestRibbon;V1.x.y.z;component/...). -->
-    <Version>1.2.3</Version>
+    <Version>1.2.4</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.3.0</FileVersion>
-    <InformationalVersion>1.2.3+PadOptShell</InformationalVersion>
+    <FileVersion>1.2.4.0</FileVersion>
+    <InformationalVersion>1.2.4+SettingsTabs</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <!-- Force correct Page paths (case-sensitive pack URI component/Shell/...). -->
@@ -49,7 +49,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Update="Shell\InitialData.xaml">
+    <Page Update="Shell\SettingsWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Shell\TracingSettingsPanel.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

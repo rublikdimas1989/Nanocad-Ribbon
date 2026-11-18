@@ -3,24 +3,25 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.3**): `nanocad-test-ribbon-v1.2.3.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.3.zip  
+Актуальный zip с GitHub (версия **1.2.4**): `nanocad-test-ribbon-v1.2.4.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.4.zip  
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.3**, распакуйте в **новую** папку.
+1. Скачайте **v1.2.4**, распакуйте в **новую** папку.
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
-4. nanoCAD: `NcTestPadOpt` / `NcTestWpf` / `NcTestInitialData` / `NcTestHello` / `NcTestHttp`
+4. nanoCAD: `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
 
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» |
 | `NcTestHttp` | WinForms HTTP GET |
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
-| `NcTestInitialData` | **WPF-оболочка** `InitialData` |
+| `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
+| `NcTestInitialData` | alias → `NcTestSettings` |
 | `NcTestPadOpt` | **WPF code shell** «Оптимизация кустовых площадок» |
 | `NcTestDemo` | маленький WinForms smoke |
 
@@ -47,7 +48,7 @@ nanocad-test-ribbon/
     NcTestRibbon.csproj
     Plugin.cs                 ← IExtensionApplication
     Commands.cs               ← команды + открытие WPF shell
-    Shell/                    ← MainWindow/InitialData/… + PadOptimizationWindow (UI only)
+    Shell/                    ← SettingsWindow (+Tracing/Trench tabs), MainWindow, PadOptimization…
     Directory.Build.props     ← NcSdkDir уже задан (UTF-8 BOM)
     icons/*.ico
 ```
@@ -72,7 +73,7 @@ nanocad-test-ribbon/
 NcTestHello
 NcTestHttp
 NcTestWpf
-NcTestInitialData
+NcTestSettings
 NcTestPadOpt
 ```
 
@@ -257,3 +258,7 @@ NcTestWpf
 
 `AssemblyVersion` зафиксирован на `1.0.0.0` (FileVersion = продукт). Иначе после NETLOAD WPF ищет `/NC_TestRibbon;V1.x.y.z;component/Shell/...` и падает.
 Pad-окно (`NcTestPadOpt`) собрано в коде без XAML.
+
+## Tracing_cache
+
+`%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`. Создаётся при открытии «Настройки».

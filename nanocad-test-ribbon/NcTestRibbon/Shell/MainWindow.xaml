@@ -33,7 +33,7 @@
                     <ribbon:RibbonButton Click="Run_Click" FontWeight="Bold" Label="Начать поиск"/>
                     <ribbon:RibbonButton Click="Clear_Click" Label="Очистить пути"/>
                     <ribbon:RibbonButton Click="ClearScreen_Click" Label="Очистить экран" ToolTip="Скрыть пути, наложение топологии и обозначения старта/финиша. Координаты и сохранённые трассы остаются."/>
-                    <ribbon:RibbonButton Click="OpenInitialSettingsWindow_Click" Label="Параметры расчёта"/>
+                    <ribbon:RibbonButton Click="OpenInitialSettingsWindow_Click" Label="Настройки"/>
                 </ribbon:RibbonGroup>
                 <ribbon:RibbonGroup Header="Координаты, м">
                     <StackPanel Margin="3">
@@ -151,7 +151,7 @@
                 </ribbon:RibbonGroup>
 
                 <ribbon:RibbonGroup Header="Параметры">
-                    <ribbon:RibbonButton Label="Параметры расчёта" Click="OpenInitialSettingsWindow_Click"/>
+                    <ribbon:RibbonButton Label="Настройки" Click="OpenInitialSettingsWindow_Click"/>
                 </ribbon:RibbonGroup>
                 <ribbon:RibbonGroup Header="Подготовка">
                     <StackPanel Margin="3">
@@ -165,7 +165,7 @@
                 </ribbon:RibbonGroup>
             </ribbon:RibbonTab>
                         <ribbon:RibbonTab x:Name="TopologyRibbonTab" Header="Топология">
-                    <ribbon:RibbonGroup Header="Исходные данные">
+                    <ribbon:RibbonGroup Header="Настройки">
                         <ribbon:RibbonButton Label="Кусты и профили" Click="TopologyInputs_Click"/>
                         <ribbon:RibbonButton Label="Точки врезки / сброса" Click="TopologyTieIns_Click" ToolTip="Координаты подключения после БУОС и среды выходных трубопроводов."/>
                         <ribbon:RibbonButton Label="Настройки" Click="TopologySettings_Click"/>

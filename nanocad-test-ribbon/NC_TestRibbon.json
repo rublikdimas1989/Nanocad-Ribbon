@@ -23,9 +23,9 @@
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
-      "intername": "NcTestInitialData",
-      "displayName": "Исходные",
-      "tooltip": "UI-оболочка InitialData (WPF). Логика — на сервере позже.",
+      "intername": "NcTestSettings",
+      "displayName": "Настройки",
+      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx, conf).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
@@ -54,8 +54,8 @@
       "style": "large"
     },
     {
-      "text": "Исходные",
-      "command": "NcTestInitialData",
+      "text": "Настройки",
+      "command": "NcTestSettings",
       "style": "large"
     },
     {

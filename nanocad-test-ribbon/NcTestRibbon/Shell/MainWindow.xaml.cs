@@ -253,7 +253,7 @@ private void OpacityTextBox_TextChanged(object sender, System.Windows.Controls.T
 
 private void OpenInitialSettingsWindow_Click(object sender, System.Windows.RoutedEventArgs e)
     {
-      var dlg = new InitialData();
+      var dlg = new SettingsWindow();
       dlg.Owner = this;
       dlg.ShowDialog();
     }

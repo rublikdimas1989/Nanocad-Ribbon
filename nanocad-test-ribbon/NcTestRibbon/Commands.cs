@@ -83,11 +83,18 @@ namespace NcTestRibbon
       OpenWpfWindow(ed: null, "NcTestWpf", () => new MainWindow());
     }
 
-    /// <summary>Opens InitialData WPF shell (UI only).</summary>
+    /// <summary>Opens Settings WPF shell (tracing + trench/road tabs).</summary>
+    [CommandMethod("NcTestSettings")]
+    public void NcTestSettings()
+    {
+      OpenWpfWindow(ed: null, "NcTestSettings", () => new SettingsWindow());
+    }
+
+    /// <summary>Alias for NcTestSettings (legacy name).</summary>
     [CommandMethod("NcTestInitialData")]
     public void NcTestInitialData()
     {
-      OpenWpfWindow(ed: null, "NcTestInitialData", () => new InitialData());
+      NcTestSettings();
     }
 
     /// <summary>
