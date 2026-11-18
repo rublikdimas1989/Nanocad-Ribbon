@@ -9,7 +9,7 @@
 | `NcTestHttp` | WinForms: URL → `HttpClient` GET (по умолчанию `https://httpbin.org/get`); ошибка — MessageBox |
 
 Сборка: `NC_TestRibbon.dll`  
-Манифест ленты: `NC_TestRibbon.json` (схема как у `NC_RibbonExecDoc.json`)
+Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
 
 ---
 
@@ -50,11 +50,13 @@ nanocad-test-ribbon/
 Что делает установщик:
 
 - копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
-- копирует `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
+- копирует **только** `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
   (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе `installer\payload\`);
+- **не** ставит панель «Рамки» / `NC_RibbonExecDoc` — при установке удаляет их DLL/JSON из LoadFile, Startup и кэш `.cfg`/`.cuix` профиля;
+- `NcBootstrap.json` с пустым `serverUrl` (локальный режим, без синхронизации ASDC, чтобы «Загрузить» снова не подтянуло «Рамки»);
 - добавляет Startup и для `NC_TestRibbon.dll`.
 
-Удаление: `installer\UNINSTALL.bat`.
+Удаление: `installer\UNINSTALL.bat` (чистит и остатки `NC_RibbonExecDoc`, если были).
 
 Альтернатива без NcBootstrap: только `.\dev-deploy.ps1` / `.\dev-deploy.ps1 -RegisterStartup`.
 
@@ -183,12 +185,12 @@ NcTestHttp
 ## 5. Лента (панель «Тест») и обновление
 
 - **Команды** регистрирует DLL (`[CommandMethod]`).
-- **Кнопки ленты** строит **NcBootstrap** по `NC_TestRibbon.json` (как у образца «Рамки»). Плагин сам UI не создаёт.
+- **Кнопки ленты** строит **NcBootstrap** по `NC_TestRibbon.json`. Плагин сам UI не создаёт. Панель «Рамки» в этот пакет **не входит**.
 
 Без ASDC:
 
 - Команды проверяются с командной строки сразу после Startup (см. выше) — этого достаточно для локального теста логики.
-- Панель «Тест» с двумя large-кнопками появится, когда JSON обработает NcBootstrap (уже установленный у вас) или когда файлы позже попадут на ASDC и пользователь нажмёт «Загрузить».
+- Панель «Тест» с двумя large-кнопками появится, когда JSON обработает NcBootstrap после `installer\INSTALL.bat`.
 
 **Обновление после пересборки:**
 
@@ -203,11 +205,11 @@ NcTestHttp
 
 ## 6. ASDC — позже
 
-Этот пакет — **только локальный стенд**. Когда понадобится серверная раздача:
+Этот пакет — **только локальный стенд** (без панели «Рамки»). Когда понадобится серверная раздача **только** `NC_TestRibbon`:
 
-1. Выложить на ASDC в набор file list nanocad: `NC_TestRibbon.dll` + `NC_TestRibbon.json`.
-2. Строка в `users_nanocad.conf` (по аналогии с `NC_RibbonExecDoc`).
-3. У пользователей с NcBootstrap — кнопка «Загрузить» подтянет панель «Тест».
+1. Выложить на ASDC в набор file list nanocad: `NC_TestRibbon.dll` + `NC_TestRibbon.json` (без `NC_RibbonExecDoc`).
+2. Строка в `users_nanocad.conf` для тестового модуля.
+3. Вернуть `serverUrl` в `NcBootstrap.json` на нужный ASDC — иначе локальный установщик намеренно не синхронизирует сервер.
 
 Иконки уже внутри DLL (`NC_ICONS.hello.ico`, `NC_ICONS.http.ico`); bootstrap извлекает их сам.
 

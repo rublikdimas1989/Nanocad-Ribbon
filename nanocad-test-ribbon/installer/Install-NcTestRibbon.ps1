@@ -217,8 +217,33 @@ New-Item -ItemType Directory -Force -Path $iconsDest | Out-Null
 Copy-Item $loadIconSrc (Join-Path $iconsDest 'load_chart.ico') -Force
 Write-Host "Copied NcBootstrap to: $dest"
 
-# --- NC_TestRibbon into LoadFile ---
+# --- LoadFile: keep only NC_TestRibbon (strip Ramki / NC_RibbonExecDoc) ---
 New-Item -ItemType Directory -Force -Path $syncFolder | Out-Null
+
+$ramkiNames = @(
+    'NC_RibbonExecDoc.dll',
+    'NC_RibbonExecDoc.json',
+    'NC_RibbonExecDoc.pdb',
+    'NC_Ribbon_Exec_Help.pdf',
+    'RibbonExecDoc.dll',
+    'RibbonExecDoc.json'
+)
+foreach ($name in $ramkiNames) {
+    $p = Join-Path $syncFolder $name
+    if (Test-Path $p) {
+        Remove-Item $p -Force
+        Write-Host "Removed leftover: $p"
+    }
+}
+
+# Never deploy NC_RibbonExecDoc even if present next to the installer.
+foreach ($name in @('NC_RibbonExecDoc.dll', 'NC_RibbonExecDoc.json')) {
+    $accidental = Join-Path $src $name
+    if (Test-Path $accidental) {
+        Write-Host "Skipping (not installing): $accidental"
+    }
+}
+
 $ribbonDllDest = Join-Path $syncFolder 'NC_TestRibbon.dll'
 $ribbonJsonDest = Join-Path $syncFolder 'NC_TestRibbon.json'
 Copy-Item $ribbon.Dll $ribbonDllDest -Force
@@ -248,8 +273,44 @@ foreach ($profile in $profiles) {
 
     Remove-MatchingStartupSections -CfgIni $profile.CfgIni -Patterns @(
         'ASDC\\NcBootstrap',
-        'NC_TestRibbon\.dll'
+        'NC_TestRibbon\.dll',
+        'NC_RibbonExecDoc\.dll',
+        'RibbonExecDoc\.dll'
     )
+
+    $masterCfg = Join-Path $profile.ConfigDir 'nanoCAD.cfg'
+    if (Test-Path $masterCfg) {
+        $kept = [IO.File]::ReadAllLines($masterCfg) | Where-Object {
+            $_ -notmatch 'NC_RibbonExecDoc\.cfg"' -and
+            $_ -notmatch 'RibbonExecDoc\.cfg"'
+        }
+        [IO.File]::WriteAllLines(
+            $masterCfg,
+            $kept,
+            (New-Object System.Text.UTF8Encoding($true))
+        )
+    }
+
+    foreach ($f in @(
+        'NC_RibbonExecDoc.cfg', 'NC_RibbonExecDoc.cuix',
+        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix',
+        'NC_Tools.cfg', 'NC_Tools.cuix'
+    )) {
+        $p = Join-Path $profile.ConfigDir $f
+        if (Test-Path $p) {
+            Remove-Item $p -Force
+            Write-Host ("Removed profile UI cache: " + $f)
+        }
+    }
+
+    $serverIcons = Join-Path $profile.ConfigDir 'server-icons'
+    if (Test-Path $serverIcons) {
+        Get-ChildItem $serverIcons -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -match '(?i)(number_list|export_pdf|delete_temp_sheets|RibbonExec|Ramki)'
+            } |
+            ForEach-Object { Remove-Item $_.FullName -Force }
+    }
 
     $addedBootstrap = Add-ManagedStartup -CfgIni $profile.CfgIni -DllPath $bootstrapDll
     if ($addedBootstrap) {
@@ -270,8 +331,9 @@ foreach ($profile in $profiles) {
 
 Write-Host ''
 Write-Host 'Install complete.'
+Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
+Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
 Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp'
-Write-Host 'Ribbon tab "Test" is built by NcBootstrap from NC_TestRibbon.json.'
 Write-Host ''
 Write-Host 'After reinstalling nanoCAD:'
 Write-Host '1. Start nanoCAD once, then close it (creates Config\Cfg.ini).'

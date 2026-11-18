@@ -105,13 +105,18 @@ foreach ($profile in $profiles) {
 
     Remove-MatchingStartupSections -CfgIni $profile.CfgIni -Patterns @(
         'ASDC\\NcBootstrap',
-        'NC_TestRibbon\.dll'
+        'NC_TestRibbon\.dll',
+        'NC_RibbonExecDoc\.dll',
+        'RibbonExecDoc\.dll'
     )
 
     if (Test-Path $profile.MasterCfg) {
         $kept = [IO.File]::ReadAllLines($profile.MasterCfg) | Where-Object {
             $_ -notmatch 'NcBootstrap\.cfg"' -and
-            $_ -notmatch 'NC_TestRibbon\.cfg"'
+            $_ -notmatch 'NC_TestRibbon\.cfg"' -and
+            $_ -notmatch 'NC_RibbonExecDoc\.cfg"' -and
+            $_ -notmatch 'RibbonExecDoc\.cfg"' -and
+            $_ -notmatch 'NC_Tools\.cfg"'
         }
 
         [IO.File]::WriteAllLines(
@@ -123,7 +128,10 @@ foreach ($profile in $profiles) {
 
     foreach ($f in @(
         'NcBootstrap.cfg', 'NcBootstrap.cuix',
-        'NC_TestRibbon.cfg', 'NC_TestRibbon.cuix'
+        'NC_TestRibbon.cfg', 'NC_TestRibbon.cuix',
+        'NC_RibbonExecDoc.cfg', 'NC_RibbonExecDoc.cuix',
+        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix',
+        'NC_Tools.cfg', 'NC_Tools.cuix'
     )) {
         $p = Join-Path $profile.ConfigDir $f
         if (Test-Path $p) {
@@ -139,7 +147,12 @@ if (Test-Path $dest) {
     Write-Host "Removed: $dest"
 }
 
-foreach ($name in @('NC_TestRibbon.dll', 'NC_TestRibbon.json')) {
+foreach ($name in @(
+    'NC_TestRibbon.dll', 'NC_TestRibbon.json',
+    'NC_RibbonExecDoc.dll', 'NC_RibbonExecDoc.json', 'NC_RibbonExecDoc.pdb',
+    'NC_Ribbon_Exec_Help.pdf',
+    'RibbonExecDoc.dll', 'RibbonExecDoc.json'
+)) {
     $p = Join-Path $syncFolder $name
     if (Test-Path $p) {
         Remove-Item $p -Force
