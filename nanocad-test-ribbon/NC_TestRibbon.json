@@ -1,0 +1,31 @@
+{
+  "panel": "Тест",
+  "commands": [
+    {
+      "intername": "NcTestHello",
+      "displayName": "Hello",
+      "tooltip": "Тестовая кнопка 1: показать сообщение «Тест 1: Hello»",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.hello.ico"
+    },
+    {
+      "intername": "NcTestHttp",
+      "displayName": "HTTP GET",
+      "tooltip": "Тестовая кнопка 2: HTTP GET к публичному URL, результат в диалоге",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
+    }
+  ],
+  "buttons": [
+    {
+      "text": "Hello",
+      "command": "NcTestHello",
+      "style": "large"
+    },
+    {
+      "text": "HTTP GET",
+      "command": "NcTestHttp",
+      "style": "large"
+    }
+  ]
+}

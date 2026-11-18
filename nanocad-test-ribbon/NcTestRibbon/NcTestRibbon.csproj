@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- nanoCAD 24 x64 работает на .NET 6, поэтому строго net6.0-windows -->
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>10</LangVersion>
+    <AssemblyName>NC_TestRibbon</AssemblyName>
+    <RootNamespace>NcTestRibbon</RootNamespace>
+    <!--
+      Каталог nanoCAD SDK на машине сборки (hostmgd/hostdbmgd).
+      Переопределите при сборке, например:
+        dotnet build -c Release -p:NcSdkDir="C:\Path\To\NC_SDK_RU_24.0...\"
+      или правьте значение ниже.
+    -->
+    <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\NC_SDK_RU_24.0\</NcSdkDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="hostdbmgd">
+      <HintPath>$(NcSdkDir)include-x64\hostdbmgd.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="hostmgd">
+      <HintPath>$(NcSdkDir)include-x64\hostmgd.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Иконки встраиваются в NC_TestRibbon.dll с LogicalName NC_ICONS.*.
+         NcBootstrap извлекает их из DLL после синхронизации. -->
+    <EmbeddedResource Include="icons\*.ico">
+      <LogicalName>NC_ICONS.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
