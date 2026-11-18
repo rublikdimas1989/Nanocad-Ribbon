@@ -249,7 +249,7 @@ function Resolve-TestRibbonFiles {
     return $null
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestInitialData')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestInitialData', 'NcTestPadOpt')
 
 if (Get-Process nCad -ErrorAction SilentlyContinue) {
     throw 'nanoCAD is running. Close all nanoCAD windows and retry.'
@@ -429,7 +429,7 @@ Write-Host ''
 Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
-Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf'
+Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestInitialData / NcTestPadOpt'
 Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
 Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''

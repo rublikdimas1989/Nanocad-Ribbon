@@ -7,12 +7,17 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
-    <Version>1.2.2</Version>
-    <AssemblyVersion>1.2.2.0</AssemblyVersion>
-    <FileVersion>1.2.2.0</FileVersion>
-    <InformationalVersion>1.2.2+ShellHandlersFix</InformationalVersion>
+    <!-- Product / File version for packages. Keep AssemblyVersion stable:
+         CAD NETLOAD + WPF pack URIs break when AssemblyVersion changes
+         (lookup becomes /NC_TestRibbon;V1.x.y.z;component/...). -->
+    <Version>1.2.3</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.2.3.0</FileVersion>
+    <InformationalVersion>1.2.3+PadOptShell</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
+    <!-- Force correct Page paths (case-sensitive pack URI component/Shell/...). -->
+    <EnableDefaultPageItems>true</EnableDefaultPageItems>
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
 
@@ -36,6 +41,26 @@
     <EmbeddedResource Include="icons\*.ico">
       <LogicalName>NC_ICONS.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Explicit Shell Page items: preserve Shell/PascalCase in BAML pack URIs. -->
+  <ItemGroup>
+    <Page Update="Shell\MainWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Shell\InitialData.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Shell\ProfileControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Shell\RatesPanel.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
 
   <ItemGroup>

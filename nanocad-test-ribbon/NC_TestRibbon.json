@@ -28,6 +28,13 @@
       "tooltip": "UI-оболочка InitialData (WPF). Логика — на сервере позже.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestPadOpt",
+      "displayName": "Кустовые площадки",
+      "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
     }
   ],
   "buttons": [
@@ -49,6 +56,11 @@
     {
       "text": "Исходные",
       "command": "NcTestInitialData",
+      "style": "large"
+    },
+    {
+      "text": "Кустовые площадки",
+      "command": "NcTestPadOpt",
       "style": "large"
     }
   ]

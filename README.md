@@ -4,13 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.2.zip`](nanocad-test-ribbon-v1.2.2.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.2.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.3.zip`](nanocad-test-ribbon-v1.2.3.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.3.zip
 - Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
 
 Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Что внутри (v1.2.2)
+## Что внутри (v1.2.3)
 
 UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
 
@@ -18,6 +18,7 @@ UI-оболочки из End-варианта (WPF), **без** Topology/PipeCal
 |---------|------|
 | `NcTestWpf` | `MainWindow` — «Трассировка трубопровода» |
 | `NcTestInitialData` | `InitialData` — «Исходные данные» |
+| `NcTestPadOpt` | «Оптимизация кустовых площадок» (TopologyInputs/Pad) |
 | `NcTestHello` / `NcTestHttp` | прежние тесты |
 | `NcTestDemo` | маленький WinForms smoke |
 
@@ -35,4 +36,4 @@ cd ..\installer
 .\VERIFY.bat
 ```
 
-nanoCAD: `NcTestWpf` или `NcTestInitialData`.
+nanoCAD: `NcTestWpf` / `NcTestInitialData` / `NcTestPadOpt` (лента «Кустовые площадки»).

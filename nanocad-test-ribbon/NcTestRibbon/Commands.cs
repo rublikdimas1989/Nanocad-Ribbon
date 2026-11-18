@@ -90,6 +90,16 @@ namespace NcTestRibbon
       OpenWpfWindow(ed: null, "NcTestInitialData", () => new InitialData());
     }
 
+    /// <summary>
+    /// Opens pad-optimization shell (TopologyInputsWindow / TopologyPadWindow UI).
+    /// Code-built WPF — no XAML pack URI.
+    /// </summary>
+    [CommandMethod("NcTestPadOpt")]
+    public void NcTestPadOpt()
+    {
+      OpenWpfWindow(ed: null, "NcTestPadOpt", () => new PadOptimizationWindow());
+    }
+
     /// <summary>Small WinForms smoke dialog (fallback).</summary>
     [CommandMethod("NcTestDemo")]
     public void NcTestDemo()
