@@ -8,6 +8,9 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
+    <!-- WinForms: HttpTestForm; WPF: DemoWindow (NcTestWpf) -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <!--
       Каталог nanoCAD SDK на машине сборки (hostmgd/hostdbmgd).
       Переопределите при сборке, например:
@@ -16,10 +19,6 @@
     -->
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\NC_SDK_RU_24.0\</NcSdkDir>
   </PropertyGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
-  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="hostdbmgd">

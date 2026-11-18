@@ -69,4 +69,4 @@ if ($RegisterStartup) {
     }
 }
 
-Write-Host 'Done. Start nanoCAD and run: NcTestHello / NcTestHttp'
+Write-Host 'Done. Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf'

@@ -14,6 +14,13 @@
       "tooltip": "Тестовая кнопка 2: HTTP GET к публичному URL, результат в диалоге",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestWpf",
+      "displayName": "WPF",
+      "tooltip": "Тестовая кнопка 3: открыть отдельное WPF-окно (Show / modeless)",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
     }
   ],
   "buttons": [
@@ -25,6 +32,11 @@
     {
       "text": "HTTP GET",
       "command": "NcTestHttp",
+      "style": "large"
+    },
+    {
+      "text": "WPF",
+      "command": "NcTestWpf",
       "style": "large"
     }
   ]

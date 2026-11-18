@@ -13,6 +13,9 @@ namespace NcTestRibbon
   {
     private const string DefaultHttpUrl = "https://httpbin.org/get";
 
+    // Keep a strong reference so a modeless WPF window is not GC'd.
+    private static DemoWindow _wpfWindow;
+
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
     {
@@ -62,6 +65,29 @@ namespace NcTestRibbon
             MessageBoxIcon.Warning);
         }
       }
+    }
+
+    /// <summary>
+    /// Opens a simple WPF window with Window.Show() (modeless).
+    /// nanoCAD stays interactive while the window is open.
+    /// </summary>
+    [CommandMethod("NcTestWpf")]
+    public void NcTestWpf()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+
+      if (_wpfWindow != null && _wpfWindow.IsLoaded)
+      {
+        _wpfWindow.Activate();
+        ed?.WriteMessage("\nNcTestWpf: окно уже открыто (Show / modeless).");
+        return;
+      }
+
+      _wpfWindow = new DemoWindow();
+      _wpfWindow.Closed += (_, __) => { _wpfWindow = null; };
+      _wpfWindow.Show();
+      ed?.WriteMessage("\nNcTestWpf: открыто WPF-окно (Show / modeless).");
     }
 
     private static string FetchUrl(string url)

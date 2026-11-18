@@ -1,12 +1,13 @@
 # NcTestRibbon — тестовая лента nanoCAD (локально, без ASDC)
 
-Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: две команды и манифест панели «Тест».
+Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» (Editor + диалог) |
 | `NcTestHttp` | WinForms: URL → `HttpClient` GET (по умолчанию `https://httpbin.org/get`); ошибка — MessageBox |
+| `NcTestWpf` | WPF: отдельное окно (`Window.Show()` — **modeless**, nanoCAD остаётся доступным) |
 
 Сборка: `NC_TestRibbon.dll`  
 Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
@@ -29,9 +30,11 @@ nanocad-test-ribbon/
     NcTestRibbon.sln
     NcTestRibbon.csproj
     Plugin.cs                 ← IExtensionApplication
-    Commands.cs               ← NcTestHello / NcTestHttp
+    Commands.cs               ← NcTestHello / NcTestHttp / NcTestWpf
+    DemoWindow.xaml(+.cs)     ← простое WPF-окно (Show / modeless)
     icons/hello.ico
-    icons/http.ico            ← embedded как NC_ICONS.*
+    icons/http.ico
+    icons/wpf.ico             ← embedded как NC_ICONS.*
 ```
 
 ---
@@ -178,6 +181,12 @@ NcTestHttp
 
 Ожидание: окно с URL → GET → диалог с фрагментом ответа (или MessageBox при ошибке сети/URL).
 
+```
+NcTestWpf
+```
+
+Ожидание: отдельное WPF-окно «Демо-окно WPF» (кнопка OK / Закрыть). Открыто через `Show()` (**modeless**): можно продолжать работу в nanoCAD, пока окно открыто. Повторный вызов активирует уже открытое окно.
+
 Если команда «неизвестна» — DLL не загрузилась: проверьте Startup, путь, что сборка `net6.0-windows`, что nanoCAD 24 x64.
 
 ---
@@ -190,7 +199,7 @@ NcTestHttp
 Без ASDC:
 
 - Команды проверяются с командной строки сразу после Startup (см. выше) — этого достаточно для локального теста логики.
-- Панель «Тест» с двумя large-кнопками появится, когда JSON обработает NcBootstrap после `installer\INSTALL.bat`.
+- Панель «Тест» с тремя large-кнопками (Hello / HTTP GET / WPF) появится, когда JSON обработает NcBootstrap после `installer\INSTALL.bat`.
 
 **Обновление после пересборки:**
 
@@ -211,7 +220,7 @@ NcTestHttp
 2. Строка в `users_nanocad.conf` для тестового модуля.
 3. Вернуть `serverUrl` в `NcBootstrap.json` на нужный ASDC — иначе локальный установщик намеренно не синхронизирует сервер.
 
-Иконки уже внутри DLL (`NC_ICONS.hello.ico`, `NC_ICONS.http.ico`); bootstrap извлекает их сам.
+Иконки уже внутри DLL (`NC_ICONS.hello.ico`, `NC_ICONS.http.ico`, `NC_ICONS.wpf.ico`); bootstrap извлекает их сам.
 
 ---
 
@@ -220,7 +229,7 @@ NcTestHttp
 | Что | Зачем |
 |-----|--------|
 | `net6.0-windows` | runtime nanoCAD 24 |
-| `Microsoft.WindowsDesktop.App` | WinForms |
+| `UseWindowsForms` / `UseWPF` | WinForms (`NcTestHttp`) и WPF (`NcTestWpf`) |
 | `hostmgd` / `hostdbmgd` | Document, Editor, `[CommandMethod]`, `IExtensionApplication` |
 
 См. также: `docs/nanocad-ribbon-reference.md` — архитектура образца RibbonExecDoc.

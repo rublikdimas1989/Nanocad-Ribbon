@@ -1,6 +1,6 @@
 # Nanocad-Ribbon
 
-Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows): две команды (`NcTestHello`, `NcTestHttp`) и манифест панели «Тест». Сервер ASDC для локальной проверки **не нужен**.
+Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows): три команды (`NcTestHello`, `NcTestHttp`, `NcTestWpf`) и манифест панели «Тест». Сервер ASDC для локальной проверки **не нужен**.
 
 ## Содержимое репозитория
 
@@ -39,4 +39,4 @@ nanocad-test-ribbon\installer\INSTALL.bat
 
 Быстрый деплой без bootstrap: `nanocad-test-ribbon\dev-deploy.ps1` (опция `-RegisterStartup`).
 
-После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp`.
+После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp` / `NcTestWpf` (WPF-окно через `Show()` — modeless).
