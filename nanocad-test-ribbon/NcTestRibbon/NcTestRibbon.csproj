@@ -8,9 +8,8 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
-    <!-- WinForms: HttpTestForm; WPF: DemoWindow (NcTestWpf) -->
+    <!-- WinForms only: HttpTestForm + DemoForm (NcTestWpf). No WPF. -->
     <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>true</UseWPF>
     <!--
       Каталог nanoCAD SDK на машине сборки (hostmgd/hostdbmgd).
       Переопределите при сборке, например:

@@ -39,4 +39,4 @@ nanocad-test-ribbon\installer\INSTALL.bat
 
 Быстрый деплой без bootstrap: `nanocad-test-ribbon\dev-deploy.ps1` (опция `-RegisterStartup`).
 
-После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp` / `NcTestWpf` (WPF-окно через `Show()` — modeless).
+После запуска nanoCAD: команды `NcTestHello` / `NcTestHttp` / `NcTestWpf` (WinForms-окно через `Form.Show()` — modeless; лента «Окно»). WPF не используется.

@@ -17,8 +17,8 @@
     },
     {
       "intername": "NcTestWpf",
-      "displayName": "WPF",
-      "tooltip": "Тестовая кнопка 3: открыть отдельное WPF-окно (Show / modeless)",
+      "displayName": "Окно",
+      "tooltip": "Тестовая кнопка 3: открыть отдельное WinForms-окно (Show / modeless). Команда NcTestWpf.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     }
@@ -35,7 +35,7 @@
       "style": "large"
     },
     {
-      "text": "WPF",
+      "text": "Окно",
       "command": "NcTestWpf",
       "style": "large"
     }

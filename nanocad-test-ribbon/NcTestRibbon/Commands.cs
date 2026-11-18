@@ -13,8 +13,9 @@ namespace NcTestRibbon
   {
     private const string DefaultHttpUrl = "https://httpbin.org/get";
 
-    // Keep a strong reference so a modeless WPF window is not GC'd.
-    private static DemoWindow _wpfWindow;
+    // Strong reference so a modeless WinForms window is not GC'd.
+    // Command name NcTestWpf is kept for ribbon/compat; UI is WinForms (not WPF).
+    private static DemoForm _demoWindow;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -68,8 +69,8 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Opens a simple WPF window with Window.Show() (modeless).
-    /// nanoCAD stays interactive while the window is open.
+    /// Opens a simple WinForms window with Form.Show() (modeless).
+    /// Command name remains NcTestWpf for ribbon compatibility; UI is not WPF.
     /// </summary>
     [CommandMethod("NcTestWpf")]
     public void NcTestWpf()
@@ -77,17 +78,42 @@ namespace NcTestRibbon
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
 
-      if (_wpfWindow != null && _wpfWindow.IsLoaded)
+      try
       {
-        _wpfWindow.Activate();
-        ed?.WriteMessage("\nNcTestWpf: окно уже открыто (Show / modeless).");
-        return;
-      }
+        if (_demoWindow != null && !_demoWindow.IsDisposed && _demoWindow.Visible)
+        {
+          if (_demoWindow.WindowState == FormWindowState.Minimized)
+          {
+            _demoWindow.WindowState = FormWindowState.Normal;
+          }
 
-      _wpfWindow = new DemoWindow();
-      _wpfWindow.Closed += (_, __) => { _wpfWindow = null; };
-      _wpfWindow.Show();
-      ed?.WriteMessage("\nNcTestWpf: открыто WPF-окно (Show / modeless).");
+          _demoWindow.BringToFront();
+          _demoWindow.Activate();
+          ed?.WriteMessage("\nNcTestWpf: окно уже открыто (WinForms Show / modeless).");
+          return;
+        }
+
+        _demoWindow = new DemoForm();
+        _demoWindow.FormClosed += (_, __) => { _demoWindow = null; };
+        _demoWindow.Show();
+        _demoWindow.BringToFront();
+        _demoWindow.Activate();
+        ed?.WriteMessage("\nNcTestWpf: открыто WinForms-окно (Show / modeless).");
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nNcTestWpf: ошибка — " + ex.GetType().Name + ": " + ex.Message);
+        if (ex.InnerException != null)
+        {
+          ed?.WriteMessage("\n  inner: " + ex.InnerException.Message);
+        }
+
+        MessageBox.Show(
+          "NcTestWpf failed.\n\n" + ex.GetType().Name + ": " + ex.Message,
+          "NcTestWpf",
+          MessageBoxButtons.OK,
+          MessageBoxIcon.Warning);
+      }
     }
 
     private static string FetchUrl(string url)
@@ -108,6 +134,56 @@ namespace NcTestRibbon
       }
 
       return value.Substring(0, maxLen) + "\n…";
+    }
+  }
+
+  /// <summary>
+  /// Simple modeless demo UI (WinForms — same stack as NcTestHttp).
+  /// </summary>
+  internal sealed class DemoForm : Form
+  {
+    public DemoForm()
+    {
+      Text = "NcTestWpf — демо окно";
+      StartPosition = FormStartPosition.CenterScreen;
+      FormBorderStyle = FormBorderStyle.FixedDialog;
+      MaximizeBox = false;
+      MinimizeBox = true;
+      ShowInTaskbar = true;
+      ClientSize = new System.Drawing.Size(420, 160);
+
+      Label title = new Label
+      {
+        AutoSize = false,
+        Font = new System.Drawing.Font(Font.FontFamily, 12f, System.Drawing.FontStyle.Bold),
+        Text = "Демо-окно (WinForms)",
+        Location = new System.Drawing.Point(16, 16),
+        Size = new System.Drawing.Size(388, 28)
+      };
+
+      Label body = new Label
+      {
+        AutoSize = false,
+        Text = "Отдельная форма плагина nanoCAD.\n"
+          + "Команда NcTestWpf открывает это окно через Form.Show()\n"
+          + "(modeless — nanoCAD остаётся доступным).",
+        Location = new System.Drawing.Point(16, 52),
+        Size = new System.Drawing.Size(388, 60)
+      };
+
+      Button closeButton = new Button
+      {
+        Text = "OK / Закрыть",
+        Location = new System.Drawing.Point(284, 120),
+        Width = 120,
+        Height = 28
+      };
+      closeButton.Click += (_, __) => Close();
+      AcceptButton = closeButton;
+
+      Controls.Add(title);
+      Controls.Add(body);
+      Controls.Add(closeButton);
     }
   }
 
