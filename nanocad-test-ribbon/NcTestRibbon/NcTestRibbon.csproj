@@ -7,16 +7,14 @@
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
-    <!-- Product / File version for packages. Keep AssemblyVersion stable:
-         CAD NETLOAD + WPF pack URIs break when AssemblyVersion changes
-         (lookup becomes /NC_TestRibbon;V1.x.y.z;component/...). -->
-    <Version>1.2.4</Version>
+    <!-- Product / File version for packages. Keep AssemblyVersion stable for any
+         remaining Page/BAML shells (MainWindow). Settings is code-built. -->
+    <Version>1.2.5</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.4.0</FileVersion>
-    <InformationalVersion>1.2.4+SettingsTabs</InformationalVersion>
+    <FileVersion>1.2.5.0</FileVersion>
+    <InformationalVersion>1.2.5+SettingsCodeBuilt</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
-    <!-- Force correct Page paths (case-sensitive pack URI component/Shell/...). -->
     <EnableDefaultPageItems>true</EnableDefaultPageItems>
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
@@ -41,19 +39,24 @@
     <EmbeddedResource Include="icons\*.ico">
       <LogicalName>NC_ICONS.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+    <!-- Loose XAML for Settings tracing tab — XamlReader, no pack/BAML URI. -->
+    <EmbeddedResource Include="Shell\TracingSettingsPanel.xaml">
+      <LogicalName>NcTestRibbon.Shell.Xaml.TracingSettingsPanel.xaml</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
-  <!-- Explicit Shell Page items: preserve Shell/PascalCase in BAML pack URIs. -->
+  <ItemGroup>
+    <!-- Do not compile Settings/TracingSettings as Page (pack URI breaks under NETLOAD). -->
+    <Page Remove="Shell\SettingsWindow.xaml" />
+    <Page Remove="Shell\TracingSettingsPanel.xaml" />
+    <None Remove="Shell\SettingsWindow.xaml" />
+    <ApplicationDefinition Remove="Shell\SettingsWindow.xaml" />
+    <ApplicationDefinition Remove="Shell\TracingSettingsPanel.xaml" />
+  </ItemGroup>
+
+  <!-- Remaining Page shells (MainWindow still uses BAML). -->
   <ItemGroup>
     <Page Update="Shell\MainWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Update="Shell\SettingsWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Update="Shell\TracingSettingsPanel.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

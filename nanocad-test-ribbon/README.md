@@ -3,14 +3,14 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.4**): `nanocad-test-ribbon-v1.2.4.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.4.zip  
+Актуальный zip с GitHub (версия **1.2.5**): `nanocad-test-ribbon-v1.2.5.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.5.zip  
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.4**, распакуйте в **новую** папку.
+1. Скачайте **v1.2.5**, распакуйте в **новую** папку.
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
 4. nanoCAD: `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -262,3 +262,7 @@ Pad-окно (`NcTestPadOpt`) собрано в коде без XAML.
 ## Tracing_cache
 
 `%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`. Создаётся при открытии «Настройки».
+
+## Settings without pack URI
+
+`SettingsWindow` is code-built. Tracing tab XAML is an **EmbeddedResource** loaded via `XamlReader` (no `/NC_TestRibbon;V…;component/shell/settingswindow.xaml`).

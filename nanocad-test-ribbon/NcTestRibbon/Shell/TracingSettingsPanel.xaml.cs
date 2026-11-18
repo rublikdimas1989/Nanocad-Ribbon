@@ -3,19 +3,60 @@ namespace NcTestRibbon.Shell
   using System.Windows;
   using System.Windows.Controls;
 
-  /// <summary>Former InitialData content — tab «Настройки трассировки».</summary>
-  public partial class TracingSettingsPanel : UserControl
+  /// <summary>
+  /// Former InitialData content — tab «Настройки трассировки».
+  /// UI loaded from embedded XAML (no Page/BAML pack URI).
+  /// </summary>
+  public class TracingSettingsPanel : UserControl
   {
+    private readonly FrameworkElement _root;
+    private readonly TextBlock _statusText;
+    private readonly TextBlock _ratesPath;
+
     public TracingSettingsPanel()
     {
-      InitializeComponent();
-      try
+      _root = ShellXaml.Load(ShellXaml.TracingSettingsResource);
+      Content = _root;
+
+      _statusText = ShellXaml.Find<TextBlock>(_root, "StatusText");
+      _ratesPath = ShellXaml.Find<TextBlock>(_root, "TxtRatesFilePath");
+
+      if (_statusText != null)
       {
-        StatusText.Text = "UI-оболочка. Расчёт на сервере — позже.";
-        TxtRatesFilePath.Text = TracingCache.PriceXlsx;
+        _statusText.Text = "UI-оболочка. Расчёт на сервере — позже.";
       }
-      catch
+
+      if (_ratesPath != null)
       {
+        _ratesPath.Text = TracingCache.PriceXlsx;
+      }
+
+      Wire(ShellXaml.Find<ComboBox>(_root, "DownsampleFactor"), DownsampleFactor_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbEnvironment"), PipeParameter_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbDiameter"), CmbDiameter_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbThickness"), PipeParameter_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbSteelGrade"), PipeParameter_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbPipeType"), PipeParameter_SelectionChanged);
+      Wire(ShellXaml.Find<ComboBox>(_root, "CmbAdditionalMedium"), AdditionalMedium_SelectionChanged);
+
+      TextBox patRadius = ShellXaml.Find<TextBox>(_root, "TxtPatNaturalRadius");
+      if (patRadius != null)
+      {
+        patRadius.TextChanged += PatRadius_TextChanged;
+      }
+
+      Button applyRates = ShellXaml.Find<Button>(_root, "BtnLoadRates");
+      if (applyRates != null)
+      {
+        applyRates.Click += BtnLoadRates_Click;
+      }
+    }
+
+    private static void Wire(ComboBox combo, SelectionChangedEventHandler handler)
+    {
+      if (combo != null)
+      {
+        combo.SelectionChanged += handler;
       }
     }
 

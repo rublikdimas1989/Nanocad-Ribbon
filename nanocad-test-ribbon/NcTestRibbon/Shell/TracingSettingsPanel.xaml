@@ -1,10 +1,5 @@
-﻿<UserControl x:Class="NcTestRibbon.Shell.TracingSettingsPanel"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:local="clr-namespace:NcTestRibbon.Shell"
-             mc:Ignorable="d">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Grid Margin="10">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="250" />
@@ -28,7 +23,7 @@
                     <TextBlock Text="Макс. итераций:" Margin="0,5,0,2"/>
                     <TextBox x:Name="MaxIter" Text="50000000" Margin="0,0,0,8"/>
                     <TextBlock Text="Коэфф. уменьшения:" Margin="0,5,0,2"/>
-                    <ComboBox x:Name="DownsampleFactor" Margin="0,0,0,12" SelectionChanged="DownsampleFactor_SelectionChanged">
+                    <ComboBox x:Name="DownsampleFactor" Margin="0,0,0,12">
                         <ComboBoxItem Content="1 (без уменьшения)" Tag="1" IsSelected="True"/>
                         <ComboBoxItem Content="2 (×4 ускорение)" Tag="2"/>
                         <ComboBoxItem Content="4 (×16 ускорение)" Tag="4"/>
@@ -122,14 +117,14 @@
                     <GroupBox Grid.Column="1" Header="🔧 Параметры трубопровода" Margin="5">
                         <StackPanel>
                             <TextBlock Text="Среда:" Margin="0,2"/>
-                            <ComboBox x:Name="CmbEnvironment" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                            <ComboBox x:Name="CmbEnvironment" Margin="0,0,0,8">
                                 <ComboBoxItem Content="Газопровод" IsSelected="True"/>
                                 <ComboBoxItem Content="Нефтепровод"/>
                                 <ComboBoxItem Content="Водовод"/>
                             </ComboBox>
 
                             <TextBlock Text="Диаметр трубы (мм):" Margin="0,2"/>
-                            <ComboBox x:Name="CmbDiameter" Margin="0,0,0,8" SelectionChanged="CmbDiameter_SelectionChanged">
+                            <ComboBox x:Name="CmbDiameter" Margin="0,0,0,8">
                                 <ComboBoxItem Content="57"/>
                                 <ComboBoxItem Content="89"/>
                                 <ComboBoxItem Content="114"/>
@@ -149,7 +144,7 @@
                             <TextBox IsReadOnly="True" x:Name="TxtCasingDiameter" Text="820" Margin="0,0,0,8"/>
 
                             <TextBlock Text="Толщина стенки (мм):" Margin="0,2"/>
-                            <ComboBox x:Name="CmbThickness" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                            <ComboBox x:Name="CmbThickness" Margin="0,0,0,8">
                                 <ComboBoxItem Content="8"/>
                                 <ComboBoxItem Content="9"/>
                                 <ComboBoxItem Content="10"/>
@@ -167,13 +162,13 @@
                             </ComboBox>
 
                             <TextBlock Text="Марка / материал:" Margin="0,2"/>
-                            <ComboBox x:Name="CmbSteelGrade" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                            <ComboBox x:Name="CmbSteelGrade" Margin="0,0,0,8">
                                 <ComboBoxItem Content="09Г2С" IsSelected="True"/>
                                 <ComboBoxItem Content="13ХФА"/>
                             </ComboBox>
 
                             <TextBlock Text="Тип трубы:" Margin="0,2"/>
-                            <ComboBox x:Name="CmbPipeType" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                            <ComboBox x:Name="CmbPipeType" Margin="0,0,0,8">
                                 <ComboBoxItem Content="Бесшовная горячедеформированная" IsSelected="True"/>
                                 <ComboBoxItem Content="Электросварная прямошовная"/>
                             </ComboBox>
@@ -185,7 +180,7 @@
                             <TextBlock Text="Шероховатость ПАТ (мм):" Margin="0,2"/>
                             <TextBox x:Name="TxtPatRoughness" Text="0,005" Margin="0,0,0,8"/>
                             <TextBlock Text="Радиус естественного изгиба ПАТ (м):" Margin="0,2"/>
-                            <TextBox x:Name="TxtPatNaturalRadius" Text="3" Margin="0,0,0,8" TextChanged="PatRadius_TextChanged"/>
+                            <TextBox x:Name="TxtPatNaturalRadius" Text="3" Margin="0,0,0,8"/>
                             <TextBlock Text="Мин. радиус естеств. изгиба в плане (м):" Margin="0,2"/>
                             <TextBox IsReadOnly="True" x:Name="TxtMinRadius" Text="300.0" Margin="0,0,0,8"
                                      ToolTip="Минимальный радиус поворота трассы в плане. Не относится к продольному профилю."/>
@@ -271,7 +266,7 @@
                     <GroupBox Grid.Column="2" Header="Дополнительно" Margin="5">
                         <StackPanel>
                             <TextBlock Text="Настройки для среды:" FontWeight="Bold"/>
-                            <ComboBox x:Name="CmbAdditionalMedium" SelectionChanged="AdditionalMedium_SelectionChanged" Margin="0,5,0,6">
+                            <ComboBox x:Name="CmbAdditionalMedium" Margin="0,5,0,6">
                                 <ComboBoxItem Content="Газ" Tag="gas"/>
                                 <ComboBoxItem Content="Нефть" Tag="oil"/>
                                 <ComboBoxItem Content="Жидкость" Tag="liquid"/>
@@ -445,7 +440,7 @@
                             <Separator Margin="0,10"/>
 
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                <Button x:Name="BtnLoadRates" Content="Применить расценки" Click="BtnLoadRates_Click" Padding="8,4"/>
+                                <Button x:Name="BtnLoadRates" Content="Применить расценки" Padding="8,4"/>
                             </StackPanel>
                             <TextBlock Text="Файл расценок (фиксированный):" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,2"/>
                             <TextBlock x:Name="TxtRatesFilePath" Text="Tracing_cache\Settings\Price.xlsx" FontSize="11" Foreground="#1565C0" TextWrapping="Wrap" Margin="0,0,0,5"/>
