@@ -3,27 +3,25 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.1.2**): `nanocad-test-ribbon-v1.1.2.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.2.zip  
+Актуальный zip с GitHub (версия **1.2.0**): `nanocad-test-ribbon-v1.2.0.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.0.zip  
 
-**`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc:
-
-`C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\`
+**`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.1.2**, распакуйте в **новую** папку. Если есть `DemoWindow.xaml` / `.xaml.cs` — удалите.
-2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release` (или Rebuild в VS).
+1. Скачайте **v1.2.0**, распакуйте в **новую** папку.
+2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
-4. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
-
-Копировать `Directory.Build.props.example` больше не нужно — props уже в пакете.
+4. nanoCAD: `NcTestWpf` (MainWindow) / `NcTestInitialData` / `NcTestHello` / `NcTestHttp`
 
 | Команда | Что делает |
 |---------|------------|
-| `NcTestHello` | Сообщение «Тест 1: Hello» (Editor + диалог) |
-| `NcTestHttp` | WinForms: URL → `HttpClient` GET (по умолчанию `https://httpbin.org/get`); ошибка — MessageBox |
-| `NcTestWpf` | **WinForms** (не WPF): `DemoForm` через `Form.ShowDialog(owner)` — тот же modal-путь, что у `NcTestHttp` |
+| `NcTestHello` | Сообщение «Тест 1: Hello» |
+| `NcTestHttp` | WinForms HTTP GET |
+| `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
+| `NcTestInitialData` | **WPF-оболочка** `InitialData` |
+| `NcTestDemo` | маленький WinForms smoke |
 
 Сборка: `NC_TestRibbon.dll`  
 Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
@@ -47,13 +45,10 @@ nanocad-test-ribbon/
     NcTestRibbon.sln
     NcTestRibbon.csproj
     Plugin.cs                 ← IExtensionApplication
-    Commands.cs               ← NcTestHello / NcTestHttp / NcTestWpf (DemoForm WinForms)
+    Commands.cs               ← команды + открытие WPF shell
+    Shell/                    ← MainWindow, InitialData, ProfileControl, RatesPanel (UI only)
     Directory.Build.props     ← NcSdkDir уже задан (UTF-8 BOM)
-    Directory.Build.props.example
-    icons/hello.ico
-    icons/http.ico
-    icons/wpf.ico             ← icon for ribbon «Окно» (NC_ICONS.wpf.ico)
-    (нет DemoWindow.xaml — WPF удалён)
+    icons/*.ico
 ```
 
 ---

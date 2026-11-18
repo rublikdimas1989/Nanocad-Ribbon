@@ -1,0 +1,279 @@
+﻿<UserControl x:Class="NcTestRibbon.Shell.RatesPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:NcTestRibbon.Shell"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="400"
+             Background="#F9F9F9">
+
+	<!-- ✅ РЕСУРСЫ КОНТРОЛА -->
+	<UserControl.Resources>
+		<local:NumberFormatConverter x:Key="NumberFormatConverter"/>
+	</UserControl.Resources>
+
+	<ScrollViewer VerticalScrollBarVisibility="Auto">
+		<Grid Margin="10">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto" />
+				<!-- Row 0: Заголовок -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 1: Исходные хар-ки заголовок -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 2: PhysicalDataGrid -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 3: Инфраструктура и болота (НОВОЕ) -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 4: Разделитель -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 5: Стоимостные хар-ки заголовок -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 6: CostDataGrid -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 7: Детали переходов рек -->
+				<RowDefinition Height="Auto" />
+				<!-- Row 8: Итоговая сумма -->
+			</Grid.RowDefinitions>
+
+			<!-- Заголовок -->
+			<TextBlock Grid.Row="0" Text="📋 Характеристики трассы" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+
+			<!-- Исходные характеристики -->
+			<TextBlock Grid.Row="1" Text="📌 Исходные характеристики" FontSize="14" FontWeight="SemiBold" Margin="0,5,0,5"/>
+			<DataGrid Grid.Row="2" x:Name="PhysicalDataGrid" AutoGenerateColumns="False" 
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      BorderThickness="1" BorderBrush="LightGray"
+                      RowHeight="24" Margin="0,0,0,5">
+				<DataGrid.Columns>
+					<DataGridTextColumn Header="Наименование" Width="*" Binding="{Binding Name}" IsReadOnly="True"/>
+					<DataGridTextColumn Header="Значение" Width="*" Binding="{Binding Value}" IsReadOnly="True"/>
+				</DataGrid.Columns>
+			</DataGrid>
+
+			<!-- ✅ БЛОК "Инфраструктура и болота" -->
+			<Border Grid.Row="3"
+                    Background="#F7FBFF"
+                    BorderBrush="#B8D8EF"
+                    BorderThickness="1"
+                    CornerRadius="5"
+                    Padding="10"
+                    Margin="0,10,0,0">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="Auto"/>
+					</Grid.ColumnDefinitions>
+
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+						<RowDefinition Height="26"/>
+					</Grid.RowDefinitions>
+
+					<TextBlock Grid.Row="0"
+                               Grid.ColumnSpan="2"
+                               Text="Итог"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Margin="0,0,0,5"/>
+
+					
+
+					<!-- Количество стыков (теперь Row 2) -->
+					<TextBlock Grid.Row="1" Text="🔗 Количество стыков:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="1" Grid.Column="1"
+                               x:Name="TxtReportWeldQuantity"
+                               Text="0 шт"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="2" Text="💧 Трасса по болотам:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="2" Grid.Column="1"
+                               x:Name="TxtReportSwampKm"
+                               Text="0,000 км"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="3" Text="🌊 Пересечения рек:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="3" Grid.Column="1"
+                               x:Name="TxtReportRiverCount"
+                               Text="0 шт."
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="4" Text="🛣️ Пересечения дорог:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="4" Grid.Column="1"
+                               x:Name="TxtReportRoadCount"
+                               Text="0 шт."
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="5" Text="🟠 Трубы без газа (вкл. ВСТО_ЕГРН):" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="5" Grid.Column="1"
+                               x:Name="TxtReportNonGasCount"
+                               Text="0 шт."
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="6" Text="🔴 Трубы с газом:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="6" Grid.Column="1"
+                               x:Name="TxtReportGasCount"
+                               Text="0 шт."
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="7" Text="⚠️ Нарушения правил перехода:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="7" Grid.Column="1"
+                               x:Name="TxtReportInvalidCount"
+                               Text="0 шт."
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="8" Text="📐 Макс. продольный угол поверхности (20 м):" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="8" Grid.Column="1"
+                               x:Name="TxtReportMaxSurfaceSlope"
+                               Text="0,00°"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+
+					<TextBlock Grid.Row="9" Text="⛔ Запретные зоны:" VerticalAlignment="Center"/>
+					<TextBlock Grid.Row="9" Grid.Column="1"
+                               x:Name="TxtReportForbiddenZones"
+                               Text="нет"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"/>
+				</Grid>
+			</Border>
+
+			<!-- Все фактические переходы в порядке от старта к финишу -->
+			<Expander Grid.Row="4"
+                      x:Name="CrossingsExpander"
+                      Header="Переходы через реки, дороги и трубопроводы"
+                      IsExpanded="True"
+                      Margin="0,10,0,0">
+                <DataGrid x:Name="CrossingsDataGrid"
+                          ItemsSource="{Binding CrossingItems}"
+                          FrozenColumnCount="1"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          MaxHeight="260"
+                          RowHeight="24"
+                          BorderBrush="#B8D8EF"
+                          BorderThickness="1">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Тип объекта" Width="135" Binding="{Binding ObjectType}"/>
+                        <DataGridTextColumn Header="Источник" Width="92" Binding="{Binding Marker}"/>
+                        <DataGridTextColumn Header="ID объекта" Width="78" Binding="{Binding ObjectId}"/>
+                        <DataGridTextColumn Header="Способ перехода" Width="120" Binding="{Binding TransitionType}"/>
+                        <DataGridTextColumn Header="Зона, м" Width="70" Binding="{Binding ProtectionZone}"/>
+                        <DataGridTextColumn Header="Мин. L, м" Width="75" Binding="{Binding MinLength}"/>
+                        <DataGridTextColumn Header="УЗА" Width="80" Binding="{Binding Uza}"/>
+                        <DataGridTextColumn Header="Футляр" Width="65" Binding="{Binding Case}"/>
+                        <DataGridTextColumn Header="Футеровка" Width="75" Binding="{Binding Liner}"/>
+                        <DataGridTextColumn Header="Габионы, м²/берег" Width="115" Binding="{Binding GabionsArea}"/>
+                        <DataGridTextColumn Header="Геореш., м²/берег" Width="115" Binding="{Binding GeoGridArea}"/>
+                        <DataGridTextColumn Header="Рено, м²/берег" Width="105" Binding="{Binding RenoArea}"/>
+                        <DataGridTextColumn Header="Угол" Width="65" Binding="{Binding Angle}"/>
+                        <DataGridTextColumn Header="Стоимость, руб." Width="120" Binding="{Binding Cost}"/>
+                        <DataGridTextColumn Header="Проверка" Width="70" Binding="{Binding RuleState}"/>
+                        <DataGridTextColumn Header="Дополнительно" Width="260" Binding="{Binding Additional}">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                    <Setter Property="ToolTip" Value="{Binding Additional}"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Expander>
+
+			<!-- Разделитель -->
+			<Border Grid.Row="5" Height="1" Background="#DDD" Margin="0,10"/>
+
+			<!-- Стоимостные характеристики -->
+			<TextBlock Grid.Row="6" Text="💰 Стоимостные характеристики" FontSize="14" FontWeight="SemiBold" Margin="0,5,0,5"/>
+			<DataGrid Grid.Row="7" x:Name="CostDataGrid" AutoGenerateColumns="False" BeginningEdit="CostDataGrid_BeginningEdit" 
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      BorderThickness="1" BorderBrush="LightGray"
+                      RowHeight="24" Margin="0,0,0,10">
+				<DataGrid.Columns>
+					<DataGridTextColumn Header="Наименование" Width="*" Binding="{Binding Name}" IsReadOnly="True"/>
+					<DataGridTextColumn Header="Ед. изм." Width="60" Binding="{Binding Unit}" IsReadOnly="True"/>
+
+					<!-- Кол-во: 1 знак после запятой (если есть) -->
+					<DataGridTextColumn Header="Кол-во" Width="60" 
+                        Binding="{Binding Quantity, Converter={StaticResource NumberFormatConverter}, ConverterParameter=2, UpdateSourceTrigger=LostFocus}" 
+                        IsReadOnly="False"/>
+
+					<!-- Цена за ед.: целое число -->
+					<DataGridTextColumn Header="Цена за ед." Width="90" 
+                        Binding="{Binding Price, Converter={StaticResource NumberFormatConverter}, ConverterParameter=0}" 
+                        IsReadOnly="True"/>
+
+					<!-- Стоимость: целое число -->
+					<DataGridTextColumn Header="Стоимость" Width="90" 
+                        Binding="{Binding Cost, Converter={StaticResource NumberFormatConverter}, ConverterParameter=0}" 
+                        IsReadOnly="True"/>
+				</DataGrid.Columns>
+			</DataGrid>
+
+			<!-- Кнопка экспорта и Итоговая сумма -->
+			<Grid Grid.Row="8" Margin="0,10,0,0">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+
+				<Button Grid.Column="0" Content="📥 Сохранить в Excel" 
+                        Click="ExportToExcel_Click" 
+                        Padding="12,6" 
+                        Background="#217346" Foreground="White" 
+                        FontWeight="Bold" Cursor="Hand"
+                        ToolTip="Экспортировать все данные в файл .xlsx">
+					<Button.Style>
+						<Style TargetType="Button">
+							<Setter Property="Template">
+								<Setter.Value>
+									<ControlTemplate TargetType="Button">
+										<Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+											<ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+										</Border>
+									</ControlTemplate>
+								</Setter.Value>
+							</Setter>
+							<Style.Triggers>
+								<Trigger Property="IsMouseOver" Value="True">
+									<Setter Property="Background" Value="#1A5C38"/>
+								</Trigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
+				</Button>
+
+				<Border Grid.Column="1" Background="#E8E8E8" Padding="10,8" CornerRadius="4" HorizontalAlignment="Right">
+					<StackPanel Orientation="Horizontal">
+						<TextBlock Text="ИТОГО: " FontWeight="Bold" Margin="0,0,5,0" FontSize="14"/>
+						<TextBlock x:Name="TotalCostText" Text="0.00" FontWeight="Bold" Foreground="#D32F2F" FontSize="14"/>
+						<TextBlock Text=" руб." Margin="2,0,0,0" FontWeight="Bold" FontSize="14"/>
+					</StackPanel>
+				</Border>
+			</Grid>
+		</Grid>
+	</ScrollViewer>
+</UserControl>

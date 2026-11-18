@@ -5,16 +5,22 @@ namespace NcTestRibbon
   using System.Net.Http;
   using System.Threading.Tasks;
   using System.Windows.Forms;
+  using System.Windows.Forms.Integration;
+  using System.Windows.Interop;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
+  using NcTestRibbon.Shell;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
   using WinFormsApp = System.Windows.Forms.Application;
+  using WpfApp = System.Windows.Application;
+  using WpfWindow = System.Windows.Window;
 
   public class TestCommands
   {
     private const string DefaultHttpUrl = "https://httpbin.org/get";
     private static bool _visualStylesTried;
+    private static bool _wpfAppCreated;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -68,59 +74,111 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Opens DemoForm with ShowDialog (same modal WinForms path as NcTestHttp).
-    /// Command name NcTestWpf kept for ribbon compatibility; UI is WinForms, not WPF.
-    /// Modeless Form.Show() does not reliably appear under nanoCAD.
+    /// Opens End-variant MainWindow WPF shell (UI only; logic stubbed).
     /// </summary>
     [CommandMethod("NcTestWpf")]
     public void NcTestWpf()
     {
+      OpenWpfWindow(ed: null, "NcTestWpf", () => new MainWindow());
+    }
+
+    /// <summary>Opens InitialData WPF shell (UI only).</summary>
+    [CommandMethod("NcTestInitialData")]
+    public void NcTestInitialData()
+    {
+      OpenWpfWindow(ed: null, "NcTestInitialData", () => new InitialData());
+    }
+
+    /// <summary>Small WinForms smoke dialog (fallback).</summary>
+    [CommandMethod("NcTestDemo")]
+    public void NcTestDemo()
+    {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
-
       try
       {
-        ed?.WriteMessage("\nNcTestWpf: start (WinForms ShowDialog).");
         EnsureVisualStyles(ed);
-
         IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        ed?.WriteMessage("\nNcTestWpf: MainWindowHandle=" + hwnd.ToInt64()
-          + ", STA=" + System.Threading.Thread.CurrentThread.GetApartmentState());
-
         using (DemoForm form = new DemoForm())
         {
-          WinFormsApp.DoEvents();
-
-          DialogResult result;
           if (hwnd != IntPtr.Zero)
           {
-            result = form.ShowDialog(new WindowWrapper(hwnd));
+            form.ShowDialog(new WindowWrapper(hwnd));
           }
           else
           {
-            ed?.WriteMessage("\nNcTestWpf: no owner HWND, ShowDialog() without owner.");
-            result = form.ShowDialog();
+            form.ShowDialog();
           }
-
-          ed?.WriteMessage("\nNcTestWpf: form closed, DialogResult=" + result);
         }
       }
       catch (System.Exception ex)
       {
-        WriteException(ed, "NcTestWpf", ex);
+        WriteException(ed, "NcTestDemo", ex);
+      }
+    }
+
+    private void OpenWpfWindow(Editor ed, string label, Func<WpfWindow> factory)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      ed = ed ?? doc?.Editor;
+
+      try
+      {
+        ed?.WriteMessage("\n" + label + ": opening WPF shell (ShowDialog).");
+        EnsureWpfApplication(ed);
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        ed?.WriteMessage("\n" + label + ": HWND=" + hwnd.ToInt64()
+          + ", STA=" + System.Threading.Thread.CurrentThread.GetApartmentState());
+
+        WpfWindow window = factory();
+        if (hwnd != IntPtr.Zero)
+        {
+          new WindowInteropHelper(window) { Owner = hwnd };
+        }
+
+        ElementHost.EnableModelessKeyboardInterop(window);
+        WinFormsApp.DoEvents();
+        bool? result = window.ShowDialog();
+        ed?.WriteMessage("\n" + label + ": closed, DialogResult=" + result);
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
         try
         {
           MessageBox.Show(
-            "NcTestWpf failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
             + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
-            "NcTestWpf",
+            label,
             MessageBoxButtons.OK,
             MessageBoxIcon.Warning);
         }
         catch
         {
-          // ignore secondary UI failures
         }
+      }
+    }
+
+    private static void EnsureWpfApplication(Editor ed)
+    {
+      if (WpfApp.Current != null || _wpfAppCreated)
+      {
+        return;
+      }
+
+      try
+      {
+        new WpfApp
+        {
+          ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown
+        };
+        _wpfAppCreated = true;
+        ed?.WriteMessage("\nWPF Application created (OnExplicitShutdown).");
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nWPF Application init: " + ex.Message);
       }
     }
 

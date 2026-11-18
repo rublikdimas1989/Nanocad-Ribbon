@@ -1,24 +1,31 @@
 # Nanocad-Ribbon
 
-Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows): три команды (`NcTestHello`, `NcTestHttp`, `NcTestWpf`) и манифест панели «Тест».
+Тестовый пакет плагина ленты для **nanoCAD 24** (`.NET 6`, Windows).
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.1.2.zip`](nanocad-test-ribbon-v1.1.2.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.2.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.0.zip`](nanocad-test-ribbon-v1.2.0.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.0.zip
 - Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
-- Старые zip (`v1.1.1` и ранее) могут кэшироваться — берите **v1.1.2**
 
 Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Быстрый старт (v1.1.2)
+## Что внутри (v1.2.0)
 
-`NcSdkDir` уже прописан в `Directory.Build.props` и в `.csproj` (путь как в RibbonExecDoc):
+UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
 
-`C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\`
+| Команда | Окно |
+|---------|------|
+| `NcTestWpf` | `MainWindow` — «Трассировка трубопровода» |
+| `NcTestInitialData` | `InitialData` — «Исходные данные» |
+| `NcTestHello` / `NcTestHttp` | прежние тесты |
+| `NcTestDemo` | маленький WinForms smoke |
 
-1. Распаковать **v1.1.2** в новую папку. Если есть `DemoWindow.xaml` — удалить.
-2. Открыть `nanocad-test-ribbon\NcTestRibbon\NcTestRibbon.sln` в VS **или**:
+Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Исходные**. Клики в UI → MessageBox «сервер позже».
+
+## Быстрый старт
+
+`NcSdkDir` уже в `Directory.Build.props` (путь RibbonExecDoc / YandexDisk).
 
 ```powershell
 cd nanocad-test-ribbon\NcTestRibbon
@@ -28,6 +35,4 @@ cd ..\installer
 .\VERIFY.bat
 ```
 
-3. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
-
-Если CS0246 HostMgd — проверьте, что SDK реально лежит по пути выше (или поправьте `Directory.Build.props`).
+nanoCAD: `NcTestWpf` или `NcTestInitialData`.

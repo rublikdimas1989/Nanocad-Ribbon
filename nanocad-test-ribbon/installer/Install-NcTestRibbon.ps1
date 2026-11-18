@@ -249,7 +249,7 @@ function Resolve-TestRibbonFiles {
     return $null
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestInitialData')
 
 if (Get-Process nCad -ErrorAction SilentlyContinue) {
     throw 'nanoCAD is running. Close all nanoCAD windows and retry.'

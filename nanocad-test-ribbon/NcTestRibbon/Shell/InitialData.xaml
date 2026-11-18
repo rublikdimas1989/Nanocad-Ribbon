@@ -1,0 +1,486 @@
+﻿<Window x:Class="NcTestRibbon.Shell.InitialData"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:NcTestRibbon.Shell"
+        mc:Ignorable="d"
+        Title="Исходные данные" Height="1100" Width="1300"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+    <Grid Margin="10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Левая панель: Общие настройки -->
+        <Border Grid.Column="0" Background="#F5F5F5" Padding="10" Margin="0,0,10,0" CornerRadius="5">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="⚙️ Общие настройки" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <TextBlock Text="X блока:" Margin="0,5,0,2"/>
+                    <TextBox x:Name="BlockX" Text="0" Margin="0,0,0,8"/>
+                    <TextBlock Text="Y блока:" Margin="0,5,0,2"/>
+                    <TextBox x:Name="BlockY" Text="0" Margin="0,0,0,8"/>
+                    <TextBlock Text="Ширина:" Margin="0,5,0,2"/>
+                    <TextBox x:Name="BlockW" Text="2000" Margin="0,0,0,8"/>
+                    <TextBlock Text="Высота:" Margin="0,5,0,2"/>
+                    <TextBox x:Name="BlockH" Text="2000" Margin="0,0,0,12"/>
+                    <Separator Margin="0,5"/>
+                    <TextBlock Text="Макс. итераций:" Margin="0,5,0,2"/>
+                    <TextBox x:Name="MaxIter" Text="50000000" Margin="0,0,0,8"/>
+                    <TextBlock Text="Коэфф. уменьшения:" Margin="0,5,0,2"/>
+                    <ComboBox x:Name="DownsampleFactor" Margin="0,0,0,12" SelectionChanged="DownsampleFactor_SelectionChanged">
+                        <ComboBoxItem Content="1 (без уменьшения)" Tag="1" IsSelected="True"/>
+                        <ComboBoxItem Content="2 (×4 ускорение)" Tag="2"/>
+                        <ComboBoxItem Content="4 (×16 ускорение)" Tag="4"/>
+                        <ComboBoxItem Content="8 (×64 ускорение)" Tag="8"/>
+                    </ComboBox>
+
+
+                    <Separator Margin="0,5"/>
+                    <TextBlock x:Name="StatusText" Text="Ожидание..." TextWrapping="Wrap" Margin="0,5" FontWeight="Bold" Foreground="#333"/>
+                    <TextBlock x:Name="InfoText" Text="" TextWrapping="Wrap" Margin="0,5" FontSize="12" Foreground="Gray"/>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Правая панель: параметры + таблица -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" MinHeight="450" />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" MaxHeight="700">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Колонка 1: Геометрические ограничения -->
+                    <GroupBox Grid.Column="0" Header="📐 Геометрические ограничения" Margin="5">
+                        <StackPanel>
+                            <TextBlock Text="Макс. продольный угол поверхности (°):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMaxLongitudinalSurfaceSlope" Text="19.0" Margin="0,0,0,8"
+                                     ToolTip="Максимально допустимый локальный продольный угол поверхности. Проверяется по тем же отметкам поверхности с шагом 20 м, которые используются Solver и окном Итог."/>
+
+                            <TextBlock Text="Макс. поперечный угол поверхности (°):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMaxTransverseSlope" Text="8.0" Margin="0,0,0,8"
+                                     ToolTip="Максимально допустимый поперечный угол поверхности на ширине рабочего коридора. Solver проверяет поперечники в начале и конце кандидата."/>
+
+                            <TextBlock Text="Ширина коридора (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtCorridorWidth" Text="30.0" Margin="0,0,0,8"/>
+
+                            <CheckBox x:Name="ChkCalculateProfileAtEachStep"
+                                      Content="Считать профиль на каждом шаге"
+                                      IsChecked="False" Margin="0,4,0,8"
+                                      ToolTip="Включено: прежний поиск с оптимизацией профиля на каждом шаге. Выключено: земляные работы при постоянной глубине; полный профиль рассчитывается только для одного итогового маршрута."/>
+                            <TextBlock Text="Без галочки поиск быстрее. Итоговый профиль учитывает заданный радиус."
+                                       TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Диаметр стартовой площадки (м):"/>
+                            <TextBox x:Name="TxtStartSiteDiameter" Text="0" Margin="0,2,0,8"/>
+                            <TextBlock Text="Диаметр финишной площадки (м):"/>
+                            <TextBox x:Name="TxtFinishSiteDiameter" Text="0" Margin="0,2,0,8"/>
+                            <TextBlock Text="Типовые углы отводов (°):" Margin="0,2"/>
+                            <TextBox x:Name="TxtTypicalAngles" Text="30,60,90" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Охранная зона рек (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtRiverProtectionZone" Text="0.0" Margin="0,0,0,8"
+							         ToolTip="Минимальное расстояние до оси реки. Каждый новый отрезок Solver, попавший в эту зону, сразу проверяется по допустимому углу перехода реки: если отрезок идёт вдоль русла/под недопустимым углом или является кривым движением, ветвь немедленно отбрасывается. Поперечный подход разрешён только как кандидат на реальный переход; если реку так и не пересекли, готовый путь не принимается. 0 — отключить правило."/>
+
+                            <TextBlock Text="Мин. глубина залегания (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMinDepth" Text="0.8" Margin="0,0,0,8"/>
+
+                            <Expander Header="⚙️ Дополнительные параметры трассировки" Margin="0,0,0,10" IsExpanded="False">
+                                <StackPanel Margin="5,5,0,5">
+                                    <TextBlock Text="Мин. размер шага (м):" Margin="0,2"/>
+                                    <TextBox x:Name="TxtMinStep" Text="100.0" Margin="0,0,0,8"/>
+
+                                    <TextBlock Text="Укрупнение точек пути — допуск (м):" Margin="0,2"/>
+                                    <TextBox x:Name="TxtRouteEditSimplifyTolerance" Text="2.0" Margin="0,0,0,8"
+                                        ToolTip="Для ручного редактирования почти прямые участки объединяются, если отклонение от прямой не больше этого допуска."/>
+
+                                    <TextBlock Text="Интервал отображения промежуточного пути (сек):" Margin="0,2"/>
+                                    <TextBox x:Name="TxtIntermediatePreviewInterval" Text="20" Margin="0,0,0,8"
+                                        ToolTip="Как часто во время расчёта обновлять на карте текущий лучший 2D-путь. 0 — отключить."/>
+
+                                    <TextBlock Text="Макс. расстояние прямого выхода в GOAL (м):" Margin="0,2"/>
+                                    <TextBox x:Name="TxtGoalDirectConnectDistance" Text="150.0" Margin="0,0,0,8"
+                                        ToolTip="Если узел подошёл к GOAL ближе этого расстояния, пробуем прямой выход."/>
+
+                                    <TextBlock Text="Длина отрезков естеств. изгиба (м):" Margin="0,2"/>
+                                    <TextBox x:Name="TxtLengthFree" Text="100.0" Margin="0,0,0,8"/>
+                                </StackPanel>
+                            </Expander>
+
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Колонка 2: Параметры трубопровода -->
+                    <GroupBox Grid.Column="1" Header="🔧 Параметры трубопровода" Margin="5">
+                        <StackPanel>
+                            <TextBlock Text="Среда:" Margin="0,2"/>
+                            <ComboBox x:Name="CmbEnvironment" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                                <ComboBoxItem Content="Газопровод" IsSelected="True"/>
+                                <ComboBoxItem Content="Нефтепровод"/>
+                                <ComboBoxItem Content="Водовод"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Диаметр трубы (мм):" Margin="0,2"/>
+                            <ComboBox x:Name="CmbDiameter" Margin="0,0,0,8" SelectionChanged="CmbDiameter_SelectionChanged">
+                                <ComboBoxItem Content="57"/>
+                                <ComboBoxItem Content="89"/>
+                                <ComboBoxItem Content="114"/>
+                                <ComboBoxItem Content="159"/>
+                                <ComboBoxItem Content="219"/>
+                                <ComboBoxItem Content="273"/>
+                                <ComboBoxItem Content="325"/>
+                                <ComboBoxItem Content="377"/>
+                                <ComboBoxItem Content="426"/>
+                                <ComboBoxItem Content="530" IsSelected="True"/>
+                                <ComboBoxItem Content="630"/>
+                                <ComboBoxItem Content="720"/>
+                                <ComboBoxItem Content="820"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Диаметр футляра (мм):" Margin="0,2"/>
+                            <TextBox IsReadOnly="True" x:Name="TxtCasingDiameter" Text="820" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Толщина стенки (мм):" Margin="0,2"/>
+                            <ComboBox x:Name="CmbThickness" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                                <ComboBoxItem Content="8"/>
+                                <ComboBoxItem Content="9"/>
+                                <ComboBoxItem Content="10"/>
+                                <ComboBoxItem Content="12"/>
+                                <ComboBoxItem Content="14"/>
+                                <ComboBoxItem Content="16"/>
+                                <ComboBoxItem Content="18"/>
+                                <ComboBoxItem Content="20"/>
+                                <ComboBoxItem Content="22"/>
+                                <ComboBoxItem Content="24"/>
+                                <ComboBoxItem Content="28"/>
+                                <ComboBoxItem Content="30"/>
+                                <ComboBoxItem Content="34"/>
+                                <ComboBoxItem Content="40" IsSelected="True"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Марка / материал:" Margin="0,2"/>
+                            <ComboBox x:Name="CmbSteelGrade" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                                <ComboBoxItem Content="09Г2С" IsSelected="True"/>
+                                <ComboBoxItem Content="13ХФА"/>
+                            </ComboBox>
+
+                            <TextBlock Text="Тип трубы:" Margin="0,2"/>
+                            <ComboBox x:Name="CmbPipeType" SelectionChanged="PipeParameter_SelectionChanged" Margin="0,0,0,8">
+                                <ComboBoxItem Content="Бесшовная горячедеформированная" IsSelected="True"/>
+                                <ComboBoxItem Content="Электросварная прямошовная"/>
+                            </ComboBox>
+
+
+
+                            <TextBlock Text="Шероховатость стали (мм):" Margin="0,2"/>
+                            <TextBox x:Name="TxtSteelRoughness" Text="0,045" Margin="0,0,0,8"/>
+                            <TextBlock Text="Шероховатость ПАТ (мм):" Margin="0,2"/>
+                            <TextBox x:Name="TxtPatRoughness" Text="0,005" Margin="0,0,0,8"/>
+                            <TextBlock Text="Радиус естественного изгиба ПАТ (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtPatNaturalRadius" Text="3" Margin="0,0,0,8" TextChanged="PatRadius_TextChanged"/>
+                            <TextBlock Text="Мин. радиус естеств. изгиба в плане (м):" Margin="0,2"/>
+                            <TextBox IsReadOnly="True" x:Name="TxtMinRadius" Text="300.0" Margin="0,0,0,8"
+                                     ToolTip="Минимальный радиус поворота трассы в плане. Не относится к продольному профилю."/>
+
+
+                            <TextBlock Text="Мин. радиус естеств. изгиба профиля (м):" Margin="0,2"/>
+                            <TextBox IsReadOnly="True" x:Name="TxtProfileMinRadius" Text="500.0" Margin="0,0,0,8"
+                                     ToolTip="Минимальный вертикальный радиус итогового профиля. Если включено «Считать профиль на каждом шаге», применяется также во время поиска. Шаг профильных отметок — 20 м."/>
+                            <!-- ✅ РИСУНОК СЕЧЕНИЯ ТРАНШЕИ -->
+                            <Border Background="White" BorderBrush="Gray" BorderThickness="1" Margin="0,10,0,10" Padding="5">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="150"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Canvas Grid.Row="1" Width="280" Height="150" Background="#FAFAFA">
+                                        <!-- Труба (круг) -->
+                                        <Ellipse Canvas.Left="110" Canvas.Top="58" Width="60" Height="60" 
+                                                 Stroke="Black" StrokeThickness="2" Fill="LightGray" HorizontalAlignment="Center" VerticalAlignment="Top" RenderTransformOrigin="0.558,0.993"/>
+
+                                        <!-- Верхняя линия земли -->
+                                        <Line X1="10" Y1="10" X2="270" Y2="10" Stroke="Black" StrokeThickness="1"/>
+
+                                        <!-- Левый склон траншеи -->
+                                        <Line X1="10" Y1="10" X2="60" Y2="130" Stroke="Black" StrokeThickness="1"/>
+
+                                        <!-- Правый склон траншеи -->
+                                        <Line X1="270" Y1="10" X2="220" Y2="130" Stroke="Black" StrokeThickness="1"/>
+
+                                        <!-- Дно траншеи -->
+                                        <Line X1="60" Y1="130" X2="220" Y2="130" Stroke="Black" StrokeThickness="1"/>
+
+                                        <!-- Горизонтальная линия трубы -->
+                                        <Line X1="110" Y1="120" X2="170" Y2="120" Stroke="Black" StrokeThickness="1" HorizontalAlignment="Center" Canvas.Top="10" VerticalAlignment="Top"/>
+
+                                        <!-- Вертикальная линия глубины -->
+                                        <Line X1="240" Y1="10" X2="240" Y2="130" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" HorizontalAlignment="Center" Height="23" Canvas.Top="107" VerticalAlignment="Top" Width="240" Canvas.Left="-100"/>
+                                        <Line X1="235" Y1="10" X2="245" Y2="10" Stroke="Black" StrokeThickness="1"/>
+
+                                        <!-- Стрелка глубины -->
+
+                                        <!-- Вертикальная линия диаметра -->
+                                        <Line X1="140" Y1="90" X2="140" Y2="150" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" HorizontalAlignment="Center" Height="129" VerticalAlignment="Top" Width="139"/>
+                                        <Line X1="135" Y1="90" X2="145" Y2="90" Stroke="Black" StrokeThickness="1" HorizontalAlignment="Center" Canvas.Top="40" VerticalAlignment="Top"/>
+
+                                        <!-- Текст "не менее 800" -->
+
+                                        <TextBlock Canvas.Left="150" Canvas.Top="29"
+												   FontSize="10" FontWeight="Bold" HorizontalAlignment="Left" VerticalAlignment="Top"><Run Text="миним"/><Run Language="ru-ru" Text="ум"/><Run Text=" 0.8 м"/></TextBlock>
+
+
+
+                                        <!-- Текст "200" -->
+
+                                        <!-- Текст диаметра (с автоматическим обновлением) -->
+                                        <TextBlock Canvas.Left="123" Canvas.Top="82" 
+											   Text="{Binding ElementName=CmbDiameter, Path=SelectedItem.Content, StringFormat='Ø{0} мм'}" 
+											   FontSize="9" FontWeight="Bold"/>
+
+                                        <!-- Текст "100" -->
+                                        <TextBlock Canvas.Left="115" Canvas.Top="118" Text="100" FontSize="9" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                        <Line X1="240" Y1="10" X2="240" Y2="130" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" Height="23" Canvas.Top="107" Width="241" Canvas.Left="-100" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Line X1="240" Y1="10" X2="240" Y2="130" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" Height="60" Width="242" Canvas.Left="-100" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                        <TextBlock Canvas.Left="115" Canvas.Top="48" Text="200" FontSize="9" HorizontalAlignment="Left" VerticalAlignment="Center"/>
+
+                                        <Line X1="10" Y1="50" X2="270" Y2="50" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" Height="58" Canvas.Left="33" Width="78" Canvas.Top="38" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                        <Line X1="10" Y1="50" X2="270" Y2="50" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" Height="58" Canvas.Left="161" Width="78" Canvas.Top="38" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                        <TextBlock Canvas.Left="73" Canvas.Top="75" FontSize="9" HorizontalAlignment="Left" VerticalAlignment="Center"><Run Language="ru-ru" Text="350"/></TextBlock>
+                                        <TextBlock Canvas.Left="191" Canvas.Top="75" FontSize="9" HorizontalAlignment="Left" VerticalAlignment="Center"><Run Language="ru-ru" Text="350"/></TextBlock>
+                                        <Line X1="10" Y1="50" X2="270" Y2="50" Stroke="Black" StrokeThickness="1" StrokeDashArray="2,2" Height="58" Canvas.Left="104" Width="36" HorizontalAlignment="Left" VerticalAlignment="Center" Canvas.Top="-2" />
+
+                                        <!-- Текст "Трубопровод" -->
+                                    </Canvas>
+
+                                    <TextBlock Grid.Row="0" Text=" Сечение траншеи" FontWeight="Bold" Margin="0,0,0,5" HorizontalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Колонка 3: Дополнительно -->
+                    <GroupBox Grid.Column="2" Header="Дополнительно" Margin="5">
+                        <StackPanel>
+                            <TextBlock Text="Настройки для среды:" FontWeight="Bold"/>
+                            <ComboBox x:Name="CmbAdditionalMedium" SelectionChanged="AdditionalMedium_SelectionChanged" Margin="0,5,0,6">
+                                <ComboBoxItem Content="Газ" Tag="gas"/>
+                                <ComboBoxItem Content="Нефть" Tag="oil"/>
+                                <ComboBoxItem Content="Жидкость" Tag="liquid"/>
+                            </ComboBox>
+                            <TextBlock Text="Выберите среду строящегося трубопровода. Для каждой среды сохраняется свой набор переходов и работ." TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,10"/>
+                            <TextBlock Text="Мин. длина перехода через реки (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMinRiverCrossing" Text="130.0" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Мин. длина перехода через дорогу (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMinRoadCrossing" Text="50.0" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Мин. длина перехода через трубу обычн. (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMinPipeCrossingNormal" Text="30.0" Margin="0,0,0,8"/>
+
+                            <TextBlock Text="Мин. длина перехода через трубу газ (м):" Margin="0,2"/>
+                            <TextBox x:Name="TxtMinPipeCrossingGas" Text="50.0" Margin="0,0,0,8"/>
+
+
+                            <TextBlock Text="Тип перехода через реки:" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <RadioButton x:Name="RbRiverClosed" GroupName="TransitionType" Content="Закрытый (ГНБ)" IsChecked="True" Margin="0,0,15,0"/>
+                                <RadioButton x:Name="RbRiverOpen" GroupName="TransitionType" Content="Открытый" Margin="0,0,0,0"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Угол реки: от" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtRiverMinAngle" Text="60" Width="48" Margin="6,0" ToolTip="Минимальный угол пересечения, градусы"/>
+                                <TextBlock Text="до" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtRiverMaxAngle" Text="90" Width="48" Margin="6,0" ToolTip="Максимальный угол пересечения, градусы"/>
+                                <TextBlock Text="°" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Тип перехода через дороги:" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <RadioButton x:Name="RbRoadClosed" GroupName="RoadTransitionType" Content="Закрытый (ГНБ)" IsChecked="True" Margin="0,0,15,0"/>
+                                <RadioButton x:Name="RbRoadOpen" GroupName="RoadTransitionType" Content="Открытый" Margin="0,0,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Угол дороги: от" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtRoadMinAngle" Text="60" Width="48" Margin="6,0" ToolTip="Минимальный угол пересечения, градусы"/>
+                                <TextBlock Text="до" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtRoadMaxAngle" Text="90" Width="48" Margin="6,0" ToolTip="Максимальный угол пересечения, градусы"/>
+                                <TextBlock Text="°" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Тип перехода через трубы:" FontWeight="Bold" Margin="0,0,0,5"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <RadioButton x:Name="RbPipeClosed" GroupName="PipeTransitionType" Content="Закрытый (ГНБ)" IsChecked="True" Margin="0,0,15,0"/>
+                                <RadioButton x:Name="RbPipeOpen" GroupName="PipeTransitionType" Content="Открытый" Margin="0,0,0,0"/>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Труба без газа: от" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtNonGasMinAngle" Text="60" Width="48" Margin="6,0" ToolTip="Минимальный угол пересечения, градусы"/>
+                                <TextBlock Text="до" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtNonGasMaxAngle" Text="90" Width="48" Margin="6,0" ToolTip="Максимальный угол пересечения, градусы"/>
+                                <TextBlock Text="°" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Газопровод: от" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtGasMinAngle" Text="60" Width="48" Margin="6,0" ToolTip="Минимальный угол пересечения, градусы"/>
+                                <TextBlock Text="до" VerticalAlignment="Center"/>
+                                <TextBox x:Name="TxtGasMaxAngle" Text="90" Width="48" Margin="6,0" ToolTip="Максимальный угол пересечения, градусы"/>
+                                <TextBlock Text="°" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Дополнительные работы:" FontWeight="Bold" Margin="0,5,0,5"/>
+
+                            <!-- ✅ ОБНОВЛЁННЫЙ СПИСОК ЧЕКБОКСОВ -->
+                            <CheckBox x:Name="ChkPneumoTest" Content="Пневматическое испытание" Margin="0,2"/>
+                            <CheckBox x:Name="ChkHydroTest" Content="Гидравлическое испытание" Margin="0,2"/>
+                            <CheckBox x:Name="ChkPrelimPneumo" Content="Предварительное пневмоиспытание" Margin="0,2"/>
+                            <CheckBox x:Name="ChkPrelimHydro" Content="Предварительное гидроиспытание" Margin="0,2"/>
+                            <CheckBox x:Name="ChkPPUInsulation" Content="Доп. изоляции ППУ" Margin="0,2"/>
+                            <CheckBox x:Name="ChkJointInsulation" Content="Изоляция стыков" Margin="0,2"/>
+                            <CheckBox x:Name="ChkEHS" Content="Устройство ЭХЗ" Margin="0,2"/>
+
+                            <TextBlock Text="Для переходов через реки:" FontWeight="SemiBold" Margin="0,8,0,3"/>
+                            <CheckBox x:Name="ChkRiverInstallUza" Content="Установка УЗА — 2 шт. на переход" Margin="0,2"/>
+                            <CheckBox x:Name="ChkRiverCase" Content="Футляр" Margin="0,2"/>
+                            <CheckBox x:Name="ChkRiverLiner" Content="Футеровка" Margin="0,2"/>
+                            <CheckBox x:Name="ChkRiverBallasting" Content="Балластировка" Margin="0,2,0,10"/>
+
+                            <TextBlock Text="Для переходов через болота:" FontWeight="SemiBold" Margin="0,3,0,3"/>
+                            <CheckBox x:Name="ChkSwampBallasting" Content="Балластировка" Margin="0,2,0,10"/>
+
+                            <!-- ✅ БЕРЕГОУКРЕПЛЕНИЕ -->
+                            <Expander Header="🌊 Берегоукрепление" Margin="0,0,0,5" IsExpanded="False">
+                                <StackPanel Margin="5,3,0,3">
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="80"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="ChkGabions" Grid.Column="0" Content="Габионы" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="Площадь на 1 берег, м²:" Margin="8,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtGabionsAreaPerBank" Grid.Column="2" Text="200" HorizontalContentAlignment="Right" Padding="4,2" IsEnabled="{Binding IsChecked, ElementName=ChkGabions}"/>
+                                    </Grid>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="80"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="ChkGeoGrid" Grid.Column="0" Content="Георешетка" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="Площадь на 1 берег, м²:" Margin="8,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtGeoGridAreaPerBank" Grid.Column="2" Text="200" HorizontalContentAlignment="Right" Padding="4,2" IsEnabled="{Binding IsChecked, ElementName=ChkGeoGrid}"/>
+                                    </Grid>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="80"/>
+                                        </Grid.ColumnDefinitions>
+                                        <CheckBox x:Name="ChkRenoMattress" Grid.Column="0" Content="Матрацы Рено" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="Площадь на 1 берег, м²:" Margin="8,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtRenoAreaPerBank" Grid.Column="2" Text="200" HorizontalContentAlignment="Right" Padding="4,2" IsEnabled="{Binding IsChecked, ElementName=ChkRenoMattress}"/>
+                                    </Grid>
+                                    <TextBlock Text="Площадь указывается для одного берега; в переходе учитываются оба берега." FontSize="10" Foreground="Gray" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- Геотехнический мониторинг -->
+                            <Expander Header=" Геомониторинг" Margin="0,0,0,5" IsExpanded="False">
+                                <StackPanel Margin="5,3,0,3">
+                                    <TextBlock Text="Типы мониторинга можно включать одновременно. Для элементов по трубе шаг задаётся отдельно." Foreground="Gray" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="125"/>
+                                            <ColumnDefinition Width="75"/>
+                                            <ColumnDefinition Width="85"/>
+                                            <ColumnDefinition Width="85"/>
+                                            <ColumnDefinition Width="75"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Тип" FontWeight="SemiBold" Margin="0,0,4,4"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="По трубе" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="2,0,2,4"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Шаг, м" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="2,0,2,4"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="3" Text="На отводах" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="2,0,2,4"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="4" Text="На УЗА" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="2,0,2,4"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Дефмарки" VerticalAlignment="Center" Margin="0,3"/>
+                                        <CheckBox x:Name="ChkGeoPipeDefmark" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtGeoDefmarkSpacing" Grid.Row="1" Grid.Column="2" Text="800" Padding="4,2" Margin="4,2" HorizontalContentAlignment="Right" IsEnabled="{Binding IsChecked, ElementName=ChkGeoPipeDefmark}"/>
+                                        <CheckBox x:Name="ChkGeoBendDefmark" Grid.Row="1" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="ChkGeoUzaDefmark" Grid.Row="1" Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Реперы" VerticalAlignment="Center" Margin="0,3"/>
+                                        <CheckBox x:Name="ChkGeoPipeReper" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtGeoReperSpacing" Grid.Row="2" Grid.Column="2" Text="800" Padding="4,2" Margin="4,2" HorizontalContentAlignment="Right" IsEnabled="{Binding IsChecked, ElementName=ChkGeoPipeReper}"/>
+                                        <CheckBox x:Name="ChkGeoBendReper" Grid.Row="2" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="ChkGeoUzaReper" Grid.Row="2" Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Термоскважины" VerticalAlignment="Center" Margin="0,3"/>
+                                        <CheckBox x:Name="ChkGeoPipeThermo" Grid.Row="3" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="TxtGeoThermoSpacing" Grid.Row="3" Grid.Column="2" Text="800" Padding="4,2" Margin="4,2" HorizontalContentAlignment="Right" IsEnabled="{Binding IsChecked, ElementName=ChkGeoPipeThermo}"/>
+                                        <CheckBox x:Name="ChkGeoBendThermo" Grid.Row="3" Grid.Column="3" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <CheckBox x:Name="ChkGeoUzaThermo" Grid.Row="3" Grid.Column="4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
+
+                            <!-- ✅ ДИАГНОСТИКА -->
+                            <Expander Header="🔍 Диагностика" Margin="0,0,0,10" IsExpanded="False">
+                                <StackPanel Margin="5,0,0,0">
+                                    <CheckBox x:Name="ChkDiagnosticOther" Content="Иная свыше 4 км" Margin="0,2"/>
+                                    <CheckBox x:Name="ChkInLineInspection" Content="Внутритрубная свыше 4 км" Margin="0,2"/>
+                                </StackPanel>
+                            </Expander>
+
+                            <Separator Margin="0,10"/>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                <Button x:Name="BtnLoadRatesFile" Content="📂 Загрузить файл расценок" Click="BtnLoadRatesFile_Click" Padding="8,4" Margin="0,0,10,0"/>
+                                <Button x:Name="BtnLoadRates" Content="📊 Применить расценки" Click="BtnLoadRates_Click" Padding="8,4" IsEnabled="False"/>
+                            </StackPanel>
+                            <TextBlock x:Name="TxtRatesFilePath" Text="Файл не выбран" FontSize="11" Foreground="Gray" TextWrapping="Wrap" Margin="0,0,0,5"/>
+
+                            <TextBlock x:Name="TxtPipeCatalogStatus" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,4"/>
+                            <TextBlock Text="Настройки сохраняются в Tracing.conf рядом с программой."
+                                       FontSize="11" Foreground="Gray" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                            <Button x:Name="BtnSaveInitialData" Content="✅ Сохранить и закрыть" Click="BtnSave_Click" Padding="10,6" Margin="0,10,0,0" HorizontalAlignment="Right" Background="#4CAF50" Foreground="White"/>
+                        </StackPanel>
+                    </GroupBox>
+                </Grid>
+            </ScrollViewer>
+
+            <!-- Таблица расценок -->
+            <GroupBox Grid.Row="1" Header="📋 Расценки для выбранной конфигурации" Margin="5,10,5,5">
+                <Grid>
+                    <DataGrid x:Name="DgRates" AutoGenerateColumns="False" 
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                              BorderThickness="1" BorderBrush="LightGray"
+                              RowHeight="24" Margin="0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Наименование" Width="*" Binding="{Binding Name}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Ед. изм." Width="80" Binding="{Binding Unit}" IsReadOnly="True"/>
+                            <DataGridTextColumn Header="Стоимость, руб." Width="150" Binding="{Binding Cost}" IsReadOnly="True"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock x:Name="TblEmptyHint" Text="Нажмите «Применить расценки» для заполнения" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center" 
+                               Foreground="Gray" IsHitTestVisible="False" FontSize="14"/>
+                </Grid>
+            </GroupBox>
+        </Grid>
+    </Grid>
+</Window>

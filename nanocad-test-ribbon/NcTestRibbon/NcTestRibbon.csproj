@@ -1,28 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- nanoCAD 24 x64: .NET 6 Windows -->
     <TargetFramework>net6.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <LangVersion>10</LangVersion>
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
-    <Version>1.1.2</Version>
-    <AssemblyVersion>1.1.2.0</AssemblyVersion>
-    <FileVersion>1.1.2.0</FileVersion>
-    <InformationalVersion>1.1.2+NcTestHello.NcTestHttp.NcTestWpf.WinForms</InformationalVersion>
-    <!-- WinForms only (HttpTestForm + DemoForm). No WPF / no DemoWindow. -->
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
+    <InformationalVersion>1.2.0+ShellUi.MainWindow.InitialData</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>false</UseWPF>
-    <!--
-      Default NcSdkDir matches this machine's RibbonExecDoc.csproj.
-      Also set in Directory.Build.props (UTF-8 BOM). Override with -p:NcSdkDir=... if needed.
-    -->
+    <UseWPF>true</UseWPF>
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
 
-  <!-- Normalize trailing slash (paths with spaces/Cyrillic are fine). -->
   <PropertyGroup>
     <NcSdkDir Condition="'$(NcSdkDir)' != '' and !HasTrailingSlash('$(NcSdkDir)')">$(NcSdkDir)\</NcSdkDir>
   </PropertyGroup>
@@ -36,6 +29,7 @@
       <HintPath>$(NcSdkDir)include-x64\hostmgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="System.Windows.Controls.Ribbon" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,7 +38,6 @@
     </EmbeddedResource>
   </ItemGroup>
 
-  <!-- Ignore stale WPF leftovers if an old unzip left them on disk. -->
   <ItemGroup>
     <Compile Remove="DemoWindow.cs" />
     <Compile Remove="DemoWindow.xaml.cs" />
@@ -57,7 +50,7 @@
   <Target Name="ValidateNcSdk" BeforeTargets="ResolveAssemblyReferences">
     <Error
       Condition="!Exists('$(NcSdkDir)include-x64\hostmgd.dll')"
-      Text="nanoCAD SDK not found: '$(NcSdkDir)include-x64\hostmgd.dll'. CS0246 (HostMgd/Teigha) means NcSdkDir is wrong. Edit Directory.Build.props or pass -p:NcSdkDir=..." />
+      Text="nanoCAD SDK not found: '$(NcSdkDir)include-x64\hostmgd.dll'. Edit Directory.Build.props or pass -p:NcSdkDir=..." />
   </Target>
 
 </Project>

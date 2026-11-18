@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf')
+$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestInitialData')
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'
 $pkgRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -88,6 +88,7 @@ Write-Host 'In nanoCAD command line try:'
 Write-Host '  NcTestHello'
 Write-Host '  NcTestHttp'
 Write-Host '  NcTestWpf'
+Write-Host '  NcTestInitialData'
 Write-Host 'If unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL path above.'
 
 if ($fail) {

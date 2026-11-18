@@ -1,0 +1,52 @@
+﻿<UserControl x:Class="NcTestRibbon.Shell.ProfileControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="250" d:DesignWidth="800">
+
+	<Border BorderBrush="LightGray" BorderThickness="1" Background="#F9F9F9">
+		<Grid>
+			<Grid.RowDefinitions>
+				<RowDefinition Height="*" />
+				<RowDefinition Height="25" />
+			</Grid.RowDefinitions>
+
+			<!-- Область отрисовки профиля с зумом -->
+			<ScrollViewer Grid.Row="0" x:Name="ProfileScrollViewer"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled"
+                          PreviewMouseWheel="ProfileCanvas_PreviewMouseWheel"
+                          BorderBrush="#E0E0E0" BorderThickness="1" Background="White">
+				<Canvas x:Name="ProfileCanvas" ClipToBounds="True" SizeChanged="ProfileCanvas_SizeChanged"
+                        Height="180" Width="800" Background="White">
+					<TextBlock x:Name="ProfileInfoText" Text="Профиль не построен" Foreground="Gray" 
+                               HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14"/>
+				</Canvas>
+			</ScrollViewer>
+
+			<!-- Нижняя панель с информацией -->
+			<Border Grid.Row="1" Background="#F0F0F0" BorderBrush="#DDD" BorderThickness="0,1,0,0">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" />
+						<ColumnDefinition Width="Auto" />
+						<ColumnDefinition Width="Auto" />
+					</Grid.ColumnDefinitions>
+
+					<TextBlock x:Name="LblTotalDist" Grid.Column="0" Text="Общая длина: 0 м" 
+                               HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0" 
+                               FontSize="12" FontWeight="Bold" Foreground="#333"/>
+
+					<Button x:Name="BtnResetProfileZoom" Grid.Column="1" Content="🔄 Сброс зума" 
+                            Click="BtnResetProfileZoom_Click" Margin="5,2" Padding="8,2" FontSize="11"/>
+
+					<TextBlock x:Name="LblHeightRange" Grid.Column="2" Text="Высота: 0 - 0 м" 
+                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="5,0" 
+                               FontSize="12" Foreground="#555"/>
+				</Grid>
+			</Border>
+		</Grid>
+	</Border>
+</UserControl>

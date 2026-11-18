@@ -17,10 +17,17 @@
     },
     {
       "intername": "NcTestWpf",
-      "displayName": "Окно",
-      "tooltip": "Тестовая кнопка 3: открыть отдельное WinForms-окно (ShowDialog / modal). Команда NcTestWpf.",
+      "displayName": "Трассировка",
+      "tooltip": "UI-оболочка MainWindow (WPF) из End-варианта. Логика расчёта — на сервере позже.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestInitialData",
+      "displayName": "Исходные",
+      "tooltip": "UI-оболочка InitialData (WPF). Логика — на сервере позже.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
     }
   ],
   "buttons": [
@@ -35,8 +42,13 @@
       "style": "large"
     },
     {
-      "text": "Окно",
+      "text": "Трассировка",
       "command": "NcTestWpf",
+      "style": "large"
+    },
+    {
+      "text": "Исходные",
+      "command": "NcTestInitialData",
       "style": "large"
     }
   ]

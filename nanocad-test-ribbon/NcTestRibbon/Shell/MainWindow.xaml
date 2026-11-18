@@ -1,0 +1,380 @@
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:NcTestRibbon.Shell" xmlns:ribbon="clr-namespace:System.Windows.Controls.Ribbon;assembly=System.Windows.Controls.Ribbon" x:Class="NcTestRibbon.Shell.MainWindow" Title="Трассировка трубопровода" Height="900" Width="1600" WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Grid.ColumnSpan="3">
+        <ribbon:Ribbon Title="Трассировка трубопровода" SelectedIndex="1" x:Name="MainRibbon">
+            <ribbon:RibbonTab Header="Файл">
+                <ribbon:RibbonGroup Header="DXF">
+                    <ribbon:RibbonMenuButton Label="Открыть">
+                        <ribbon:RibbonMenuItem Header="Карта и инфраструктура…" Click="OpenScene_Click"/>
+                        <ribbon:RibbonMenuItem Header="Путь 3D — Z из DXF…" Click="OpenRouteDxf3D_Click"/>
+                        <ribbon:RibbonMenuItem Header="Путь 2D — Z по Height.tif…" Click="OpenRouteDxf2D_Click"/>
+                    </ribbon:RibbonMenuButton>
+                    <ribbon:RibbonButton Click="SaveScene_Click" FontWeight="Bold" Label="Сохранить всю карту"/>
+                    <ribbon:RibbonButton Click="ResetMapDrawingEdits_Click" ToolTip="Отменить несохранённые изменения и открыть TracingMap.dxf рядом с exe." Label="Восстановить сохранённую карту"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Экспорт">
+                    <ribbon:RibbonButton x:Name="BtnSavePath2D" Click="SavePathDxf2D_Click" ToolTip="Сохранить текущий окончательный путь как 2D-полилинию DXF. Координаты без масштабирования и ресемплинга." Label="🗺 Путь DXF 2D"/>
+                    <ribbon:RibbonButton x:Name="BtnSavePath3D" Click="SavePathDxf3D_Click" ToolTip="Сохранить текущий окончательный путь как 3D-полилинию DXF. X/Y мировые, Z выбранного пути." Label="🌐 Путь DXF 3D"/>
+                    <ribbon:RibbonButton Click="SaveProfileDxf_Click" ToolTip="Сохранить окончательный тяжёлый профиль в DXF с отдельным масштабом X/Y и настраиваемым шагом пикетажа" Label="Профиль DXF"/>
+                </ribbon:RibbonGroup>
+            </ribbon:RibbonTab>
+            <ribbon:RibbonTab Header="Трасса">
+                <ribbon:RibbonGroup Header="Поиск">
+                    <ribbon:RibbonButton Click="Run_Click" FontWeight="Bold" Label="Начать поиск"/>
+                    <ribbon:RibbonButton Click="Clear_Click" Label="Очистить пути"/>
+                    <ribbon:RibbonButton Click="ClearScreen_Click" Label="Очистить экран" ToolTip="Скрыть пути, наложение топологии и обозначения старта/финиша. Координаты и сохранённые трассы остаются."/>
+                    <ribbon:RibbonButton Click="OpenInitialSettingsWindow_Click" Label="Параметры расчёта"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Координаты, м">
+                    <StackPanel Margin="3">
+                        <StackPanel Orientation="Horizontal" Margin="0,3">
+                            <TextBlock Text="Старт" Width="52" VerticalAlignment="Center"/>
+                            <TextBox x:Name="TxtStartX" Text="645788.190" Width="104" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="X координата старта (мировые)"/>
+                            <TextBox x:Name="TxtStartY" Text="6370656.818" Width="104" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="Y координата старта (мировые)"/>
+                            <Button Content="✓" Click="ApplyStart_Click" Padding="5,2" Margin="2,0" FontWeight="Bold"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,3">
+                            <TextBlock Text="Финиш" Width="52" VerticalAlignment="Center"/>
+                            <TextBox x:Name="TxtGoalX" Text="651971.50" Width="104" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="X координата финиша (мировые)"/>
+                            <TextBox x:Name="TxtGoalY" Text="6369002.90" Width="104" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="Y координата финиша (мировые)"/>
+                            <Button Content="✓" Click="ApplyGoal_Click" Padding="5,2" Margin="2,0" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Выбрать на карте">
+                    <ribbon:RibbonToggleButton x:Name="BtnPickStart" Click="BtnPickStart_Click" ToolTip="Нажмите, затем щёлкните нужную точку старта на карте." Label="🟢 Старт на карте"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnPickGoal" Click="BtnPickGoal_Click" ToolTip="Нажмите, затем щёлкните нужную точку финиша на карте." Label="🎯 Финиш на карте"/>
+                    <ribbon:RibbonButton x:Name="BtnDefaultPoints" Click="BtnDefaultPoints_Click" ToolTip="Нажмите, для применения точек по умолчанию." Label="Сбросить точки"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Правка пути">
+                    <ribbon:RibbonToggleButton x:Name="BtnEditRoute" Click="BtnEditRoute_Click" ToolTip="ЛКМ по вершине — перетащить; двойной щелчок по сегменту — вставить; Delete/ПКМ — удалить." Label="✏ Редактировать путь"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnInsertRoutePoint" Click="BtnInsertRoutePoint_Click" IsEnabled="False" ToolTip="Включите и щёлкните по сегменту пути, куда нужно вставить вершину." Label="＋ точка"/>
+                    <ribbon:RibbonButton x:Name="BtnDeleteRoutePoint" Click="BtnDeleteRoutePoint_Click" IsEnabled="False" ToolTip="Удалить выбранную внутреннюю вершину. Старт и финиш удалить нельзя." Label="－ точка"/>
+                    <ribbon:RibbonButton x:Name="BtnApplyRouteEdits" Click="BtnApplyRouteEdits_Click" IsEnabled="False" FontWeight="SemiBold" ToolTip="Пересчитать профиль и итоговый анализ по отредактированной геометрии." Label="✓ Применить правки"/>
+                    <ribbon:RibbonButton x:Name="BtnNormalizeRoute" Click="BtnNormalizeRoute_Click" FontWeight="SemiBold" ToolTip="Найти нормативный вариант в минимально необходимом коридоре вокруг вручную изменённого пути. Результат сначала показывается для проверки." Label="✓ Нормативы"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Пути и отчёт">
+                    <StackPanel Margin="3">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="LblPathNumber" Text="Путь № (из 0):" VerticalAlignment="Center" Margin="3,0,5,0" FontWeight="SemiBold"/>
+                            <TextBox x:Name="TxtPathNumber" Text="2" Width="50" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold"/>
+                        </StackPanel>
+                        <ribbon:RibbonButton Click="AnalyzePathByNumber_Click" FontWeight="Bold" ToolTip="Выбрать путь по номеру и рассчитать стоимость. Для импортированного DXF исходные Z сохраняются." Label="Выбрать и рассчитать стоимость"/>
+                        <ribbon:RibbonToggleButton x:Name="BtnToggleAllPaths" Checked="PathDisplayMode_Changed" Unchecked="PathDisplayMode_Changed" FontWeight="SemiBold" ToolTip="Показать или скрыть все альтернативные пути на карте" Label="👁 Показать все пути"/>
+                    </StackPanel>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Гидравлика">
+                    <ribbon:RibbonButton Click="Prep_calc" Label="Гидравлический расчёт" MinHeight="58" ToolTip="Выбор номера трассы и трубы для отдельного расчёта"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Отчёт">
+                    <ribbon:RibbonButton Label="ИТОГ" Click="ShowFinalSummary_Click" FontSize="16" FontWeight="SemiBold" MinWidth="86" MinHeight="58" Background="#FFE8F0F8" ToolTip="Объёмы, стоимость и гидравлика. Выбор вариантов и номеров трасс."/>
+                </ribbon:RibbonGroup>
+            </ribbon:RibbonTab>
+            <ribbon:RibbonTab Header="Инфраструктура">
+                <ribbon:RibbonGroup Header="Размещение БУОС">
+                    <ribbon:RibbonButton Label="Разрешённые точки БУОС…" Click="TopologyBuosSites_Click" ToolTip="Укажите фиксированные разрешённые точки на карте. Подбор количества и производительности БУОС без проверки и перемещения площадок."/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Полилинии">
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawRiver" Tag="River" Click="MapDrawTool_Click" Label="🌊 Река"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawRoad" Tag="Road" Click="MapDrawTool_Click" Label="🛣 Дорога"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawNonGas" Tag="NonGas" Click="MapDrawTool_Click" Label="🟠 Труба без газа"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawGas" Tag="Gas" Click="MapDrawTool_Click" Label="🔴 Газопровод"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawProposed" Tag="Proposed" Click="MapDrawTool_Click" Label="Предполагаемая прокладка трубопроводов"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawDelete" Tag="Delete" Click="MapDrawTool_Click" ToolTip="Щёлкните по объекту. Удаляется вся полилиния." Label="🗑 Удалить линию"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Порядок реки">
+                    <ComboBox x:Name="CmbMapDrawRiverOrder" Width="48" SelectedIndex="0" Margin="0,1,7,1">
+                        <ComboBoxItem Content="1" Tag="1"/>
+                        <ComboBoxItem Content="2" Tag="2"/>
+                        <ComboBoxItem Content="3" Tag="3"/>
+                        <ComboBoxItem Content="4" Tag="4"/>
+                        <ComboBoxItem Content="5" Tag="5"/>
+                    </ComboBox>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Области">
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawForestAdd" Tag="ForestAdd" Click="MapDrawTool_Click" Label="🌲 Лес +"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawForestRemove" Tag="ForestRemove" Click="MapDrawTool_Click" Label="🌲 Лес −"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawSwampAdd" Tag="SwampAdd" Click="MapDrawTool_Click" Label="💧 Болото +"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawSwampRemove" Tag="SwampRemove" Click="MapDrawTool_Click" Label="💧 Болото −"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnMapDrawForbiddenAdd" Tag="ForbiddenAdd" Click="MapDrawTool_Click" ToolTip="Зажмите ЛКМ и обведите запретную область. Путь не сможет войти в неё или коснуться её границы." Label="⛔ Запретная зона"/>
+                    <CheckBox x:Name="ChkShowForbiddenZones" Content="показывать запрет" IsChecked="True" VerticalAlignment="Center" Margin="7,0,2,0" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Область поиска">
+                    <ribbon:RibbonToggleButton x:Name="BtnDrawLasso" Click="BtnDrawLasso_Click" ToolTip="Зажмите ЛКМ и обведите нужную область. Отпустите для завершения." Label="✏️ Рисовать лассо"/>
+                    <CheckBox x:Name="ChkShowLasso" Content="Показывать лассо" IsChecked="False" Margin="5,8,5,0" VerticalAlignment="Top" FontWeight="SemiBold" Checked="ChkShowLasso_Toggled" Unchecked="ChkShowLasso_Toggled" ToolTip="Показать или скрыть визуальное отображение нарисованной области"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Дороги и R29">
+                    <ribbon:RibbonButton Click="EditRoad_Click" Label="Настройка / разделение / соединение"/>
+                    <ribbon:RibbonButton x:Name="BtnGenerateRoadPipes" Click="GenerateRoadPipes_Click" Label="Построить трубы для выбранных дорог" ToolTip="Выделите дороги лассо правой кнопкой, затем нажмите эту кнопку. R29 выполняется только для выбранных дорог."/>
+                    <ribbon:RibbonButton x:Name="BtnCancelRoadGeneration" Click="CancelRoadGeneration_Click" IsEnabled="False" Label="Отмена R29"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Группы объектов">
+                    <ribbon:RibbonButton Label="Лассо правой кнопкой" Click="GroupSelectionHint_Click"/>
+                    <ribbon:RibbonButton Label="Снять выделение" Click="ClearGroupSelection_Click"/>
+                    <ribbon:RibbonButton Label="Настроить выделенные" Click="EditSelectedGroup_Click"/>
+                    <ribbon:RibbonButton Label="R29 для выделенных дорог" Click="GenerateSelectedRoadPipes_Click"/>
+                </ribbon:RibbonGroup>
+            </ribbon:RibbonTab>
+            <ribbon:RibbonTab Header="Вид и настройки">
+                <ribbon:RibbonGroup Header="Размещение площадок">
+                    <ribbon:RibbonButton Label="Рассчитать слои БУОС / узлов" Click="SiteGrid_Click" ToolTip="Отдельное сканирование карты с шагом 50 м. Показ слоёв по умолчанию выключен."/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Панели">
+                    <ribbon:RibbonButton Label="Слои карты" Click="ShowLayersPane_Click"/>
+                    <ribbon:RibbonButton Label="Цвета и толщины" Click="ShowAppearancePane_Click"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnShowProfile" Label="Продольный профиль" IsChecked="True" Click="ShowProfile_Click" ToolTip="Показать или скрыть нижнюю панель профиля. Расчёт профиля продолжает выполняться."/>
+                    <ribbon:RibbonButton Label="Итоговый отчёт" Click="ToggleSidePanel_Click"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Карта">
+                    <ribbon:RibbonToggleButton x:Name="BtnShowRouteWeb" Label="Отображать все маршруты"
+                                               Click="ShowRouteWeb_Click" IsChecked="False"/>
+                    <ribbon:RibbonToggleButton x:Name="BtnTopologyCallouts" Label="Выноски топологии" IsChecked="True" Click="TopologyCallouts_Click"
+                                               ToolTip="Включено: выноски с названиями и пиковыми нагрузками. Выключено: номера прямо на линиях и названия у площадок; подробности при наведении."/>
+                    <ComboBox x:Name="CmbDownsample" Width="100" SelectionChanged="Downsample_Changed">
+                        <ComboBoxItem Content="100% (1 пикс = 10 м)" Tag="1" IsSelected="True"/>
+                        <ComboBoxItem Content="50% (1 пикс = 20 м)" Tag="2"/>
+                        <ComboBoxItem Content="33% (1 пикс = 30 м)" Tag="3"/>
+                        <ComboBoxItem Content="25% (1 пикс = 40 м)" Tag="4"/>
+                        <ComboBoxItem Content="20% (1 пикс = 50 м)" Tag="5"/>
+                    </ComboBox>
+                    <ribbon:RibbonButton Label="Сбросить масштаб" Click="ResetZoom_Click"/>
+                </ribbon:RibbonGroup>
+
+                <ribbon:RibbonGroup Header="Параметры">
+                    <ribbon:RibbonButton Label="Параметры расчёта" Click="OpenInitialSettingsWindow_Click"/>
+                </ribbon:RibbonGroup>
+                <ribbon:RibbonGroup Header="Подготовка">
+                    <StackPanel Margin="3">
+                        <TextBlock Text="Предварительная точка, м"/>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBox x:Name="TxtPrepX" Text="620745.815" Width="90" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="X координата старта (мировые)"/>
+                            <TextBox x:Name="TxtPrepY" Text="6360827.673" Width="90" Margin="2,0" VerticalAlignment="Center" TextAlignment="Center" ToolTip="Y координата старта (мировые)"/>
+                            <Button Content="✓" Click="ApplyPrep_Click" Padding="5,2" Margin="2,0" FontWeight="Bold"/>
+                        </StackPanel>
+                    </StackPanel>
+                </ribbon:RibbonGroup>
+            </ribbon:RibbonTab>
+                        <ribbon:RibbonTab x:Name="TopologyRibbonTab" Header="Топология">
+                    <ribbon:RibbonGroup Header="Исходные данные">
+                        <ribbon:RibbonButton Label="Кусты и профили" Click="TopologyInputs_Click"/>
+                        <ribbon:RibbonButton Label="Точки врезки / сброса" Click="TopologyTieIns_Click" ToolTip="Координаты подключения после БУОС и среды выходных трубопроводов."/>
+                        <ribbon:RibbonButton Label="Настройки" Click="TopologySettings_Click"/>
+                        <ribbon:RibbonButton Label="Варианты оптимизации" Click="TopologyOptimization_Click" ToolTip="Сравнить мощности БУОС, дебиты и сроки ввода КП до или после поиска топологии."/>
+                    </ribbon:RibbonGroup>
+                    <ribbon:RibbonGroup Header="Расчёт сети">
+                        <ribbon:RibbonButton Label="Показать кустовые площадки на карте" Click="TopologyShowPads_Click"
+                                             ToolTip="Показать координаты и названия всех кустов из текущего файла исходных данных без расчёта топологии и проверок размещения."/>
+                        <StackPanel>
+                            <ribbon:RibbonButton Label="Создать все возможные маршруты" Click="TopologySearch_Click"/>
+                            <ribbon:RibbonButton Label="Сохранить все маршруты" Click="SaveRouteWeb_Click"/>
+                            <ribbon:RibbonButton Label="Открыть все маршруты" Click="OpenRouteWeb_Click"/>
+                        </StackPanel>
+                        <StackPanel>
+                            <ribbon:RibbonButton Label="Быстрая трассировка" Click="TopologyQuick_Click"/>
+                            <ribbon:RibbonButton Label="Трассировка в ограничениях" Click="TopologyFullTrace_Click"
+                                                 ToolTip="Трассировать выбранный вариант внутри коридоров, найденных быстрой трассировкой."/>
+                            <ribbon:RibbonButton Label="Трассировка без ограничений" Click="TopologyFreeTrace_Click"
+                                                 ToolTip="Трассировать между закреплёнными точками без коридоров быстрой трассировки. Найденные общие траншеи обязательны. Ограничения карты и проверки труб сохраняются."/>
+                        </StackPanel>
+                        <ribbon:RibbonButton Label="Полная оптимизация" Click="TopologyRefine_Click"/>
+                        <ribbon:RibbonButton Label="Остановить" Click="TopologyCancel_Click"/>
+                    </ribbon:RibbonGroup>
+                    <ribbon:RibbonGroup Header="Результаты">
+                        <StackPanel>
+                            <ribbon:RibbonButton Click="ClearScreen_Click" Label="Очистить экран" ToolTip="Скрыть пути, наложение топологии и обозначения старта/финиша. Координаты и сохранённые трассы остаются."/>
+                            <ribbon:RibbonButton Click="TopologyLoadHistory_Click" Label="Загрузить историю"
+                                                 ToolTip="Открыть .topology.json: восстановить варианты, трассы и расчётные результаты для просмотра, продолжения расчёта и сохранения в DXF."/>
+                        </StackPanel>
+                        <ribbon:RibbonButton Label="Сравнить и сохранить" Click="TopologyResults_Click"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ribbon:RibbonButton Label="Сохранить выбранный вариант в DXF" Click="TopologyExportDxf_Click"/>
+                            <ComboBox x:Name="RouteWebVariants" Width="220" Margin="4,2"
+                                      DisplayMemberPath="Display" SelectionChanged="RouteWebVariant_SelectionChanged"
+                                      ToolTip="До трёх вариантов по стоимости труб. Выберите вариант для трассировки в ограничениях или без ограничений."/>
+                        </StackPanel>
+                        <ListBox x:Name="TopologyVariants" Width="360" Height="78" SelectionMode="Extended" DisplayMemberPath="Display"
+                                 SelectionChanged="TopologyVariant_SelectionChanged" ToolTip="Выберите варианты для следующего этапа. Ctrl/Shift — несколько вариантов. Выбор показывает сеть на карте."/>
+                    </ribbon:RibbonGroup>
+                    <ribbon:RibbonGroup Header="Состояние">
+                        <TextBlock x:Name="TopologyStatus" Text="Перенесите схему на карту и создайте все возможные маршруты." Width="290" TextWrapping="Wrap"/>
+                    </ribbon:RibbonGroup>
+                    <ribbon:RibbonGroup Header="Отчёт">
+                    <ribbon:RibbonButton Label="ИТОГ" Click="ShowFinalSummary_Click" FontSize="16" FontWeight="SemiBold" MinWidth="86" MinHeight="58" Background="#FFE8F0F8" ToolTip="Объёмы, стоимость и гидравлика. Выбор вариантов и номеров трасс."/>
+                </ribbon:RibbonGroup>
+            </ribbon:RibbonTab>
+        </ribbon:Ribbon>
+        </Grid>
+        <!-- ✅ Верхняя лента -->
+        <!-- Основная область -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="5">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition x:Name="ProfilePanelRow" Height="220"/>
+            </Grid.RowDefinitions>
+            <!-- Область карты -->
+            <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="1" Background="White" Margin="0,0,0,2" ClipToBounds="True">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <!-- ScrollViewer для прокрутки и зума карты -->
+                    <ScrollViewer Grid.Row="0" x:Name="MapScrollViewer" PreviewMouseWheel="MapScrollViewer_PreviewMouseWheel" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PanningMode="None" Background="White">
+                        <!-- ✅ Canvas с LayoutTransform для зума -->
+                        <Canvas x:Name="MapCanvas" Width="2000" Height="2000" Background="White" MouseDown="MapCanvas_MouseDown" MouseUp="MapCanvas_MouseUp" MouseLeftButtonDown="MapCanvas_MouseLeftButtonDown" MouseMove="MapCanvas_MouseMove" MouseLeftButtonUp="MapCanvas_MouseLeftButtonUp" MouseRightButtonDown="MapCanvas_MouseRightButtonDown" MouseLeave="MapCanvas_MouseLeave">
+                            <Canvas.LayoutTransform>
+                                <ScaleTransform x:Name="MapScaleTransform" ScaleX="1" ScaleY="1"/>
+                            </Canvas.LayoutTransform>
+                            <!-- Спутниковый ECW: самый нижний геопривязанный растровый слой -->
+                            <Image x:Name="EcwImage" Stretch="Fill" IsHitTestVisible="False" Canvas.ZIndex="0" Canvas.Left="0" Canvas.Top="0"/>
+                            <!-- Высоты/лес + служебная графика. Фон этого слоя прозрачный. -->
+                            <Image x:Name="MapImage" Stretch="None" IsHitTestVisible="False" Canvas.ZIndex="1" Canvas.Left="0" Canvas.Top="0"/>
+                            <!-- ✅ ОВЕРЛЕЙ ПУТЕЙ (поверх карты, под векторными наложениями) -->
+                            <Image x:Name="PathsOverlayImage" Stretch="None" IsHitTestVisible="False" Canvas.ZIndex="5" Canvas.Left="0" Canvas.Top="0"/>
+                        </Canvas>
+                    </ScrollViewer>
+                    <!-- Панель управления зумом внизу -->
+                    <Border Grid.Row="1" Background="#F5F5F5" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="10,5">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="Масштаб:" VerticalAlignment="Center" Margin="0,0,5,0" FontWeight="SemiBold"/>
+                            <TextBox x:Name="TxtZoomPercent" Text="100" Width="60" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" PreviewTextInput="ZoomTextBox_PreviewTextInput" KeyDown="ZoomTextBox_KeyDown"/>
+                            <TextBlock Text="%" VerticalAlignment="Center" Margin="2,0,10,0"/>
+                            <Button Content="Применить" Click="ApplyZoom_Click" Padding="10,3" Margin="0,0,5,0"/>
+                            <Button Content="🔄 Сброс" Click="ResetZoom_Click" Padding="10,3"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Подсказка поверх всего -->
+                    <TextBlock x:Name="MapHint" Text="Загрузите TIFF файл" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20" Foreground="Gray" IsHitTestVisible="False"/>
+                </Grid>
+            </Border>
+            <Border x:Name="ProfileSeparator" Grid.Row="1" Height="2" Background="#E0E0E0" Margin="0"/>
+            <!-- ✅ МОДУЛЬНЫЙ КОНТРОЛ ПРОФИЛЯ -->
+            <controls:ProfileControl x:Name="ProfileControl" Grid.Row="2" Margin="0,2,0,0"/>
+        </Grid>
+        <!-- ✅ ОСНОВНОЙ ОТЧЁТ -->
+        <Grid Grid.Row="1" Grid.Column="2" Width="600" Visibility="{Binding ElementName=RatesPanel, Path=Visibility}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Существующий основной стоимостной отчёт -->
+            <controls:RatesPanel x:Name="RatesPanel" Grid.Row="1" Width="600" Visibility="Collapsed"/>
+        </Grid>
+        <Border Grid.Row="1" Grid.Column="0" Visibility="Collapsed" Width="650" Margin="4" BorderBrush="#C7CDD6" BorderThickness="1" Background="#F7F9FC" x:Name="MapToolsPane">
+            <DockPanel>
+                <Button Content="Закрыть панель ×" Click="CloseMapToolsPane_Click" HorizontalAlignment="Right" Margin="4" Padding="8,4" DockPanel.Dock="Top"/>
+                <TabControl x:Name="MapToolsTabs" SelectionChanged="MapToolsTabs_SelectionChanged">
+                    <TabItem Header="Слои">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <Expander x:Name="ExpLayers" Header="🗂️ Слои карты" IsExpanded="True" Loaded="InfrastructureLayersPanel_Loaded">
+                                <Border Background="White" BorderBrush="#C8E6C9" BorderThickness="1" CornerRadius="3" Padding="7" Margin="0,5,0,0">
+                                    <Grid Width="345">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="55"/>
+                                            <ColumnDefinition Width="45"/>
+                                            <ColumnDefinition Width="20"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="28"/>
+                                            <RowDefinition Height="48"/>
+                                            <RowDefinition Height="34"/>
+                                            <RowDefinition Height="48"/>
+                                            <RowDefinition Height="34"/>
+                                            <RowDefinition Height="34"/>
+                                        </Grid.RowDefinitions>
+                                        <!-- Спутниковый снимок ECW -->
+                                        <CheckBox Grid.Row="0" Grid.Column="0" x:Name="ChkShowEcw" Content="🛰️ Снимок ECW" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="EcwLayerVisibility_Changed" Unchecked="EcwLayerVisibility_Changed" ToolTip="Screen_ESRI.ecw рядом с exe. Независимый визуальный слой, не участвует в Solver."/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="0" Grid.Column="2" x:Name="TxtEcwOpacity" Text="100" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="EcwLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Высоты -->
+                                        <CheckBox Grid.Row="1" Grid.Column="0" x:Name="ChkShowHeight" Content="🏔️ Высоты" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="LayerToggle_Changed" Unchecked="LayerToggle_Changed"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1" Grid.Column="2" x:Name="TxtHeightOpacity" Text="50" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="OpacityTextBox_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Лес -->
+                                        <CheckBox Grid.Row="2" Grid.Column="0" x:Name="ChkShowForest" Content="🌲 Лес" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="LayerToggle_Changed" Unchecked="LayerToggle_Changed"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="2" Grid.Column="2" x:Name="TxtForestOpacity" Text="50" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="OpacityTextBox_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Болота -->
+                                        <CheckBox Grid.Row="3" Grid.Column="0" x:Name="ChkShowSwamps" Content="💧 Болота" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="3" Grid.Column="2" x:Name="TxtSwampOpacity" Text="45" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="ExternalLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Реки -->
+                                        <CheckBox Grid.Row="4" Grid.Column="0" x:Name="ChkShowRiversVector" Content="🌊 Реки (вектор)" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="4" Grid.Column="2" x:Name="TxtRiversOpacity" Text="85" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="ExternalLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Дороги -->
+                                        <CheckBox Grid.Row="5" Grid.Column="0" x:Name="ChkShowRoads" Content="🛣️ Дороги" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="5" Grid.Column="2" x:Name="TxtRoadsOpacity" Text="75" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="ExternalLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="5" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <!-- Трубы без газа -->
+                                        <CheckBox Grid.Row="6" Grid.Column="0" x:Name="ChkShowNonGasPipes" Content="🟠 Трубы без газа" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed" ToolTip="Включая слой ВСТО_ЕГРН"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="6" Grid.Column="2" x:Name="TxtNonGasPipesOpacity" Text="80" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="ExternalLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="6" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="4" x:Name="ChkShowProposedPipes" IsChecked="True" VerticalAlignment="Center" Foreground="DarkViolet" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed" ToolTip="Проезд не тарифицируется только вдоль этих линий. Скрытие слоя не исключает его из поиска.">
+                                            <TextBlock Text="Предполагаемая прокладка трубопроводов" TextWrapping="Wrap" Width="290"/>
+                                        </CheckBox>
+                                        <!-- Газопроводы -->
+                                        <CheckBox Grid.Row="7" Grid.Column="0" x:Name="ChkShowGasPipes" Content="🔴 Газопровод" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold" Checked="ExternalLayerVisibility_Changed" Unchecked="ExternalLayerVisibility_Changed"/>
+                                        <TextBlock Grid.Row="7" Grid.Column="1" Text="Прозр.:" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="7" Grid.Column="2" x:Name="TxtGasPipesOpacity" Text="85" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Bold" TextChanged="ExternalLayerOpacity_TextChanged" PreviewTextInput="OpacityTextBox_PreviewTextInput"/>
+                                        <TextBlock Grid.Row="7" Grid.Column="3" Text="%" VerticalAlignment="Center"/>
+                                        <CheckBox Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="4" x:Name="ChkShowTopologyPipes" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold"
+                                                  Checked="TopologyLayerVisibility_Changed" Unchecked="TopologyLayerVisibility_Changed" ToolTip="Показать или скрыть трубы от кустовых площадок до БУОС и их номера. На расчёт и экспорт не влияет.">
+                                            <TextBlock Text="Трубы топологии (КП → БУОС)" TextWrapping="Wrap" Width="290"/>
+                                        </CheckBox>
+                                        <CheckBox Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="4" x:Name="ChkShowTopologyOutletPipes" IsChecked="True" VerticalAlignment="Center" FontWeight="SemiBold"
+                                                  Checked="TopologyLayerVisibility_Changed" Unchecked="TopologyLayerVisibility_Changed" ToolTip="Отдельные трубы от БУОС до точки врезки / пункта сбора. Рисуются поверх входящей сети, в том числе в общей траншее. На расчёт и экспорт не влияет.">
+                                            <TextBlock Text="Трубы до пункта сбора (от БУОС)" TextWrapping="Wrap" Width="290"/>
+                                        </CheckBox>
+                                        <CheckBox Grid.Row="11" Grid.Column="0" Grid.ColumnSpan="4" x:Name="ChkShowBuosSuitability" Content="Площадки БУОС: объём и цена" Tag="Buos" IsChecked="False" Checked="SiteGridVisibility_Changed" Unchecked="SiteGridVisibility_Changed" ToolTip="Зелёные и красные центры площадок, сетка 50 м. Сначала рассчитайте слой отдельной кнопкой во вкладке Вид и настройки."/>
+                                        <CheckBox Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="4" x:Name="ChkShowJunctionSuitability" Content="Площадки узлов: допустимость" Tag="Junction" IsChecked="False" Checked="SiteGridVisibility_Changed" Unchecked="SiteGridVisibility_Changed" ToolTip="Учитывается полный габарит узла; единственное пространственное ограничение — пересечение реки."/>
+                                    </Grid>
+                                </Border>
+                            </Expander>
+                        </ScrollViewer>
+                    </TabItem>
+                    <TabItem Header="Оформление">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <StackPanel Margin="8" MinWidth="590">
+                                <TextBlock Text="Трубопроводы" FontWeight="Bold" Margin="0,4"/>
+                                <StackPanel x:Name="PipelineStyleEditor"/>
+                                <TextBlock Text="Остальные слои и лассо" FontWeight="Bold" Margin="0,12,0,4"/>
+                                <StackPanel x:Name="LayerStyleEditor"/>
+                                <Button Content="Применить и сохранить оформление" Click="ApplyAppearance_Click" Padding="12,6" HorizontalAlignment="Left" Margin="0,8"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </DockPanel>
+        </Border>
+        <Border Grid.Row="2" Grid.ColumnSpan="3" Background="#EDF1F6" Padding="8,4">
+            <TextBlock x:Name="TxtMapDrawStatus" Text="ПКМ + движение — выбрать объекты лассо. Средняя кнопка — переместить карту." TextWrapping="Wrap" Foreground="#455A64" FontSize="11" Margin="2,6,2,0"/>
+        </Border>
+    </Grid>
+</Window>
