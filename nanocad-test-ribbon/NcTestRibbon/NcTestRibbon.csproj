@@ -8,10 +8,10 @@
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
     <!-- Product / File version. AssemblyVersion stays 1.0.0.0 for any remaining Page shells. -->
-    <Version>1.2.6</Version>
+    <Version>1.2.7</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.6.0</FileVersion>
-    <InformationalVersion>1.2.6+SettingsDedupe</InformationalVersion>
+    <FileVersion>1.2.7.0</FileVersion>
+    <InformationalVersion>1.2.7+PurgeShellXamlCs</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <EnableDefaultPageItems>true</EnableDefaultPageItems>
@@ -45,16 +45,26 @@
   </ItemGroup>
 
   <!--
-    Settings is code-built (Shell\SettingsWindow.cs only).
-    Remove leftovers that survive unzip-over-old-folder (cause CS0111/CS0260).
+    Code-built / embedded shells (NOT Page code-behind):
+      SettingsWindow.cs only
+      TracingSettingsPanel.cs + TracingSettingsPanel.xaml (EmbeddedResource)
+    Unzip-over-old leaves *.xaml.cs twins → CS0101/CS0111. Remove from compile + disk.
+    Keep real Page pairs: MainWindow / ProfileControl / RatesPanel *.xaml.cs
   -->
   <ItemGroup>
     <Compile Remove="Shell\SettingsWindow.xaml.cs" />
+    <Compile Remove="Shell\TracingSettingsPanel.xaml.cs" />
     <Compile Remove="Shell\InitialData.xaml.cs" />
     <Compile Remove="Shell\InitialData.cs" />
+    <Compile Remove="Shell\PadOptimizationWindow.xaml.cs" />
+    <Compile Remove="Shell\TrenchRoadSettingsPanel.xaml.cs" />
+    <Compile Remove="Shell\TracingCache.xaml.cs" />
+    <Compile Remove="Shell\ShellXaml.xaml.cs" />
     <Page Remove="Shell\SettingsWindow.xaml" />
     <Page Remove="Shell\TracingSettingsPanel.xaml" />
     <Page Remove="Shell\InitialData.xaml" />
+    <Page Remove="Shell\PadOptimizationWindow.xaml" />
+    <Page Remove="Shell\TrenchRoadSettingsPanel.xaml" />
     <None Remove="Shell\SettingsWindow.xaml" />
     <None Remove="Shell\InitialData.xaml" />
     <EmbeddedResource Remove="Shell\SettingsWindow.xaml" />
@@ -89,15 +99,24 @@
     <ApplicationDefinition Remove="DemoWindow.xaml" />
   </ItemGroup>
 
-  <!-- Delete leftover Settings XAML/code-behind on disk before compile (unzip over old tree). -->
-  <Target Name="DeleteLegacySettingsShellFiles" BeforeTargets="BeforeBuild;CoreCompile">
+  <!-- Delete leftover Shell files on disk before compile (unzip-over-old tree). -->
+  <Target Name="DeleteLegacyShellDuplicates" BeforeTargets="BeforeBuild;CoreCompile">
     <ItemGroup>
-      <_LegacySettings Include="$(MSBuildProjectDirectory)\Shell\SettingsWindow.xaml" />
-      <_LegacySettings Include="$(MSBuildProjectDirectory)\Shell\SettingsWindow.xaml.cs" />
-      <_LegacySettings Include="$(MSBuildProjectDirectory)\Shell\InitialData.xaml" />
-      <_LegacySettings Include="$(MSBuildProjectDirectory)\Shell\InitialData.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\SettingsWindow.xaml" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\SettingsWindow.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\TracingSettingsPanel.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\InitialData.xaml" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\InitialData.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\InitialData.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\PadOptimizationWindow.xaml" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\PadOptimizationWindow.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\TrenchRoadSettingsPanel.xaml" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\Shell\TrenchRoadSettingsPanel.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\DemoWindow.xaml" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\DemoWindow.xaml.cs" />
+      <_LegacyShell Include="$(MSBuildProjectDirectory)\DemoWindow.cs" />
     </ItemGroup>
-    <Delete Files="@(_LegacySettings)" TreatErrorsAsWarnings="true" />
+    <Delete Files="@(_LegacyShell)" TreatErrorsAsWarnings="true" />
   </Target>
 
   <Target Name="ValidateNcSdk" BeforeTargets="ResolveAssemblyReferences">

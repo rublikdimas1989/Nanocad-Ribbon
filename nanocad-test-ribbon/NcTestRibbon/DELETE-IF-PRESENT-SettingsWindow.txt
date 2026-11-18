@@ -1,12 +1,25 @@
-If Visual Studio reports SettingsWindow defined twice (CS0111/CS0260/CS0121):
+UNPACK v1.2.7+ INTO A NEW FOLDER (do not unzip over an old tree).
 
-Delete these leftover files from NcTestRibbon\Shell\ (from older zips):
+If Visual Studio reports CS0101/CS0111 (class defined twice):
+
+Delete these leftover files from NcTestRibbon\Shell\ if present:
   SettingsWindow.xaml
   SettingsWindow.xaml.cs
+  TracingSettingsPanel.xaml.cs
   InitialData.xaml
   InitialData.xaml.cs
+  InitialData.cs
+  PadOptimizationWindow.xaml
+  PadOptimizationWindow.xaml.cs
+  TrenchRoadSettingsPanel.xaml
+  TrenchRoadSettingsPanel.xaml.cs
 
-Keep only:
+Keep:
   SettingsWindow.cs
+  TracingSettingsPanel.cs
+  TracingSettingsPanel.xaml   (EmbeddedResource, not Page)
+  MainWindow.xaml + MainWindow.xaml.cs
+  ProfileControl.xaml + ProfileControl.xaml.cs
+  RatesPanel.xaml + RatesPanel.xaml.cs
 
-Then Rebuild. INSTALL.bat also removes these leftovers automatically.
+Then Rebuild. INSTALL.bat and MSBuild also delete the leftovers above.

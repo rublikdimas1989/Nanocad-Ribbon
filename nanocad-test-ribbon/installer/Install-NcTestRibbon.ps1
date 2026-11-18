@@ -251,15 +251,30 @@ function Resolve-TestRibbonFiles {
 
 $requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
 
-# Leftovers from unzip-over-old-folder cause CS0111 (SettingsWindow twice).
+# Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
+# Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
 $shellDir = Join-Path $pkgRoot 'NcTestRibbon\Shell'
 foreach ($legacy in @(
         'SettingsWindow.xaml',
         'SettingsWindow.xaml.cs',
+        'TracingSettingsPanel.xaml.cs',
         'InitialData.xaml',
-        'InitialData.xaml.cs'
+        'InitialData.xaml.cs',
+        'InitialData.cs',
+        'PadOptimizationWindow.xaml',
+        'PadOptimizationWindow.xaml.cs',
+        'TrenchRoadSettingsPanel.xaml',
+        'TrenchRoadSettingsPanel.xaml.cs'
     )) {
     $legacyPath = Join-Path $shellDir $legacy
+    if (Test-Path $legacyPath) {
+        Remove-Item -LiteralPath $legacyPath -Force
+        Write-Host "Removed leftover: $legacyPath"
+    }
+}
+$projDir = Join-Path $pkgRoot 'NcTestRibbon'
+foreach ($legacy in @('DemoWindow.xaml', 'DemoWindow.xaml.cs', 'DemoWindow.cs')) {
+    $legacyPath = Join-Path $projDir $legacy
     if (Test-Path $legacyPath) {
         Remove-Item -LiteralPath $legacyPath -Force
         Write-Host "Removed leftover: $legacyPath"
