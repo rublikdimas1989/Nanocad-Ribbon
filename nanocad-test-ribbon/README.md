@@ -3,6 +3,10 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
+Актуальный zip с GitHub (версия **1.1.0**): `nanocad-test-ribbon-v1.1.0.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.0.zip  
+(имя `nanocad-test-ribbon.zip` оставлено как копия — может кэшироваться).
+
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» (Editor + диалог) |

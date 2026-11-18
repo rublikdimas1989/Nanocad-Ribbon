@@ -4,10 +4,14 @@
 
 ## Содержимое репозитория
 
-- [`nanocad-test-ribbon.zip`](nanocad-test-ribbon.zip) — архив пакета (включая `installer/`)
+- **Скачать пакет (актуальный, без кэша старого имени):** [`nanocad-test-ribbon-v1.1.0.zip`](nanocad-test-ribbon-v1.1.0.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.0.zip
 - [`nanocad-test-ribbon/`](nanocad-test-ribbon/) — исходники VS-проекта (то же содержимое)
+- [`nanocad-test-ribbon.zip`](nanocad-test-ribbon.zip) — копия того же архива (старое имя; браузер может кэшировать)
 
 Подробности — в [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
+
+**После скачивания v1.1.0:** распаковать → **обязательно** `dotnet build ... -c Release` → `installer\INSTALL.bat` → `installer\VERIFY.bat` → в nanoCAD команды `NcTestHello` / `NcTestHttp` / `NcTestWpf`.
 
 ## Открыть решение
 
