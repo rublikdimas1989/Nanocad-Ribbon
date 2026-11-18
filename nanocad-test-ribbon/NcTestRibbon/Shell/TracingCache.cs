@@ -40,21 +40,12 @@ namespace NcTestRibbon.Shell
       Directory.CreateDirectory(MapsDir);
       Directory.CreateDirectory(SourceDataDir);
 
-      EnsureTextFile(
-        TracingConf,
-        "# NcTestRibbon tracing settings (shell placeholder)\r\n"
-        + "# Real save/load later. Path is fixed under Tracing_cache\\Settings\\\r\n");
-
+      // tracing.conf is created/overwritten as JSON by AppSettings on first use.
+      // Do not create an empty Price.xlsx — user places the real End workbook there.
       EnsureTextFile(
         TrenchRoadConf,
         "# NcTestRibbon trench/road settings (shell placeholder)\r\n"
-        + "# Real save/load later. Path is fixed under Tracing_cache\\Settings\\\r\n");
-
-      // Touch empty Price.xlsx only if missing — user replaces with real workbook.
-      if (!File.Exists(PriceXlsx))
-      {
-        File.WriteAllBytes(PriceXlsx, Array.Empty<byte>());
-      }
+        + "# Path is fixed under Tracing_cache\\Settings\\\r\n");
     }
 
     private static void EnsureTextFile(string path, string contents)

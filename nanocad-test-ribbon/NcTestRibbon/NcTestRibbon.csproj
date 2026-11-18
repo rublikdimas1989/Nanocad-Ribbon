@@ -8,10 +8,10 @@
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
     <!-- Product / File version. AssemblyVersion stays 1.0.0.0 for any remaining Page shells. -->
-    <Version>1.2.7</Version>
+    <Version>1.2.8</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.7.0</FileVersion>
-    <InformationalVersion>1.2.7+PurgeShellXamlCs</InformationalVersion>
+    <FileVersion>1.2.8.0</FileVersion>
+    <InformationalVersion>1.2.8+LocalRates</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <EnableDefaultPageItems>true</EnableDefaultPageItems>
@@ -32,6 +32,11 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Windows.Controls.Ribbon" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- End-variant Price.xlsx reader (InitialData / TopologyRates path). -->
+    <PackageReference Include="EPPlus" Version="8.6.3" />
   </ItemGroup>
 
   <ItemGroup>

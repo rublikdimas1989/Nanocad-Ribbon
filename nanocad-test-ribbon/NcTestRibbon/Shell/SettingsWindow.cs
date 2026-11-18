@@ -2,7 +2,6 @@ namespace NcTestRibbon.Shell
 {
   using System;
   using System.IO;
-  using System.Text;
   using System.Windows;
   using System.Windows.Controls;
 
@@ -13,6 +12,7 @@ namespace NcTestRibbon.Shell
   public sealed class SettingsWindow : Window
   {
     private readonly TrenchRoadSettingsPanel _trenchPanel = new TrenchRoadSettingsPanel();
+    private readonly TracingSettingsPanel _tracingPanel;
     private readonly TextBlock _cacheInfo = new TextBlock
     {
       Margin = new Thickness(0, 6, 0, 0),
@@ -30,6 +30,7 @@ namespace NcTestRibbon.Shell
       ResizeMode = ResizeMode.CanResize;
 
       TracingCache.EnsureCreated();
+      _tracingPanel = new TracingSettingsPanel();
 
       var root = new DockPanel { Margin = new Thickness(10) };
       Content = root;
@@ -72,7 +73,7 @@ namespace NcTestRibbon.Shell
       tabs.Items.Add(new TabItem
       {
         Header = "Настройки трассировки",
-        Content = new TracingSettingsPanel()
+        Content = _tracingPanel
       });
       tabs.Items.Add(new TabItem
       {
@@ -91,14 +92,14 @@ namespace NcTestRibbon.Shell
       try
       {
         TracingCache.EnsureCreated();
-        WriteTracingConfStub();
+        _tracingPanel.SaveToConfig();
         _trenchPanel.SaveStubConf();
-        StubUi.Notify(
+        MessageBox.Show(
           this,
-          "Settings.Save → "
-          + TracingCache.TracingConf
-          + " ; "
-          + TracingCache.TrenchRoadConf);
+          "Сохранено:\n" + TracingCache.TracingConf + "\n" + TracingCache.TrenchRoadConf,
+          "Настройки",
+          MessageBoxButton.OK,
+          MessageBoxImage.Information);
         DialogResult = true;
       }
       catch (Exception ex)
@@ -112,15 +113,5 @@ namespace NcTestRibbon.Shell
       }
     }
 
-    private static void WriteTracingConfStub()
-    {
-      var sb = new StringBuilder();
-      sb.AppendLine("# tracing.conf — shell snapshot " + DateTime.Now.ToString("O"));
-      sb.AppendLine("price_xlsx=" + TracingCache.PriceXlsx);
-      sb.AppendLine("maps_dir=" + TracingCache.MapsDir);
-      sb.AppendLine("source_data_dir=" + TracingCache.SourceDataDir);
-      sb.AppendLine("# UI values are not serialized yet (shell only).");
-      File.WriteAllText(TracingCache.TracingConf, sb.ToString(), Encoding.UTF8);
-    }
   }
 }
