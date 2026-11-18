@@ -1,6 +1,7 @@
 namespace NcTestRibbon
 {
   using System;
+  using System.Diagnostics;
   using System.Net.Http;
   using System.Threading.Tasks;
   using System.Windows.Forms;
@@ -8,14 +9,12 @@ namespace NcTestRibbon
   using HostMgd.EditorInput;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
+  using WinFormsApp = System.Windows.Forms.Application;
 
   public class TestCommands
   {
     private const string DefaultHttpUrl = "https://httpbin.org/get";
-
-    // Strong reference so a modeless WinForms window is not GC'd.
-    // Command name NcTestWpf is kept for ribbon/compat; UI is WinForms (not WPF).
-    private static DemoForm _demoWindow;
+    private static bool _visualStylesTried;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -69,8 +68,9 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Opens a simple WinForms window with Form.Show() (modeless).
-    /// Command name remains NcTestWpf for ribbon compatibility; UI is not WPF.
+    /// Opens DemoForm with ShowDialog (same modal WinForms path as NcTestHttp).
+    /// Command name NcTestWpf kept for ribbon compatibility; UI is WinForms, not WPF.
+    /// Modeless Form.Show() does not reliably appear under nanoCAD.
     /// </summary>
     [CommandMethod("NcTestWpf")]
     public void NcTestWpf()
@@ -80,40 +80,79 @@ namespace NcTestRibbon
 
       try
       {
-        if (_demoWindow != null && !_demoWindow.IsDisposed && _demoWindow.Visible)
+        ed?.WriteMessage("\nNcTestWpf: start (WinForms ShowDialog).");
+        EnsureVisualStyles(ed);
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        ed?.WriteMessage("\nNcTestWpf: MainWindowHandle=" + hwnd.ToInt64()
+          + ", STA=" + System.Threading.Thread.CurrentThread.GetApartmentState());
+
+        using (DemoForm form = new DemoForm())
         {
-          if (_demoWindow.WindowState == FormWindowState.Minimized)
+          WinFormsApp.DoEvents();
+
+          DialogResult result;
+          if (hwnd != IntPtr.Zero)
           {
-            _demoWindow.WindowState = FormWindowState.Normal;
+            result = form.ShowDialog(new WindowWrapper(hwnd));
+          }
+          else
+          {
+            ed?.WriteMessage("\nNcTestWpf: no owner HWND, ShowDialog() without owner.");
+            result = form.ShowDialog();
           }
 
-          _demoWindow.BringToFront();
-          _demoWindow.Activate();
-          ed?.WriteMessage("\nNcTestWpf: окно уже открыто (WinForms Show / modeless).");
-          return;
+          ed?.WriteMessage("\nNcTestWpf: form closed, DialogResult=" + result);
         }
-
-        _demoWindow = new DemoForm();
-        _demoWindow.FormClosed += (_, __) => { _demoWindow = null; };
-        _demoWindow.Show();
-        _demoWindow.BringToFront();
-        _demoWindow.Activate();
-        ed?.WriteMessage("\nNcTestWpf: открыто WinForms-окно (Show / modeless).");
       }
       catch (System.Exception ex)
       {
-        ed?.WriteMessage("\nNcTestWpf: ошибка — " + ex.GetType().Name + ": " + ex.Message);
-        if (ex.InnerException != null)
+        WriteException(ed, "NcTestWpf", ex);
+        try
         {
-          ed?.WriteMessage("\n  inner: " + ex.InnerException.Message);
+          MessageBox.Show(
+            "NcTestWpf failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            "NcTestWpf",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
         }
-
-        MessageBox.Show(
-          "NcTestWpf failed.\n\n" + ex.GetType().Name + ": " + ex.Message,
-          "NcTestWpf",
-          MessageBoxButtons.OK,
-          MessageBoxIcon.Warning);
+        catch
+        {
+          // ignore secondary UI failures
+        }
       }
+    }
+
+    private static void EnsureVisualStyles(Editor ed)
+    {
+      if (_visualStylesTried)
+      {
+        return;
+      }
+
+      _visualStylesTried = true;
+      try
+      {
+        WinFormsApp.EnableVisualStyles();
+        ed?.WriteMessage("\nNcTestWpf: EnableVisualStyles OK.");
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nNcTestWpf: EnableVisualStyles skipped — " + ex.Message);
+      }
+    }
+
+    private static void WriteException(Editor ed, string prefix, System.Exception ex)
+    {
+      ed?.WriteMessage("\n" + prefix + ": ошибка — " + ex.GetType().FullName + ": " + ex.Message);
+      if (ex.InnerException != null)
+      {
+        ed?.WriteMessage("\n  inner: " + ex.InnerException.GetType().FullName
+          + ": " + ex.InnerException.Message);
+      }
+
+      ed?.WriteMessage("\n  stack: " + (ex.StackTrace ?? string.Empty));
     }
 
     private static string FetchUrl(string url)
@@ -137,19 +176,30 @@ namespace NcTestRibbon
     }
   }
 
+  /// <summary>IWin32Window wrapper for ShowDialog owner (nanoCAD main HWND).</summary>
+  internal sealed class WindowWrapper : IWin32Window
+  {
+    public WindowWrapper(IntPtr handle)
+    {
+      Handle = handle;
+    }
+
+    public IntPtr Handle { get; }
+  }
+
   /// <summary>
-  /// Simple modeless demo UI (WinForms — same stack as NcTestHttp).
+  /// Modal demo UI (WinForms) — same ShowDialog pattern as HttpTestForm / RibbonExecDoc.
   /// </summary>
   internal sealed class DemoForm : Form
   {
     public DemoForm()
     {
       Text = "NcTestWpf — демо окно";
-      StartPosition = FormStartPosition.CenterScreen;
+      StartPosition = FormStartPosition.CenterParent;
       FormBorderStyle = FormBorderStyle.FixedDialog;
       MaximizeBox = false;
-      MinimizeBox = true;
-      ShowInTaskbar = true;
+      MinimizeBox = false;
+      ShowInTaskbar = false;
       ClientSize = new System.Drawing.Size(420, 160);
 
       Label title = new Label
@@ -165,8 +215,8 @@ namespace NcTestRibbon
       {
         AutoSize = false,
         Text = "Отдельная форма плагина nanoCAD.\n"
-          + "Команда NcTestWpf открывает это окно через Form.Show()\n"
-          + "(modeless — nanoCAD остаётся доступным).",
+          + "Команда NcTestWpf открывает это окно через Form.ShowDialog()\n"
+          + "(как NcTestHttp — modal WinForms).",
         Location = new System.Drawing.Point(16, 52),
         Size = new System.Drawing.Size(388, 60)
       };
@@ -174,11 +224,11 @@ namespace NcTestRibbon
       Button closeButton = new Button
       {
         Text = "OK / Закрыть",
+        DialogResult = DialogResult.OK,
         Location = new System.Drawing.Point(284, 120),
         Width = 120,
         Height = 28
       };
-      closeButton.Click += (_, __) => Close();
       AcceptButton = closeButton;
 
       Controls.Add(title);

@@ -18,7 +18,7 @@
     {
       "intername": "NcTestWpf",
       "displayName": "Окно",
-      "tooltip": "Тестовая кнопка 3: открыть отдельное WinForms-окно (Show / modeless). Команда NcTestWpf.",
+      "tooltip": "Тестовая кнопка 3: открыть отдельное WinForms-окно (ShowDialog / modal). Команда NcTestWpf.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     }

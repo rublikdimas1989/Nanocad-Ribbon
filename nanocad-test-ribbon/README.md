@@ -7,7 +7,7 @@
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» (Editor + диалог) |
 | `NcTestHttp` | WinForms: URL → `HttpClient` GET (по умолчанию `https://httpbin.org/get`); ошибка — MessageBox |
-| `NcTestWpf` | **WinForms** (не WPF): отдельное окно `DemoForm` через `Form.Show()` — **modeless**; имя команды сохранено для совместимости |
+| `NcTestWpf` | **WinForms** (не WPF): `DemoForm` через `Form.ShowDialog(owner)` — тот же modal-путь, что у `NcTestHttp` |
 
 Сборка: `NC_TestRibbon.dll`  
 Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
@@ -48,11 +48,7 @@ nanocad-test-ribbon/
    (чтобы появился `%APPDATA%\Nanosoft\nanoCAD*\Config\Cfg.ini`).
 4. Из каталога `installer\` запустите `INSTALL.bat`  
    (или `Install-NcTestRibbon.ps1`).
-
-После копирования DLL и регистрации Startup установщик **сам запускает nanoCAD два раза**:
-1-й запуск — прогрев ленты/кэша (окно закрывается скриптом), 2-й — оставляет nanoCAD открытым.
-Путь к `nCad.exe` ищется в `Program Files\Nanosoft*` с предпочтением имени профиля из `%APPDATA%\Nanosoft`.
-Если exe не найден — установка всё равно завершена; запустите nanoCAD вручную дважды.
+5. Запустите nanoCAD вручную и проверьте команды / ленту «Тест».
 
 Что делает установщик:
 
@@ -189,7 +185,7 @@ NcTestHttp
 NcTestWpf
 ```
 
-Ожидание: отдельное **WinForms**-окно «Демо-окно (WinForms)» (кнопка OK / Закрыть). Открыто через `Form.Show()` (**modeless**): можно продолжать работу в nanoCAD. Повторный вызов активирует уже открытое окно. Ошибки пишутся в командную строку (`Editor.WriteMessage`). WPF в проекте **нет**.
+Ожидание: отдельное **WinForms**-окно «Демо-окно (WinForms)» (кнопка OK / Закрыть). Открыто через `Form.ShowDialog()` с владельцем — главным HWND nanoCAD (**modal**, как `NcTestHttp`). В командную строку пишутся start/HWND/результат и любые исключения. WPF в проекте **нет**.
 
 Если команда «неизвестна» — DLL не загрузилась: проверьте Startup, путь, что сборка `net6.0-windows`, что nanoCAD 24 x64.
 
