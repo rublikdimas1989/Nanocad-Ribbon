@@ -13,6 +13,7 @@ namespace NcTestRibbon
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
   using WinFormsApp = System.Windows.Forms.Application;
+  using WinFormsIWin32Window = System.Windows.Forms.IWin32Window;
   using WpfApp = System.Windows.Application;
   using WpfWindow = System.Windows.Window;
 
@@ -234,8 +235,11 @@ namespace NcTestRibbon
     }
   }
 
-  /// <summary>IWin32Window wrapper for ShowDialog owner (nanoCAD main HWND).</summary>
-  internal sealed class WindowWrapper : IWin32Window
+  /// <summary>
+  /// WinForms IWin32Window wrapper for Form.ShowDialog(owner).
+  /// WPF windows use WindowInteropHelper.Owner instead (no Forms IWin32Window).
+  /// </summary>
+  internal sealed class WindowWrapper : WinFormsIWin32Window
   {
     public WindowWrapper(IntPtr handle)
     {
