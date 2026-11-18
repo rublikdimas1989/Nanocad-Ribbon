@@ -1,0 +1,6 @@
+# Machine-specific SDK path (from Directory.Build.props.example)
+Directory.Build.props
+bin/
+obj/
+*.user
+*.suo

@@ -3,9 +3,34 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.1.0**): `nanocad-test-ribbon-v1.1.0.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.0.zip  
-(имя `nanocad-test-ribbon.zip` оставлено как копия — может кэшироваться).
+Актуальный zip с GitHub (версия **1.1.1**): `nanocad-test-ribbon-v1.1.1.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.1.zip  
+
+### Быстрая пересборка (если CS0246 HostMgd / Teigha)
+
+1. Скачайте **v1.1.1**, распакуйте в **новую** папку (не поверх старой с `DemoWindow.xaml`).
+2. Если в `NcTestRibbon\` остались `DemoWindow.xaml` / `DemoWindow.xaml.cs` — **удалите** их (это старый WPF; сейчас только WinForms в `Commands.cs`).
+3. Укажите путь к SDK (папка, где есть `include-x64\hostmgd.dll`):
+
+```powershell
+cd NcTestRibbon
+copy Directory.Build.props.example Directory.Build.props
+notepad Directory.Build.props
+```
+
+В `NcSdkDir` впишите свой путь (пробелы в YandexDisk — нормально), например:
+
+`C:\Users\bublik_da\YandexDisk\...\NC_SDK_RU_24.0.6388.4326.7145\`
+
+Или одной командой (кавычки обязательны при пробелах):
+
+```powershell
+dotnet build NcTestRibbon.csproj -c Release `
+  -p:NcSdkDir="C:\Users\bublik_da\YandexDisk\PATH\NC_SDK_RU_24.0.6388.4326.7145\"
+```
+
+4. `dotnet build NcTestRibbon.csproj -c Release`
+5. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` → nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
 
 | Команда | Что делает |
 |---------|------------|
@@ -36,9 +61,11 @@ nanocad-test-ribbon/
     NcTestRibbon.csproj
     Plugin.cs                 ← IExtensionApplication
     Commands.cs               ← NcTestHello / NcTestHttp / NcTestWpf (DemoForm WinForms)
+    Directory.Build.props.example  ← скопировать в Directory.Build.props и задать NcSdkDir
     icons/hello.ico
     icons/http.ico
     icons/wpf.ico             ← icon for ribbon «Окно» (NC_ICONS.wpf.ico)
+    (нет DemoWindow.xaml — WPF удалён)
 ```
 
 ---
@@ -90,29 +117,31 @@ NcTestWpf
 3. Откройте `NcTestRibbon\NcTestRibbon.sln` двойным щелчком  
    **или** `NcTestRibbon.csproj` → «Open with Visual Studio».
 
-### Путь к SDK (`NcSdkDir`)
+### Путь к SDK (`NcSdkDir`) — устранение CS0246
 
-В `NcTestRibbon.csproj` задано:
+Ошибки `CS0246: HostMgd / Teigha / CommandMethod / Document / Editor` значат: **Visual Studio не видит SDK**.  
+Нужна папка SDK с файлами `include-x64\hostmgd.dll` и `hostdbmgd.dll`.
+
+**Рекомендуемый способ** (путь с пробелами / YandexDisk ок):
+
+1. `copy Directory.Build.props.example Directory.Build.props`
+2. В `Directory.Build.props` задайте:
 
 ```xml
-<NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\NC_SDK_RU_24.0\</NcSdkDir>
+<NcSdkDir>C:\Users\bublik_da\YandexDisk\ВАША_ПАПКА\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
 ```
 
-HintPath ссылок: `$(NcSdkDir)include-x64\hostmgd.dll` и `hostdbmgd.dll` (`Private=False` — в выход не копируются).
+3. Reload проекта / Rebuild.
 
-**Как указать свой SDK:**
-
-- Править `NcSdkDir` в `.csproj`, **или**
-- Сборка из командной строки:
+**Альтернатива — командная строка** (кавычки при пробелах):
 
 ```powershell
-dotnet build NcTestRibbon\NcTestRibbon.csproj -c Release `
-  -p:NcSdkDir="C:\Users\...\NC_SDK_RU_24.0.6388.4326.7145\"
+dotnet build NcTestRibbon.csproj -c Release `
+  -p:NcSdkDir="C:\Users\bublik_da\YandexDisk\PATH\NC_SDK_RU_24.0.6388.4326.7145\"
 ```
 
-(Слеш в конце пути желателен.)
-
-Также можно положить SDK рядом и править HintPath под относительный путь — главное, чтобы `hostmgd` / `hostdbmgd` находились при сборке.
+По умолчанию в `.csproj`: `C:\NC_SDK_RU_24.0\` (если `NcSdkDir` не задан).  
+При сборке скрипт сам добавит `\` в конце пути, если его нет. Если `hostmgd.dll` не найден — сборка остановится с понятным текстом вместо «тихих» CS0246.
 
 ---
 
@@ -249,7 +278,7 @@ NcTestWpf
 | Что | Зачем |
 |-----|--------|
 | `net6.0-windows` | runtime nanoCAD 24 |
-| `UseWindowsForms` | WinForms (`NcTestHttp` modal + `NcTestWpf` / DemoForm modeless). **WPF не используется** |
+| `UseWindowsForms` | WinForms (`NcTestHttp` + `NcTestWpf` / `DemoForm`, оба `ShowDialog`). **WPF не используется** |
 | `hostmgd` / `hostdbmgd` | Document, Editor, `[CommandMethod]`, `IExtensionApplication` |
 
 См. также: `docs/nanocad-ribbon-reference.md` — архитектура образца RibbonExecDoc.

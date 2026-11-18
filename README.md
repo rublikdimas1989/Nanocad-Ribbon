@@ -4,44 +4,44 @@
 
 ## Содержимое репозитория
 
-- **Скачать пакет (актуальный, без кэша старого имени):** [`nanocad-test-ribbon-v1.1.0.zip`](nanocad-test-ribbon-v1.1.0.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.0.zip
-- [`nanocad-test-ribbon/`](nanocad-test-ribbon/) — исходники VS-проекта (то же содержимое)
-- [`nanocad-test-ribbon.zip`](nanocad-test-ribbon.zip) — копия того же архива (старое имя; браузер может кэшировать)
+- **Скачать пакет (актуальный):** [`nanocad-test-ribbon-v1.1.1.zip`](nanocad-test-ribbon-v1.1.1.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.1.1.zip
+- [`nanocad-test-ribbon/`](nanocad-test-ribbon/) — исходники VS-проекта
+- Старые имена zip (`v1.1.0`, `nanocad-test-ribbon.zip`) могут кэшироваться — берите **v1.1.1**
 
 Подробности — в [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-**После скачивания v1.1.0:** распаковать → **обязательно** `dotnet build ... -c Release` → `installer\INSTALL.bat` → `installer\VERIFY.bat` → в nanoCAD команды `NcTestHello` / `NcTestHttp` / `NcTestWpf`.
+## Быстрый старт (после скачивания v1.1.1)
 
-## Открыть решение
-
-1. Установите Visual Studio 2022 (.NET Desktop) и **nanoCAD SDK 24**.
-2. Откройте `nanocad-test-ribbon/NcTestRibbon/NcTestRibbon.sln`.
-
-По умолчанию путь к SDK в `.csproj`: `C:\NC_SDK_RU_24.0\` (свой путь — через `NcSdkDir`).
-
-## Сборка
+1. Распаковать в **новую** папку. Если видите `DemoWindow.xaml` — удалить (старый WPF; в v1.1.1 его нет).
+2. Указать SDK (нужен `include-x64\hostmgd.dll`):
 
 ```powershell
 cd nanocad-test-ribbon\NcTestRibbon
+copy Directory.Build.props.example Directory.Build.props
+notepad Directory.Build.props
+```
+
+В `NcSdkDir` — ваш путь, пробелы (YandexDisk) допустимы, например  
+`C:\Users\bublik_da\YandexDisk\...\NC_SDK_RU_24.0.6388.4326.7145\`
+
+3. Сборка и установка:
+
+```powershell
 dotnet build NcTestRibbon.csproj -c Release
+cd ..\installer
+.\INSTALL.bat
+.\VERIFY.bat
 ```
 
-DLL: `bin\Release\net6.0-windows\NC_TestRibbon.dll`.
+4. nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf`
 
-## Установка (после сборки или после переустановки nanoCAD)
+Если Error List = **CS0246 HostMgd/Teigha** — неверный `NcSdkDir` (см. выше).  
+Если Error List = **Window / RoutedEventArgs / DemoWindow** — удалите старые `DemoWindow.*` и откройте свежий v1.1.1.
 
-Закройте nanoCAD. Если nanoCAD только что переустановили — один раз запустите и закройте его (создаётся `Cfg.ini`), затем:
+## Открыть решение
 
-```text
-nanocad-test-ribbon\installer\INSTALL.bat
-```
+1. Visual Studio 2022 (.NET Desktop) + **nanoCAD SDK 24**.
+2. `nanocad-test-ribbon/NcTestRibbon/NcTestRibbon.sln`.
 
-Установщик ставит **NcBootstrap** + **перезаписывает** `NC_TestRibbon` в LoadFile и прописывает Startup (nanoCAD **не** запускается автоматически). Перед копированием проверяет, что DLL содержит `NcTestHello` / `NcTestHttp` / `NcTestWpf` (иначе отказ — нужна пересборка Release). Панель «Рамки» / `NC_RibbonExecDoc` **не** устанавливается.
-
-Удаление: `nanocad-test-ribbon\installer\UNINSTALL.bat`.  
-Проверка DLL: `nanocad-test-ribbon\installer\VERIFY.bat`.
-
-Быстрый деплой без bootstrap: `nanocad-test-ribbon\dev-deploy.ps1` (опция `-RegisterStartup`).
-
-После запуска nanoCAD: `NcTestHello` / `NcTestHttp` / `NcTestWpf` (лента «Окно»). Если `NcTestWpf` неизвестна — старая DLL; rebuild + INSTALL.
+SDK: через `Directory.Build.props` или `-p:NcSdkDir="..."`.

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copy this file to: Directory.Build.props  (same folder as NcTestRibbon.csproj)
+  Then set NcSdkDir to YOUR nanoCAD SDK folder (the one that contains include-x64\hostmgd.dll).
+
+  Example (spaces in path are OK inside the XML value):
+    C:\Users\bublik_da\YandexDisk\Work\NC_SDK_RU_24.0.6388.4326.7145\
+
+  Do NOT commit Directory.Build.props if it has a machine-specific path.
+-->
+<Project>
+  <PropertyGroup>
+    <NcSdkDir>C:\NC_SDK_RU_24.0\</NcSdkDir>
+  </PropertyGroup>
+</Project>

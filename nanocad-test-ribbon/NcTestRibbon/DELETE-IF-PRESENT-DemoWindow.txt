@@ -1,0 +1,5 @@
+If your Visual Studio Error List still mentions DemoWindow.xaml / Window / RoutedEventArgs:
+delete these files from THIS folder if they exist, then Rebuild:
+  DemoWindow.xaml
+  DemoWindow.xaml.cs
+They are obsolete. This project uses WinForms DemoForm inside Commands.cs only (no WPF).
