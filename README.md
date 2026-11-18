@@ -33,7 +33,7 @@ DLL: `bin\Release\net6.0-windows\NC_TestRibbon.dll`.
 nanocad-test-ribbon\installer\INSTALL.bat
 ```
 
-Установщик ставит **NcBootstrap** + копирует **только** `NC_TestRibbon` в LoadFile и прописывает Startup. Панель «Рамки» / `NC_RibbonExecDoc` **не** устанавливается (остатки счищаются; `serverUrl` в bootstrap пустой — без ASDC).
+Установщик ставит **NcBootstrap** + копирует **только** `NC_TestRibbon` в LoadFile и прописывает Startup, затем **дважды запускает nanoCAD** (1-й — прогрев ленты и закрытие, 2-й — оставляет открытым). Панель «Рамки» / `NC_RibbonExecDoc` **не** устанавливается (остатки счищаются; `serverUrl` в bootstrap пустой — без ASDC).
 
 Удаление: `nanocad-test-ribbon\installer\UNINSTALL.bat`.
 

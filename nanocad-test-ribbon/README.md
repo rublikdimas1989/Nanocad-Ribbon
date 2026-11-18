@@ -49,6 +49,11 @@ nanocad-test-ribbon/
 4. Из каталога `installer\` запустите `INSTALL.bat`  
    (или `Install-NcTestRibbon.ps1`).
 
+После копирования DLL и регистрации Startup установщик **сам запускает nanoCAD два раза**:
+1-й запуск — прогрев ленты/кэша (окно закрывается скриптом), 2-й — оставляет nanoCAD открытым.
+Путь к `nCad.exe` ищется в `Program Files\Nanosoft*` с предпочтением имени профиля из `%APPDATA%\Nanosoft`.
+Если exe не найден — установка всё равно завершена; запустите nanoCAD вручную дважды.
+
 Что делает установщик:
 
 - копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
