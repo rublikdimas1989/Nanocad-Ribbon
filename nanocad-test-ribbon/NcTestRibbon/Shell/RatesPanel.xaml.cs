@@ -17,6 +17,13 @@ namespace NcTestRibbon.Shell
     {
       StubUi.Notify(this, "RatesPanel.ExportToExcel_Click");
     }
+
+    private void CostDataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+    {
+      // Stub: editing disabled for shell UI (server later).
+      e.Cancel = true;
+      StubUi.Notify(this, "RatesPanel.CostDataGrid_BeginningEdit");
+    }
   }
 
   /// <summary>Stub converter so RatesPanel XAML loads without Cost/EPPlus logic.</summary>
@@ -24,7 +31,8 @@ namespace NcTestRibbon.Shell
   {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-      return value == null ? string.Empty : Convert.ToString(value, culture);
+      // Use System.Convert explicitly — Convert alone binds to this method (CS0119).
+      return value == null ? string.Empty : System.Convert.ToString(value, culture);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

@@ -40,6 +40,27 @@ private void ApplyZoom_Click(object sender, System.Windows.RoutedEventArgs e)
       StubUi.Notify(this, "MainWindow.ApplyZoom_Click");
     }
 
+private void ZoomTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+      // Stub: allow digits only later; for now do not block input.
+      e.Handled = false;
+    }
+
+private void ZoomTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+      if (e.Key == System.Windows.Input.Key.Enter)
+      {
+        StubUi.Notify(this, "MainWindow.ZoomTextBox_KeyDown(Enter)");
+        e.Handled = true;
+      }
+    }
+
+private void OpacityTextBox_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+      // Stub: numeric filter not enforced in shell UI.
+      e.Handled = false;
+    }
+
 private void BtnApplyRouteEdits_Click(object sender, System.Windows.RoutedEventArgs e)
     {
       StubUi.Notify(this, "MainWindow.BtnApplyRouteEdits_Click");

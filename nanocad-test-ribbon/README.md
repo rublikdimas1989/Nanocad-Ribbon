@@ -3,14 +3,14 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.0**): `nanocad-test-ribbon-v1.2.0.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.0.zip  
+Актуальный zip с GitHub (версия **1.2.2**): `nanocad-test-ribbon-v1.2.2.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.2.zip  
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.0**, распакуйте в **новую** папку.
+1. Скачайте **v1.2.2**, распакуйте в **новую** папку.
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
 4. nanoCAD: `NcTestWpf` (MainWindow) / `NcTestInitialData` / `NcTestHello` / `NcTestHttp`
