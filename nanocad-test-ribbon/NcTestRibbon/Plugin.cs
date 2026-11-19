@@ -30,6 +30,14 @@ namespace NcTestRibbon
       {
       }
 
+      try
+      {
+        CadPadOverlay.Clear();
+      }
+      catch
+      {
+      }
+
       AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
     }
 

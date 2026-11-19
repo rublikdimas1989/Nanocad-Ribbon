@@ -71,6 +71,91 @@ namespace NcTestRibbon.Rates
       return data;
     }
 
+    /// <summary>
+    /// Writes updated X/Y for named pads into sheet «КП» of the open workbook.
+    /// </summary>
+    public static int SavePadCoordinates(string workbookPath, IEnumerable<PadRecord> pads)
+    {
+      if (string.IsNullOrWhiteSpace(workbookPath) || !File.Exists(workbookPath))
+      {
+        throw new FileNotFoundException("Файл таблиц КП не найден.", workbookPath);
+      }
+
+      if (pads == null)
+      {
+        return 0;
+      }
+
+      var byName = new Dictionary<string, PadRecord>(StringComparer.OrdinalIgnoreCase);
+      foreach (PadRecord pad in pads)
+      {
+        if (pad != null && !string.IsNullOrWhiteSpace(pad.Name))
+        {
+          byName[pad.Name] = pad;
+        }
+      }
+
+      if (byName.Count == 0)
+      {
+        return 0;
+      }
+
+      using var package = new ExcelPackage(new FileInfo(workbookPath));
+      ExcelWorksheet sheet = package.Workbook.Worksheets["КП"]
+        ?? package.Workbook.Worksheets[0]
+        ?? throw new InvalidDataException("В книге нет листа «КП».");
+
+      var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      int cols = Math.Max(sheet.Dimension?.End.Column ?? 0, 1);
+      int rows = Math.Max(sheet.Dimension?.End.Row ?? 0, 1);
+      for (int c = 1; c <= cols; c++)
+      {
+        string key = (sheet.Cells[1, c].Text ?? string.Empty).Trim();
+        if (!string.IsNullOrEmpty(key) && !headers.ContainsKey(key))
+        {
+          headers[key] = c;
+        }
+      }
+
+      int Col(params string[] names)
+      {
+        foreach (string name in names)
+        {
+          if (headers.TryGetValue(name, out int index))
+          {
+            return index;
+          }
+        }
+
+        return -1;
+      }
+
+      int nameCol = Col("name", "КП", "Name");
+      int xCol = Col("x", "X");
+      int yCol = Col("y", "Y");
+      if (nameCol < 0 || xCol < 0 || yCol < 0)
+      {
+        throw new InvalidDataException("Лист «КП» должен содержать столбцы name/x/y.");
+      }
+
+      int updated = 0;
+      for (int r = 2; r <= rows; r++)
+      {
+        string name = (sheet.Cells[r, nameCol].Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(name) || !byName.TryGetValue(name, out PadRecord pad))
+        {
+          continue;
+        }
+
+        sheet.Cells[r, xCol].Value = pad.X;
+        sheet.Cells[r, yCol].Value = pad.Y;
+        updated++;
+      }
+
+      package.Save();
+      return updated;
+    }
+
     private static List<PadRecord> ReadPadSheet(ExcelPackage package)
     {
       ExcelWorksheet sheet = package.Workbook.Worksheets["КП"]

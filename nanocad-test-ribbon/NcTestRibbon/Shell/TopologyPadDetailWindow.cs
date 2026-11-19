@@ -60,8 +60,10 @@ namespace NcTestRibbon.Shell
       });
       header.Children.Add(new TextBlock
       {
-        Text = FormattableString.Invariant(
-          $"X={pad.X:G17}; Y={pad.Y:G17}; {pad.WidthM:0.###}×{pad.LengthM:0.###} м; P={pad.PressureBar:0.###} бар; separation={pad.SeparationMode}"),
+        Text = string.Format(
+          CultureInfo.InvariantCulture,
+          "X={0:G17}; Y={1:G17}; {2:0.###}×{3:0.###} м; P={4:0.###} бар; separation={5}",
+          pad.X, pad.Y, pad.WidthM, pad.LengthM, pad.PressureBar, pad.SeparationMode),
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 0, 0, 2)
       });
@@ -77,8 +79,10 @@ namespace NcTestRibbon.Shell
       string units = book?.UnitsNote;
       if (string.IsNullOrWhiteSpace(units))
       {
-        units = FormattableString.Invariant(
-          $"oil={book?.OilUnit}; liquid={book?.LiquidUnit}; gas={book?.GasUnit}");
+        units = string.Format(
+          CultureInfo.InvariantCulture,
+          "oil={0}; liquid={1}; gas={2}",
+          book?.OilUnit, book?.LiquidUnit, book?.GasUnit);
       }
 
       header.Children.Add(new TextBlock
@@ -90,12 +94,19 @@ namespace NcTestRibbon.Shell
 
       double combined = load?.CombinedCapacity ?? PadLoadPreview.DefaultCombinedCapacity;
       double gasCap = load?.GasCapacity ?? PadLoadPreview.DefaultGasCapacity;
+      string buosLine = string.Format(
+        CultureInfo.InvariantCulture,
+        "БУОС (один): жидкость/нефть ≤ {0:N0} м³/сут; газ ≤ {1:N0} м³/сут",
+        combined, gasCap);
+      buosLine += book?.CapacitiesFromBuosSheet == true ? " (из листа БУОС)" : " (по умолчанию End)";
+      if (!string.IsNullOrWhiteSpace(load?.DensityNote))
+      {
+        buosLine += "; " + load.DensityNote;
+      }
+
       header.Children.Add(new TextBlock
       {
-        Text = FormattableString.Invariant(
-          $"БУОС (один): жидкость/нефть ≤ {combined:N0} м³/сут; газ ≤ {gasCap:N0} м³/сут"
-          + (book?.CapacitiesFromBuosSheet == true ? " (из листа БУОС)" : " (по умолчанию End)")
-          + (string.IsNullOrWhiteSpace(load?.DensityNote) ? string.Empty : "; " + load.DensityNote)),
+        Text = buosLine,
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 4, 0, 0)
       });

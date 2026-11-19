@@ -3,9 +3,10 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.15**): `nanocad-test-ribbon-v1.2.15.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.15.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.15/nanocad-test-ribbon-v1.2.15.zip  
+Актуальный zip с GitHub (версия **1.2.16**): `nanocad-test-ribbon-v1.2.16.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.16.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.16/nanocad-test-ribbon-v1.2.16.zip  
+
 
 
 
@@ -13,7 +14,7 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.15**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.16**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -25,7 +26,7 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
 | `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
-| `NcTestPadOpt` | Просмотр КП из Excel; **двойной щелчок** → профили + «Ограничивает в месяце» |
+| `NcTestPadOpt` | КП из Excel; чертёж / ручная расстановка / сохранение X/Y; двойной щелчок → профили |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
 | `NcTestBlinkOff` | принудительно выключить мигание |
 | `NcTestDemo` | маленький WinForms smoke |
@@ -84,14 +85,14 @@ NcTestPadOpt
 NcTestBlink
 ```
 
-### Кустовые площадки (v1.2.15)
+### Кустовые площадки (v1.2.16)
 
 `NcTestPadOpt` / лента **Кустовые площадки**:
 
-- Excel свойств / таблицы КП — только **Обзор…** (сразу load + `paths.json`)
-- Читает листы **КП**, **Профили**, опционально ёмкости с **БУОС**
-- **Двойной щелчок** по КП → окно профилей с колонкой **Ограничивает в месяце** (End `TopologyPadLoadPreview`)
-- Окно по-прежнему без редактирования / расчёта сети
+- **Показывать на чертеже** — прямоугольники (ширина×длина), подпись сверху (высота текста = ½ ширины)
+- Выбрать строку → **Задать положение вручную** (окно скрывается, jig следует за курсором) → жёлтая строка → **Сохранить координаты** (подтверждение, запись X/Y в лист «КП»)
+- **Двойной щелчок** → профили + **Ограничивает в месяце**
+- Fix: CS1503 `FormattableString.Invariant` в детальном окне
 
 ### Мигание сегмента (v1.2.13+)
 

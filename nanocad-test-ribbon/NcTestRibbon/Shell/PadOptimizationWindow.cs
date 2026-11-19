@@ -1,6 +1,7 @@
 namespace NcTestRibbon.Shell
 {
   using System;
+  using System.Collections.Generic;
   using System.Globalization;
   using System.IO;
   using System.Linq;
@@ -10,11 +11,12 @@ namespace NcTestRibbon.Shell
   using System.Windows.Input;
   using System.Windows.Media;
   using Microsoft.Win32;
+  using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
 
   /// <summary>
-  /// Display-only KP table from Excel. Double-click opens profiles + «Ограничивает в месяце».
+  /// KP table from Excel: view profiles, draw pads on CAD, place manually, save X/Y.
   /// </summary>
   public sealed class PadOptimizationWindow : Window
   {
@@ -25,16 +27,32 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _log;
     private readonly TextBlock _status;
     private readonly DataGrid _grid;
+    private readonly CheckBox _showOnDrawing;
+    private readonly Button _placeButton;
+    private readonly Button _saveButton;
     private PadWorkbookLoader.WorkbookData _book;
 
     public PadOptimizationWindow()
     {
       Title = "Кустовые площадки";
       Width = 1100;
-      Height = 640;
+      Height = 680;
       MinWidth = 720;
       MinHeight = 480;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
+      Closed += (_, __) =>
+      {
+        try
+        {
+          if (_showOnDrawing.IsChecked == true)
+          {
+            CadPadOverlay.Clear();
+          }
+        }
+        catch
+        {
+        }
+      };
 
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
@@ -73,7 +91,7 @@ namespace NcTestRibbon.Shell
         return box;
       }
 
-      void Button(Panel parent, string label, Action action)
+      void Button(Panel parent, string label, Action action, out Button created)
       {
         var button = new Button
         {
@@ -94,19 +112,47 @@ namespace NcTestRibbon.Shell
           }
         };
         parent.Children.Add(button);
+        created = button;
       }
 
       var fluidRow = Row();
       _fluidFile = Field(fluidRow, "Excel свойств:", paths.FluidProperties ?? string.Empty, 420);
-      Button(fluidRow, "Обзор…", () => BrowseFluidExcel());
+      Button(fluidRow, "Обзор…", () => BrowseFluidExcel(), out _);
 
       var tables = Row();
       _tablesFile = Field(tables, "Таблицы КП (xlsx):", paths.PadsWorkbook ?? string.Empty, 420);
-      Button(tables, "Обзор…", () => BrowsePadsWorkbook());
+      Button(tables, "Обзор…", () => BrowsePadsWorkbook(), out _);
+
+      var cadRow = Row();
+      _showOnDrawing = new CheckBox
+      {
+        Content = "Показывать на чертеже",
+        VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(5, 3, 12, 3)
+      };
+      _showOnDrawing.Checked += (_, __) => RefreshDrawingOverlay();
+      _showOnDrawing.Unchecked += (_, __) =>
+      {
+        try
+        {
+          CadPadOverlay.Clear();
+          Log("Подписи КП на чертеже скрыты.");
+        }
+        catch (Exception ex)
+        {
+          Log("Не удалось очистить чертёж: " + ex.Message);
+        }
+      };
+      cadRow.Children.Add(_showOnDrawing);
+
+      Button(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
+      _placeButton.IsEnabled = false;
+      Button(cadRow, "Сохранить координаты", () => SaveCoordinates(), out _saveButton);
+      _saveButton.IsEnabled = false;
 
       top.Children.Add(new TextBlock
       {
-        Text = "Только просмотр. Двойной щелчок по КП — профили и «Ограничивает в месяце». Правки — в Excel.",
+        Text = "Двойной щелчок — профили. Жёлтая строка — координаты изменены, сохраните в Excel.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -151,6 +197,8 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
       _grid.MouseDoubleClick += Grid_MouseDoubleClick;
+      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
+      _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
       if (!string.IsNullOrWhiteSpace(paths.FluidProperties) && File.Exists(paths.FluidProperties))
@@ -173,6 +221,26 @@ namespace NcTestRibbon.Shell
       {
         Log("Откройте таблицы КП (xlsx) через «Обзор…».");
       }
+
+      UpdateActionButtons();
+    }
+
+    private void Grid_LoadingRow(object sender, DataGridRowEventArgs e)
+    {
+      if (e.Row.Item is PadRow row && row.CoordsDirty)
+      {
+        e.Row.Background = Brushes.Yellow;
+      }
+      else
+      {
+        e.Row.ClearValue(Control.BackgroundProperty);
+      }
+    }
+
+    private void UpdateActionButtons()
+    {
+      _placeButton.IsEnabled = _grid.SelectedItem is PadRow { Record: not null };
+      _saveButton.IsEnabled = _pads.Any(p => p.CoordsDirty);
     }
 
     private void Grid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -205,6 +273,122 @@ namespace NcTestRibbon.Shell
       var detail = new TopologyPadDetailWindow(live, _book, load) { Owner = this };
       detail.ShowDialog();
       Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
+    }
+
+    private void PlaceSelectedPad()
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        throw new InvalidOperationException("Выберите КП в таблице.");
+      }
+
+      var geom = ToGeom(row);
+      Hide();
+      try
+      {
+        if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
+        {
+          Log("Размещение «" + row.Name + "» отменено.");
+          return;
+        }
+
+        row.Record.X = x;
+        row.Record.Y = y;
+        row.X = x.ToString("G17", CultureInfo.CurrentCulture);
+        row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
+        row.CoordsDirty = true;
+        if (_showOnDrawing.IsChecked == true)
+        {
+          CadPadOverlay.UpdatePad(ToGeom(row));
+        }
+
+        _grid.Items.Refresh();
+        UpdateActionButtons();
+        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y);
+      }
+      finally
+      {
+        Show();
+        Activate();
+        Focus();
+      }
+    }
+
+    private void SaveCoordinates()
+    {
+      if (_book == null || string.IsNullOrWhiteSpace(_book.Path))
+      {
+        throw new InvalidOperationException("Нет открытого файла таблиц КП.");
+      }
+
+      List<PadWorkbookLoader.PadRecord> dirty = _pads
+        .Where(p => p.CoordsDirty && p.Record != null)
+        .Select(p => p.Record)
+        .ToList();
+      if (dirty.Count == 0)
+      {
+        throw new InvalidOperationException("Нет изменённых координат.");
+      }
+
+      MessageBoxResult confirm = MessageBox.Show(
+        this,
+        "Перезаписать координаты X/Y в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
+        "Сохранить координаты",
+        MessageBoxButton.YesNo,
+        MessageBoxImage.Question);
+      if (confirm != MessageBoxResult.Yes)
+      {
+        return;
+      }
+
+      int updated = PadWorkbookLoader.SavePadCoordinates(_book.Path, dirty);
+      foreach (PadRow row in _pads)
+      {
+        row.CoordsDirty = false;
+      }
+
+      _grid.Items.Refresh();
+      UpdateActionButtons();
+      Log("Сохранено координат в Excel: " + updated + " (" + Path.GetFileName(_book.Path) + ")");
+    }
+
+    private void RefreshDrawingOverlay()
+    {
+      if (_showOnDrawing.IsChecked != true)
+      {
+        return;
+      }
+
+      if (_pads.Count == 0)
+      {
+        CadPadOverlay.Clear();
+        return;
+      }
+
+      CadPadOverlay.ShowPads(_pads.Select(ToGeom));
+      Log("На чертеже: " + _pads.Count + " КП (слой " + CadPadOverlay.LayerName + ").");
+    }
+
+    private static CadPadOverlay.PadGeom ToGeom(PadRow row)
+    {
+      double width = 150;
+      double length = 250;
+      double.TryParse((row.WidthM ?? string.Empty).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out width);
+      double.TryParse((row.LengthM ?? string.Empty).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out length);
+      if (row.Record != null)
+      {
+        width = row.Record.WidthM;
+        length = row.Record.LengthM;
+      }
+
+      return new CadPadOverlay.PadGeom
+      {
+        Name = row.Name,
+        X = row.Record?.X ?? 0,
+        Y = row.Record?.Y ?? 0,
+        WidthM = width > 0 ? width : 150,
+        LengthM = length > 0 ? length : 250
+      };
     }
 
     private void BrowseFluidExcel()
@@ -289,7 +473,8 @@ namespace NcTestRibbon.Shell
           Liquid = pad.ActiveLiquid,
           Gas = pad.ActiveGas,
           FirstLaunch = "1",
-          Record = pad
+          Record = pad,
+          CoordsDirty = false
         });
       }
 
@@ -306,6 +491,11 @@ namespace NcTestRibbon.Shell
         + "; профилей мес.: " + book.Months
         + "; " + caps
         + " (" + Path.GetFileName(path) + ")");
+      UpdateActionButtons();
+      if (_showOnDrawing.IsChecked == true)
+      {
+        RefreshDrawingOverlay();
+      }
     }
 
     private void Log(string text)
@@ -347,6 +537,7 @@ namespace NcTestRibbon.Shell
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;
       public string FirstLaunch { get; set; } = "1";
+      public bool CoordsDirty { get; set; }
       public PadWorkbookLoader.PadRecord Record { get; set; }
     }
   }
