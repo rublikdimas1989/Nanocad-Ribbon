@@ -3,12 +3,14 @@
 
 $ErrorActionPreference = 'Stop'
 
-$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
+$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw')
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'
+$loadEpplus = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\EPPlus.dll'
 $pkgRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $srcCommands = Join-Path $pkgRoot 'NcTestRibbon\Commands.cs'
 $releaseDll = Join-Path $pkgRoot 'NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll'
+$packagedEpplus = Join-Path $pkgRoot 'installer\deps\EPPlus.dll'
 
 function Test-FileContainsText {
     param([string]$Path, [string]$Text)
@@ -50,6 +52,8 @@ function Show-File {
 Write-Host 'NcTestRibbon VERIFY'
 Show-File -Label 'Installed LoadFile DLL' -Path $loadDll
 Show-File -Label 'Installed LoadFile JSON' -Path $loadJson
+Show-File -Label 'Installed LoadFile EPPlus' -Path $loadEpplus
+Show-File -Label 'Packaged installer\deps EPPlus' -Path $packagedEpplus
 Show-File -Label 'Local Release build DLL' -Path $releaseDll
 Show-File -Label 'Source Commands.cs' -Path $srcCommands
 
@@ -84,6 +88,23 @@ else {
 }
 
 Write-Host ''
+Write-Host '=== EPPlus next to plugin ==='
+if (-not (Test-Path $packagedEpplus)) {
+    Write-Host 'Packaged EPPlus.dll missing under installer\deps\.'
+    $fail = $true
+}
+else {
+    Write-Host '  OK  installer\deps\EPPlus.dll'
+}
+if (-not (Test-Path $loadEpplus)) {
+    Write-Host 'Installed EPPlus.dll missing in LoadFile. Re-run INSTALL.bat.'
+    $fail = $true
+}
+else {
+    Write-Host '  OK  LoadFile\EPPlus.dll'
+}
+
+Write-Host ''
 Write-Host 'In nanoCAD command line try:'
 Write-Host '  NcTestHello'
 Write-Host '  NcTestHttp'
@@ -91,7 +112,28 @@ Write-Host '  NcTestWpf'
 Write-Host '  NcTestSettings'
 Write-Host '  NcTestInitialData'
 Write-Host '  NcTestPadOpt'
+Write-Host '  NcTestBlink'
+Write-Host '  NcTestBlinkOff'
+Write-Host '  NcTestEcw'
+Write-Host '  NcTestRaster'
 Write-Host 'If unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL path above.'
+
+Write-Host ''
+Write-Host '=== Bundled GDAL ECW (NcTestEcw embedded georef) ==='
+$gdalWrap = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\gdal_wrap.dll'
+$gdalEcw = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\gdal_ECW_JP2ECW.dll'
+$gdalNcs = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\NCSEcw.dll'
+$gdalCsharp = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal_csharp.dll'
+$ncGdalGeo = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\tools\NcGdalGeo\NcGdalGeo.exe'
+foreach ($p in @($gdalWrap, $gdalEcw, $gdalNcs, $gdalCsharp, $ncGdalGeo)) {
+    if (Test-Path $p) {
+        Write-Host ("  OK  {0}" -f $p)
+    }
+    else {
+        Write-Host ("  MISSING  {0}" -f $p)
+        $fail = $true
+    }
+}
 
 if ($fail) {
     Write-Host ''

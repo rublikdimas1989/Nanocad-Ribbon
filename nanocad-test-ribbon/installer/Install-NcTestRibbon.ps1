@@ -249,7 +249,87 @@ function Resolve-TestRibbonFiles {
     return $null
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
+function Get-RibbonDependencyDlls {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath
+    )
+
+    $skip = @{
+        'NC_TestRibbon.dll' = $true
+        'hostmgd.dll'       = $true
+        'hostdbmgd.dll'     = $true
+        'NcBootstrap.dll'   = $true
+    }
+
+    $byName = @{}
+
+    $depsDir = Join-Path $src 'deps'
+    if (Test-Path $depsDir) {
+        Get-ChildItem -Path $depsDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $ribbonDir = Split-Path -Parent $RibbonDllPath
+    if (Test-Path $ribbonDir) {
+        Get-ChildItem -Path $ribbonDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $payloadDeps = Join-Path $src 'payload'
+    if (Test-Path $payloadDeps) {
+        Get-ChildItem -Path $payloadDeps -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object {
+                if (-not $byName.ContainsKey($_.Name)) {
+                    $byName[$_.Name] = $_.FullName
+                }
+            }
+    }
+
+    return @(
+        $byName.GetEnumerator() |
+            Sort-Object Name |
+            ForEach-Object {
+                [PSCustomObject]@{ Name = $_.Key; Path = $_.Value }
+            }
+    )
+}
+
+function Copy-RibbonDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath,
+        [Parameter(Mandatory = $true)][string]$DestFolder
+    )
+
+    $deps = @(Get-RibbonDependencyDlls -RibbonDllPath $RibbonDllPath)
+    if ($deps.Count -eq 0) {
+        Write-Host 'WARNING: no plugin dependency DLLs found (installer\deps or build output).' -ForegroundColor Yellow
+        Write-Host 'EPPlus.dll must sit next to NC_TestRibbon.dll for Price.xlsx rates.'
+        return
+    }
+
+    $copied = 0
+    foreach ($dep in $deps) {
+        $destPath = Join-Path $DestFolder $dep.Name
+        if (Test-Path $destPath) {
+            Remove-Item $destPath -Force
+        }
+        Copy-Item $dep.Path $destPath -Force
+        $copied++
+    }
+
+    Write-Host ("Copied {0} dependency DLL(s) to: {1}" -f $copied, $DestFolder)
+    $epplus = Join-Path $DestFolder 'EPPlus.dll'
+    if (Test-Path $epplus) {
+        Write-DllInfo -Label 'Installed EPPlus' -Path $epplus
+    }
+    else {
+        Write-Host 'WARNING: EPPlus.dll was not installed. Rates tab will fail to load.' -ForegroundColor Yellow
+    }
+}
+
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -376,6 +456,68 @@ Assert-DllHasCommands -DllPath $ribbonDllDest -Commands $requiredCommands
 Write-Host "Copied NC_TestRibbon to: $syncFolder"
 Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 
+# EPPlus + transitive NuGet deps must sit next to the plugin in LoadFile.
+Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
+
+# Bundled GDAL x64 + ECW plugin (End-style embedded GeoTransform for NcTestEcw).
+# Must land at %LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal\x64\... (plugin probes this path).
+$gdalSrc = Join-Path $src 'gdal'
+if (-not (Test-Path $gdalSrc)) {
+    $gdalSrc = Join-Path $pkgRoot 'installer\gdal'
+}
+$gdalDest = Join-Path $syncFolder 'gdal'
+if (Test-Path $gdalSrc) {
+    Write-Host ("GDAL source: {0}" -f $gdalSrc)
+    if (Test-Path $gdalDest) {
+        Remove-Item $gdalDest -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $gdalDest -Force | Out-Null
+    # Copy contents so LoadFile\NANOCAD\gdal\x64 exists (not gdal\gdal\x64).
+    Copy-Item -Path (Join-Path $gdalSrc '*') -Destination $gdalDest -Recurse -Force
+    $wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
+    $ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
+    $ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
+    $csharp = Join-Path $syncFolder 'gdal_csharp.dll'
+    Write-Host ("  wrap:   {0}  exists={1}" -f $wrap, (Test-Path $wrap))
+    Write-Host ("  ECW:    {0}  exists={1}" -f $ecw, (Test-Path $ecw))
+    Write-Host ("  NCSEcw: {0}  exists={1}" -f $ncs, (Test-Path $ncs))
+    Write-Host ("  csharp: {0}  exists={1}" -f $csharp, (Test-Path $csharp))
+    if ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs) -and (Test-Path $csharp)) {
+        Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
+    }
+    else {
+        Write-Host 'ERROR: GDAL install incomplete (need wrap + ECW plugins + gdal_csharp.dll).' -ForegroundColor Yellow
+        throw 'Bundled GDAL ECW files missing after INSTALL copy. Re-unpack v1.2.48+ zip (includes installer\gdal).'
+    }
+}
+else {
+    Write-Host 'ERROR: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
+    throw 'installer\gdal not found. Unpack the full versioned zip (not a partial source tree).'
+}
+
+# Out-of-process NcGdalGeo (matched GDAL 3.12.1) — avoids in-process gdal_wrap 0x8007007F.
+$toolSrc = Join-Path $src 'tools\NcGdalGeo'
+if (-not (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe'))) {
+    $toolSrc = Join-Path $pkgRoot 'installer\tools\NcGdalGeo'
+}
+$toolDest = Join-Path $syncFolder 'tools\NcGdalGeo'
+if (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe')) {
+    if (Test-Path $toolDest) {
+        Remove-Item $toolDest -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $toolDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $toolSrc '*') -Destination $toolDest -Recurse -Force
+    $toolExe = Join-Path $toolDest 'NcGdalGeo.exe'
+    Write-Host ("NcGdalGeo: {0} exists={1}" -f $toolExe, (Test-Path $toolExe))
+    if (-not (Test-Path $toolExe)) {
+        throw 'NcGdalGeo.exe missing after INSTALL copy.'
+    }
+}
+else {
+    Write-Host 'ERROR: installer\tools\NcGdalGeo missing — required for ECW GeoTransform out-of-process.' -ForegroundColor Yellow
+    throw 'installer\tools\NcGdalGeo not found. Unpack the full v1.2.48+ zip.'
+}
+
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {
     Write-Host ''
@@ -459,7 +601,7 @@ Write-Host ''
 Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
-Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt'
+Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt / NcTestBlink'
 Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
 Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''
