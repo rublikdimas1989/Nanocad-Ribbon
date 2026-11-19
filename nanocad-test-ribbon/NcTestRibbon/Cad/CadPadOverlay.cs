@@ -115,6 +115,116 @@ namespace NcTestRibbon.Cad
       return true;
     }
 
+    /// <summary>
+    /// Unlock layer, select pad entities, run standard CAD ROTATE (sync if Editor.Command exists).
+    /// Returns false if the user cancelled. When true, poseUpdated indicates X/Y/angle were read back.
+    /// </summary>
+    public static bool TryManualRotate(
+      string padName,
+      out double x,
+      out double y,
+      out double rotationDeg,
+      out bool poseUpdated)
+    {
+      x = 0;
+      y = 0;
+      rotationDeg = 0;
+      poseUpdated = false;
+      if (string.IsNullOrWhiteSpace(padName))
+      {
+        throw new InvalidOperationException("Не указано имя КП.");
+      }
+
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+      Editor ed = doc.Editor;
+
+      ObjectId[] ids = Array.Empty<ObjectId>();
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        ids = FindNamedPadIds(tr, model, padName);
+        // Leave unlocked so ROTATE can modify entities.
+      });
+
+      if (ids.Length == 0)
+      {
+        throw new InvalidOperationException(
+          "КП «" + padName + "» нет на чертеже. Включите «Показывать на чертеже».");
+      }
+
+      try
+      {
+        ed.SetImpliedSelection(ids);
+      }
+      catch
+      {
+      }
+
+      ed.WriteMessage("\nПоворот КП «" + padName + "»: стандартная команда ROTATE (база + угол).");
+      bool ran = TryEditorCommand(ed, "_.ROTATE");
+      if (!ran)
+      {
+        // Fallback: same prompts as ROTATE, then TransformBy.
+        if (!RotateByPrompts(ed, doc, ids))
+        {
+          RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
+          return false;
+        }
+      }
+
+      poseUpdated = TryReadPadPose(padName, out x, out y, out rotationDeg);
+      RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
+      TryRegen(doc);
+      TryUpdateScreen(doc);
+      return true;
+    }
+
+    public static bool TryReadPadPose(string padName, out double x, out double y, out double rotationDeg)
+    {
+      x = 0;
+      y = 0;
+      rotationDeg = 0;
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null || string.IsNullOrWhiteSpace(padName))
+      {
+        return false;
+      }
+
+      bool ok = false;
+      double cx = 0, cy = 0, rot = 0;
+      RunWrite(doc, (tr, model, db) =>
+      {
+        foreach (ObjectId id in FindNamedPadIds(tr, model, padName))
+        {
+          DbPolyline pl = tr.GetObject(id, OpenMode.ForRead) as DbPolyline;
+          if (pl == null || pl.NumberOfVertices < 2)
+          {
+            continue;
+          }
+
+          Point2d p0 = pl.GetPoint2dAt(0);
+          Point2d p1 = pl.GetPoint2dAt(1);
+          Point2d p2 = pl.GetPoint2dAt(Math.Min(2, pl.NumberOfVertices - 1));
+          cx = (p0.X + p2.X) / 2.0;
+          cy = (p0.Y + p2.Y) / 2.0;
+          rot = NormalizeDegrees(Math.Atan2(p1.Y - p0.Y, p1.X - p0.X) * 180.0 / Math.PI);
+          ok = true;
+          break;
+        }
+      });
+
+      if (!ok)
+      {
+        return false;
+      }
+
+      x = cx;
+      y = cy;
+      rotationDeg = rot;
+      return true;
+    }
+
     private static void RunWrite(Document doc, Action<Transaction, BlockTableRecord, Database> action)
     {
       Database db = doc.Database;
@@ -239,8 +349,9 @@ namespace NcTestRibbon.Cad
       return null;
     }
 
-    private static void EraseNamedPad(Transaction tr, BlockTableRecord model, string name)
+    private static ObjectId[] FindNamedPadIds(Transaction tr, BlockTableRecord model, string name)
     {
+      var ids = new List<ObjectId>();
       foreach (ObjectId id in CollectModelIds(model))
       {
         if (id.IsNull || id.IsErased)
@@ -255,13 +366,101 @@ namespace NcTestRibbon.Cad
         }
 
         string stored = ReadPadName(ent);
-        if (!string.Equals(stored, name, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(stored, name, StringComparison.OrdinalIgnoreCase))
         {
+          ids.Add(id);
           continue;
         }
 
-        ent.UpgradeOpen();
-        ent.Erase();
+        // Fallback: label text match (entities without XData).
+        if (ent is DBText text
+            && string.Equals(text.TextString, name, StringComparison.OrdinalIgnoreCase))
+        {
+          ids.Add(id);
+        }
+      }
+
+      return ids.ToArray();
+    }
+
+    private static bool TryEditorCommand(Editor ed, string command)
+    {
+      try
+      {
+        System.Reflection.MethodInfo method = ed.GetType().GetMethod(
+          "Command",
+          System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+        if (method == null)
+        {
+          return false;
+        }
+
+        System.Reflection.ParameterInfo[] ps = method.GetParameters();
+        if (ps.Length == 1 && ps[0].ParameterType.IsArray)
+        {
+          method.Invoke(ed, new object[] { new object[] { command } });
+          return true;
+        }
+
+        if (ps.Length >= 1)
+        {
+          method.Invoke(ed, new object[] { command });
+          return true;
+        }
+      }
+      catch
+      {
+      }
+
+      return false;
+    }
+
+    private static bool RotateByPrompts(Editor ed, Document doc, ObjectId[] ids)
+    {
+      PromptPointResult basePt = ed.GetPoint("\nБазовая точка поворота: ");
+      if (basePt.Status != PromptStatus.OK)
+      {
+        ed.WriteMessage("\nПоворот отменён.");
+        return false;
+      }
+
+      var angOpts = new PromptAngleOptions("\nУгол поворота: ")
+      {
+        BasePoint = basePt.Value,
+        UseBasePoint = true,
+        AllowNone = false
+      };
+      PromptDoubleResult ang = ed.GetAngle(angOpts);
+      if (ang.Status != PromptStatus.OK)
+      {
+        ed.WriteMessage("\nПоворот отменён.");
+        return false;
+      }
+
+      Matrix3d xform = Matrix3d.Rotation(ang.Value, Vector3d.ZAxis, basePt.Value);
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        foreach (ObjectId id in ids)
+        {
+          if (id.IsNull || id.IsErased)
+          {
+            continue;
+          }
+
+          Entity ent = tr.GetObject(id, OpenMode.ForWrite) as Entity;
+          ent?.TransformBy(xform);
+        }
+      });
+      return true;
+    }
+
+    private static void EraseNamedPad(Transaction tr, BlockTableRecord model, string name)
+    {
+      foreach (ObjectId id in FindNamedPadIds(tr, model, name))
+      {
+        Entity ent = tr.GetObject(id, OpenMode.ForWrite) as Entity;
+        ent?.Erase();
       }
     }
 

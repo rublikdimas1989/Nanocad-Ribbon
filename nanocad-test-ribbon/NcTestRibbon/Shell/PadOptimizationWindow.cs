@@ -42,19 +42,7 @@ namespace NcTestRibbon.Shell
       MinWidth = 720;
       MinHeight = 480;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
-      Closed += (_, __) =>
-      {
-        try
-        {
-          if (_showOnDrawing.IsChecked == true)
-          {
-            CadPadOverlay.Clear();
-          }
-        }
-        catch
-        {
-        }
-      };
+      // Closing the window must NOT erase KP entities — they stay on the drawing.
 
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
@@ -164,15 +152,15 @@ namespace NcTestRibbon.Shell
       _placeButton.IsEnabled = false;
 
       _rotationBox = Field(cadRow, "Угол °:", "0", 60, readOnly: false);
-      Button(cadRow, "Повернуть", () => ApplyRotationToSelected(), out _rotateButton);
+      Button(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
       _rotateButton.IsEnabled = false;
 
-      Button(cadRow, "Сохранить координаты", () => SaveCoordinates(), out _saveButton);
+      Button(cadRow, "Сохранить положения", () => SaveCoordinates(), out _saveButton);
       _saveButton.IsEnabled = false;
 
       top.Children.Add(new TextBlock
       {
-        Text = "0°: Длина по X (широкая), Ширина по Y. Слой NC_KP_PADS блокируется. Повтор «Показывать» только обновляет.",
+        Text = "0°: Длина по X (широкая), Ширина по Y. Слой NC_KP_PADS блокируется после отрисовки. Закрытие окна объекты не удаляет. «Повернуть вручную» = CAD ROTATE.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -305,29 +293,58 @@ namespace NcTestRibbon.Shell
       Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
     }
 
-    private void ApplyRotationToSelected()
+    private void ManualRotateSelected()
     {
       if (_grid.SelectedItem is not PadRow row || row.Record == null)
       {
         throw new InvalidOperationException("Выберите КП в таблице.");
       }
 
-      if (!TryParseAngle(_rotationBox.Text, out double angle))
+      // Ensure the pad exists on the drawing before ROTATE.
+      if (_showOnDrawing.IsChecked != true)
       {
-        throw new InvalidOperationException("Угол: число 0…360.");
+        _showOnDrawing.IsChecked = true;
       }
-
-      row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
-      row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
-      _rotationBox.Text = row.RotationText;
-      _grid.Items.Refresh();
-
-      if (_showOnDrawing.IsChecked == true)
+      else
       {
         CadPadOverlay.UpdatePad(ToGeom(row));
       }
 
-      Log("Поворот «" + row.Name + "»: " + row.RotationText + "°");
+      Hide();
+      try
+      {
+        if (!CadPadOverlay.TryManualRotate(row.Name, out double x, out double y, out double rot, out bool poseUpdated))
+        {
+          Log("Поворот «" + row.Name + "» отменён.");
+          return;
+        }
+
+        if (poseUpdated)
+        {
+          row.Record.X = x;
+          row.Record.Y = y;
+          row.X = x.ToString("G17", CultureInfo.CurrentCulture);
+          row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
+          row.RotationDeg = CadPadOverlay.NormalizeDegrees(rot);
+          row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+          _rotationBox.Text = row.RotationText;
+          row.CoordsDirty = true;
+          _grid.Items.Refresh();
+          UpdateActionButtons();
+          Log("Поворот вручную «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+            + "; угол=" + row.RotationText + "°");
+        }
+        else
+        {
+          Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
+        }
+      }
+      finally
+      {
+        Show();
+        Activate();
+        Focus();
+      }
     }
 
     private void PlaceSelectedPad()
@@ -400,8 +417,8 @@ namespace NcTestRibbon.Shell
 
       MessageBoxResult confirm = MessageBox.Show(
         this,
-        "Перезаписать координаты X/Y в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
-        "Сохранить координаты",
+        "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
+        "Сохранить положения",
         MessageBoxButton.YesNo,
         MessageBoxImage.Question);
       if (confirm != MessageBoxResult.Yes)
