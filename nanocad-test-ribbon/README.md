@@ -3,17 +3,38 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.8**): `nanocad-test-ribbon-v1.2.8.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.8.zip  
+Актуальный zip с GitHub (версия **1.2.43**): `nanocad-test-ribbon-v1.2.43.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.43.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/nanocad-test-ribbon-v1.2.43.zip  
+
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/Topology_Buos.xlsx)  
+Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/Topology_Nodes.xlsx)  
+
+
+
+
+
+
+
+Книги КП: [Burskoe_6](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/burskoe-6-kp/Burskoe_6_KP.xlsx) · [Burskoe_10](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/burskoe-10-kp/Burskoe_10_KP.xlsx)  
+
+
+
+
+
+
+
+
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.8**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.43**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
-3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
-4. nanoCAD: `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
+3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
+4. nanoCAD: `NcTestEcw` / `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
 
 | Команда | Что делает |
 |---------|------------|
@@ -22,7 +43,11 @@ https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-te
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
 | `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
-| `NcTestPadOpt` | **WPF code shell** «Оптимизация кустовых площадок» |
+| `NcTestSourceData` | Лента: «Исходные данные» — вкладки Кустовые / Врезки / БУОС / Узлы |
+| `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` | Только командой (без кнопок ленты) → нужная вкладка |
+| `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
+| `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
+| `NcTestBlinkOff` | принудительно выключить мигание |
 | `NcTestDemo` | маленький WinForms smoke |
 
 Сборка: `NC_TestRibbon.dll`  
@@ -41,6 +66,7 @@ nanocad-test-ribbon/
     INSTALL.bat / Install-NcTestRibbon.ps1
     VERIFY.bat / Verify-NcTestRibbon.ps1
     UNINSTALL.bat / Uninstall-NcTestRibbon.ps1
+    deps/                     ← EPPlus 8.6.3 + transitive DLLs (copied to LoadFile)
     NcBootstrap.dll / .json / .deps.json
     icons/load_chart.ico
   NcTestRibbon/
@@ -75,13 +101,72 @@ NcTestHttp
 NcTestWpf
 NcTestSettings
 NcTestPadOpt
+NcTestBlink
 ```
+
+### Кустовые площадки (v1.2.28+)
+
+`NcTestPadOpt` / лента **Кустовые площадки**:
+
+- Таблица **WinForms DataGridView** (read-only); Excel — источник полей
+- **Modeless**: окно не закрывается после place/rotate; X/Y/угол сразу в таблице
+- «Показывать на чертеже» запоминается в `paths.json`
+- Без «Сохранить положения»: при закрытии чертеж возвращается к последним Excel-положениям
+- Положение/угол только **Задать положение вручную** / **Повернуть вручную** на чертеже
+- Crash log: `Tracing_cache\Settings\nc_test_ribbon_crash.log`
+- **Двойной щелчок** → профили + **Ограничивает в месяце**
+
+### Точки врезки + оформление (v1.2.31)
+
+`NcTestInserts` — как End «Топология — точки врезки / сброса после БУОС»:
+
+- Лист Excel **«Врезки»**: Имя, Включена, X, Y, Среда, P противодавления, Макс. приём нефти **т/сут** (**без Id**; ключ = уникальное Имя)
+- Дубликат имён при загрузке → ошибка
+- Таблица display-only; положение только **Задать положение вручную** (CAD); zoom к врезке
+- «Показывать на чертеже» → слой `NC_INSERTS` (круг + подпись); persist `paths.json`
+- Sample: `Topology_Inserts.xlsx` (в корне репо / release)
+
+`NcTestInterface` — `Tracing_cache\Settings\interface.conf`:
+
+- `LabelFontHeightM` — подписи КП и врезок
+- `InsertCircleDiameterM` — диаметр круга врезки
+
+### Исходные данные (v1.2.37)
+
+Одно WinForms-окно **«Исходные данные»** (`NcTestSourceData`) с вкладками. На ленте только эта кнопка; `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` остаются командами для отладки.
+
+При закрытии окна, если есть жёлтые строки (несохранённые X/Y КП или врезок): вопрос **«Применить новые координаты?»** — Да = запись в Excel как «Сохранить положения», Нет = откат сетки и чертежа к последним Excel.
+
+### Варианты БУОС (v1.2.33 / TCON-51)
+
+Вкладка **БУОС** — каталог типов (End `TopologyBuosType`), **без** координат и «в подборе»:
+
+- Лист Excel **«БУОС»**: Имя, производительность жидкость/ПНГ, длина/ширина площадки
+- Стоимость — из `Price.xlsx` лист **«Элементы топологии»** (A=имя, B=цена); нет цены → красный «введите в Price стоимость»
+- Sample: `Topology_Buos.xlsx`; `paths.json` → `buosWorkbook`
+
+### Узлы (v1.2.34)
+
+Вкладка **Узлы** — типы «Узел 3 соединения» / «Узел 4 соединения»:
+
+- Лист Excel **«Узлы»**: Имя, длина/ширина площадки (без производительности)
+- Стоимость — тот же Price lookup, что у БУОС
+- Sample: `Topology_Nodes.xlsx`; `paths.json` → `nodesWorkbook`
+
+### Мигание сегмента (v1.2.13+)
+
+Как в End (`MainWindow.ManualProgress` / fragment blink, таймер 200 мс), но в чертеже nanoCAD:
+
+1. Выделите **полилинию** (или другую кривую) в чертеже.
+2. Лента **Тест → Мигание** или команда `NcTestBlink`.
+3. Объект мигает (`Highlight` / `Unhighlight`), пока снова не нажмёте кнопку / `NcTestBlink` (отжать) или `NcTestBlinkOff`.
 
 Что делает установщик:
 
 - копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
 - **принудительно перезаписывает** `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
   (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе Debug / `installer\payload\`; JSON берётся из корня пакета);
+- copies `installer\deps\*.dll` (EPPlus 8.6.3 + transitive) — and any matching NuGet DLLs from the build output — next to the plugin in LoadFile;
 - проверяет, что DLL содержит имена команд `NcTestHello`, `NcTestHttp`, `NcTestWpf`;
 - **не** ставит панель «Рамки» / `NC_RibbonExecDoc` — при установке удаляет их DLL/JSON из LoadFile, Startup и кэш `.cfg`/`.cuix` профиля;
 - `NcBootstrap.json` с пустым `serverUrl` (локальный режим, без синхронизации ASDC, чтобы «Загрузить» снова не подтянуло «Рамки»);
@@ -261,7 +346,9 @@ Pad-окно (`NcTestPadOpt`) собрано в коде без XAML.
 
 ## Tracing_cache
 
-`%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`. Создаётся при открытии «Настройки».
+`%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx|xlsm, `paths.json`, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`.
+
+`paths.json` remembers last pads/inserts/BUOS/nodes / Price / fluid / background / profiles. Paths are portable: relative under `Tracing_cache` when possible, otherwise `%LOCALAPPDATA%\…` (expanded on load; absolute LocalAppData rewritten on save). Pad window: **Открыть таблицы…** loads sheet «КП» (incl. Ширина/Длина).
 
 ## Settings without pack URI
 
