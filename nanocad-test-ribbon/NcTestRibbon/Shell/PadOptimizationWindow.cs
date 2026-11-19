@@ -189,15 +189,19 @@ namespace NcTestRibbon.Shell
 
       _grid = new DataGrid
       {
-        ItemsSource = _pads,
         AutoGenerateColumns = false,
         IsReadOnly = true,
         CanUserAddRows = false,
         CanUserDeleteRows = false,
         CanUserSortColumns = true,
         SelectionMode = DataGridSelectionMode.Single,
-        SelectionUnit = DataGridSelectionUnit.FullRow
+        SelectionUnit = DataGridSelectionUnit.FullRow,
+        // Virtualization + Visibility.Collapsed restore can leave headers-only with 0 rows.
+        EnableRowVirtualization = false,
+        EnableColumnVirtualization = false
       };
+      VirtualizingPanel.SetIsVirtualizing(_grid, false);
+      VirtualizingPanel.SetVirtualizationMode(_grid, VirtualizationMode.Standard);
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
       _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
       _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
@@ -214,6 +218,7 @@ namespace NcTestRibbon.Shell
       _grid.BeginningEdit += (_, e) => e.Cancel = true;
       _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
+      BindPadsGrid();
 
       if (!string.IsNullOrWhiteSpace(paths.FluidProperties) && File.Exists(paths.FluidProperties))
       {
@@ -333,7 +338,7 @@ namespace NcTestRibbon.Shell
           Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
         }
       });
-      SafeRefreshGrid();
+      BindPadsGrid(row);
       UpdateActionButtons();
     }
 
@@ -372,7 +377,7 @@ namespace NcTestRibbon.Shell
         Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
       });
-      SafeRefreshGrid();
+      BindPadsGrid(row);
       UpdateActionButtons();
     }
 
@@ -424,8 +429,8 @@ namespace NcTestRibbon.Shell
             Activate();
           }
 
-          // Rebind after restore so rows stay visible (Refresh during EditItem emptied the grid).
-          SafeRefreshGrid();
+          // Always reassign ItemsSource after Collapsed→Visible (never Items.Refresh).
+          BindPadsGrid();
         }
         catch (Exception ex)
         {
@@ -442,8 +447,7 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// End any pending DataGrid / IEditableCollectionView edit before Refresh/rebind.
-    /// Fixes: InvalidOperationException «Refresh не разрешено во время AddNew или EditItem».
+    /// End any pending DataGrid / IEditableCollectionView edit before rebind.
     /// </summary>
     private void CancelGridEdit()
     {
@@ -483,41 +487,57 @@ namespace NcTestRibbon.Shell
       }
     }
 
-    private void SafeRefreshGrid()
+    /// <summary>
+    /// Force DataGrid rows by assigning a fresh ObservableCollection copy of _pads.
+    /// Avoids Items.Refresh (EditItem / empty-grid) and stale ItemsSource after load or Collapsed.
+    /// PadRow references are shared so place/rotate mutations stay on the same objects.
+    /// </summary>
+    private void BindPadsGrid(PadRow preferSelect = null)
     {
       try
       {
         CancelGridEdit();
+        string keepName = preferSelect?.Name ?? (_grid.SelectedItem as PadRow)?.Name;
+
+        var view = new System.Collections.ObjectModel.ObservableCollection<PadRow>(_pads);
+        _grid.ItemsSource = null;
+        _grid.ItemsSource = view;
+
+        if (!string.IsNullOrEmpty(keepName))
+        {
+          PadRow match = view.FirstOrDefault(p =>
+            string.Equals(p.Name, keepName, StringComparison.OrdinalIgnoreCase));
+          if (match != null)
+          {
+            _grid.SelectedItem = match;
+            try
+            {
+              _grid.ScrollIntoView(match);
+            }
+            catch
+            {
+            }
+          }
+        }
+
         try
         {
-          _grid.Items.Refresh();
-        }
-        catch (InvalidOperationException)
-        {
-          RebindPadsPreservingSelection();
-        }
-      }
-      catch (Exception ex)
-      {
-        WriteCrashLog("SafeRefreshGrid", ex);
-        try
-        {
-          RebindPadsPreservingSelection();
+          _grid.UpdateLayout();
         }
         catch
         {
         }
       }
-    }
-
-    private void RebindPadsPreservingSelection()
-    {
-      object selected = _grid.SelectedItem;
-      _grid.ItemsSource = null;
-      _grid.ItemsSource = _pads;
-      if (selected is PadRow row && _pads.Contains(row))
+      catch (Exception ex)
       {
-        _grid.SelectedItem = row;
+        WriteCrashLog("BindPadsGrid", ex);
+        try
+        {
+          Log("BindPadsGrid: " + ex.Message);
+        }
+        catch
+        {
+        }
       }
     }
 
@@ -626,7 +646,7 @@ namespace NcTestRibbon.Shell
         row.CoordsDirty = false;
       }
 
-      SafeRefreshGrid();
+      BindPadsGrid();
       UpdateActionButtons();
       Log("Сохранено координат в Excel: " + updated + " (" + Path.GetFileName(_book.Path) + ")");
     }
@@ -800,6 +820,9 @@ namespace NcTestRibbon.Shell
         + "; " + caps
         + (fromJson > 0 ? "; sourMedium из JSON: " + fromJson : string.Empty)
         + " (" + Path.GetFileName(path) + ")");
+      // Always rebind ItemsSource after load — ObservableCollection Clear/Add during ctor
+      // or after Collapsed can leave the DataGrid with headers only (0 rows) while _pads is full.
+      BindPadsGrid();
       UpdateActionButtons();
       if (_showOnDrawing.IsChecked == true)
       {
