@@ -9,6 +9,7 @@ namespace NcTestRibbon.Cad
   using Teigha.Geometry;
   using Teigha.GraphicsInterface;
   using CadApp = HostMgd.ApplicationServices.Application;
+  using DbPolyline = Teigha.DatabaseServices.Polyline;
 
   /// <summary>
   /// Draws KP width×length rectangles + labels on a dedicated layer; interactive place jig.
@@ -162,7 +163,7 @@ namespace NcTestRibbon.Cad
     {
       double halfW = Math.Max(pad.WidthM, 1) / 2.0;
       double halfL = Math.Max(pad.LengthM, 1) / 2.0;
-      var pl = new Polyline();
+      var pl = new DbPolyline();
       pl.SetDatabaseDefaults();
       pl.Layer = LayerName;
       pl.Color = Color.FromColorIndex(ColorMethod.ByAci, 3);
@@ -308,7 +309,8 @@ namespace NcTestRibbon.Cad
           new Point3d(_center.X - halfW, _center.Y + halfL, 0),
           new Point3d(_center.X - halfW, _center.Y - halfL, 0)
         };
-        draw.Geometry.Polyline(corners, 0, -1);
+        // Teigha: Geometry.Polyline(Point3dCollection, Vector3d normal, IntPtr) — not (…, int, int).
+        draw.Geometry.Polyline(corners, Vector3d.ZAxis, IntPtr.Zero);
 
         double height = _width / 2.0;
         Point3d labelAt = new Point3d(_center.X, _center.Y + halfL + height * 0.15, 0);
