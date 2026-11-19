@@ -3,11 +3,11 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.30**): `nanocad-test-ribbon-v1.2.30.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.30.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.30/nanocad-test-ribbon-v1.2.30.zip  
+Актуальный zip с GitHub (версия **1.2.31**): `nanocad-test-ribbon-v1.2.31.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.31.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.31/nanocad-test-ribbon-v1.2.31.zip  
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.30/Topology_Inserts.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.31/Topology_Inserts.xlsx)  
 
 
 
@@ -28,7 +28,7 @@ Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas198
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.30**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.31**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -113,13 +113,13 @@ NcTestBlink
 - Crash log: `Tracing_cache\Settings\nc_test_ribbon_crash.log`
 - **Двойной щелчок** → профили + **Ограничивает в месяце**
 
-### Точки врезки + оформление (v1.2.30)
+### Точки врезки + оформление (v1.2.31)
 
 `NcTestInserts` — как End «Топология — точки врезки / сброса после БУОС»:
 
-- Лист Excel **«Врезки»**: Id, Имя, Включена, X, Y, Среда, P противодавления, Макс. приём нефти
-- Таблица display-only; положение только **Задать положение вручную** (CAD)
-- **v1.2.30:** перед place — zoom к врезке (как у КП)
+- Лист Excel **«Врезки»**: Имя, Включена, X, Y, Среда, P противодавления, Макс. приём нефти **т/сут** (**без Id**; ключ = уникальное Имя)
+- Дубликат имён при загрузке → ошибка
+- Таблица display-only; положение только **Задать положение вручную** (CAD); zoom к врезке
 - «Показывать на чертеже» → слой `NC_INSERTS` (круг + подпись); persist `paths.json`
 - Sample: `Topology_Inserts.xlsx` (в корне репо / release)
 

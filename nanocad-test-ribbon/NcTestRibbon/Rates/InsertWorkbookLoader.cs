@@ -4,10 +4,12 @@ namespace NcTestRibbon.Rates
   using System.Collections.Generic;
   using System.Globalization;
   using System.IO;
+  using System.Linq;
+  using System.Text;
   using OfficeOpenXml;
 
   /// <summary>
-  /// Loads / saves sheet «Врезки» (End TopologyTieIn fields) from a dedicated inserts xlsx.
+  /// Loads / saves sheet «Врезки». Identity = unique «Имя» (no Id column).
   /// </summary>
   public static class InsertWorkbookLoader
   {
@@ -15,7 +17,6 @@ namespace NcTestRibbon.Rates
 
     public sealed class InsertRecord
     {
-      public string Id { get; set; } = Guid.NewGuid().ToString("N");
       public string Name { get; set; } = "Врезка";
       public bool Enabled { get; set; } = true;
       public double X { get; set; }
@@ -23,8 +24,8 @@ namespace NcTestRibbon.Rates
       /// <summary>oil | liquid | gas</summary>
       public string Fluid { get; set; } = "oil";
       public double BackPressureBar { get; set; }
-      /// <summary>Null = unlimited.</summary>
-      public double? MaxOilRateM3Day { get; set; }
+      /// <summary>Null = unlimited. Unit: т/сут (tonnes/day).</summary>
+      public double? MaxOilRateTDay { get; set; }
     }
 
     public sealed class WorkbookData
@@ -74,7 +75,6 @@ namespace NcTestRibbon.Rates
       int nameCol = Require(headers, "имя", "name", "врезка");
       int xCol = Require(headers, "x");
       int yCol = Require(headers, "y");
-      headers.TryGetValue("id", out int idCol);
 
       int updated = 0;
       int rows = sheet.Dimension?.End.Row ?? 1;
@@ -97,11 +97,6 @@ namespace NcTestRibbon.Rates
 
         sheet.Cells[r, xCol].Value = rec.X;
         sheet.Cells[r, yCol].Value = rec.Y;
-        if (idCol > 0 && string.IsNullOrWhiteSpace(CellText(sheet, r, idCol)))
-        {
-          sheet.Cells[r, idCol].Value = rec.Id;
-        }
-
         updated++;
       }
 
@@ -126,7 +121,7 @@ namespace NcTestRibbon.Rates
       ExcelWorksheet sheet = package.Workbook.Worksheets.Add(SheetName);
       string[] headers =
       {
-        "Id", "Имя", "Включена", "X", "Y", "Среда", "P противодавления бар", "Макс приём нефти м3/сут"
+        "Имя", "Включена", "X", "Y", "Среда", "P противодавления бар", "Макс приём нефти т/сут"
       };
       for (int c = 0; c < headers.Length; c++)
       {
@@ -135,9 +130,9 @@ namespace NcTestRibbon.Rates
 
       object[][] rows =
       {
-        new object[] { Guid.NewGuid().ToString("N"), "Врезка-1", "Да", 618495.37, 6486631.77, "Нефть", 15, "" },
-        new object[] { Guid.NewGuid().ToString("N"), "Врезка-2", "Да", 614825.645, 6499254.297, "Нефть", 11, 1200 },
-        new object[] { Guid.NewGuid().ToString("N"), "Врезка-газ", "Нет", 618357.937, 6486506.552, "ПНГ", 5, "" }
+        new object[] { "Врезка-1", "Да", 618495.37, 6486631.77, "Нефть", 15, "" },
+        new object[] { "Врезка-2", "Да", 614825.645, 6499254.297, "Нефть", 11, 1200 },
+        new object[] { "Врезка-газ", "Нет", 618357.937, 6486506.552, "ПНГ", 5, "" }
       };
       for (int i = 0; i < rows.Length; i++)
       {
@@ -157,7 +152,6 @@ namespace NcTestRibbon.Rates
       int nameCol = Require(headers, "имя", "name", "врезка");
       int xCol = Require(headers, "x");
       int yCol = Require(headers, "y");
-      headers.TryGetValue("id", out int idCol);
       headers.TryGetValue("включена", out int enCol);
       if (enCol <= 0)
       {
@@ -176,13 +170,25 @@ namespace NcTestRibbon.Rates
         headers.TryGetValue("backpressurebar", out pCol);
       }
 
-      headers.TryGetValue("макс приём нефти м3/сут", out int maxCol);
+      headers.TryGetValue("макс приём нефти т/сут", out int maxCol);
       if (maxCol <= 0)
       {
-        headers.TryGetValue("maxoilratem3day", out maxCol);
+        headers.TryGetValue("макс приём нефти м3/сут", out maxCol); // legacy header
+      }
+
+      if (maxCol <= 0)
+      {
+        headers.TryGetValue("maxoilratetday", out maxCol);
+      }
+
+      if (maxCol <= 0)
+      {
+        headers.TryGetValue("maxoilratem3day", out maxCol); // legacy alias
       }
 
       var list = new List<InsertRecord>();
+      var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      var duplicates = new List<string>();
       int rows = sheet.Dimension?.End.Row ?? 1;
       for (int r = 2; r <= rows; r++)
       {
@@ -192,31 +198,44 @@ namespace NcTestRibbon.Rates
           continue;
         }
 
+        string trimmed = name.Trim();
+        if (seen.TryGetValue(trimmed, out int firstRow))
+        {
+          duplicates.Add("«" + trimmed + "» (строки " + firstRow + " и " + r + ")");
+          continue;
+        }
+
+        seen[trimmed] = r;
+
         var rec = new InsertRecord
         {
-          Name = name.Trim(),
-          Id = idCol > 0 ? (CellText(sheet, r, idCol) ?? string.Empty).Trim() : Guid.NewGuid().ToString("N"),
+          Name = trimmed,
           Enabled = enCol > 0 ? ParseBool(CellText(sheet, r, enCol), defaultValue: true) : true,
           X = ParseDouble(sheet, r, xCol),
           Y = ParseDouble(sheet, r, yCol),
           Fluid = NormalizeFluid(fluidCol > 0 ? CellText(sheet, r, fluidCol) : "oil"),
           BackPressureBar = pCol > 0 ? ParseDouble(sheet, r, pCol) : 0
         };
-        if (string.IsNullOrWhiteSpace(rec.Id))
-        {
-          rec.Id = Guid.NewGuid().ToString("N");
-        }
 
         if (maxCol > 0)
         {
           string maxText = CellText(sheet, r, maxCol);
           if (!string.IsNullOrWhiteSpace(maxText))
           {
-            rec.MaxOilRateM3Day = ParseDouble(sheet, r, maxCol);
+            rec.MaxOilRateTDay = ParseDouble(sheet, r, maxCol);
           }
         }
 
         list.Add(rec);
+      }
+
+      if (duplicates.Count > 0)
+      {
+        var sb = new StringBuilder();
+        sb.Append("Лист «").Append(SheetName).Append("»: имена врезок должны быть уникальными. Дубликаты: ");
+        sb.Append(string.Join("; ", duplicates.Distinct()));
+        sb.Append(". Исправьте Excel и загрузите снова.");
+        throw new InvalidOperationException(sb.ToString());
       }
 
       return list;

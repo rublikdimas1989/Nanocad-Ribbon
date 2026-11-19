@@ -68,7 +68,7 @@ namespace NcTestRibbon.Shell
       top.Controls.Add(new Label
       {
         Text = "Мировые X/Y в метрах. Положение — только «Задать положение вручную» на чертеже. "
-          + "Поля среды / давления / лимита — из Excel (лист «Врезки»). Пусто в макс. приёме = без лимита.",
+          + "Поля среды / давления / лимита — из Excel (лист «Врезки»). Макс. приём нефти — т/сут; пусто = без лимита.",
         AutoSize = true,
         MaximumSize = new Size(1120, 0),
         Margin = new Padding(3, 0, 3, 8)
@@ -145,7 +145,7 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(TextCol("Y, м", nameof(InsertRow.Y), 110));
       _grid.Columns.Add(TextCol("Среда", nameof(InsertRow.FluidText), 90));
       _grid.Columns.Add(TextCol("P противодавления,\nбар (изб.)", nameof(InsertRow.BackPressureText), 120));
-      _grid.Columns.Add(TextCol("Макс. приём нефти,\nм³/сут", nameof(InsertRow.MaxOilText), 130));
+      _grid.Columns.Add(TextCol("Макс. приём нефти,\nт/сут", nameof(InsertRow.MaxOilText), 130));
       _grid.SelectionChanged += (_, __) => UpdateButtons();
       _grid.CellFormatting += (_, e) =>
       {
@@ -465,8 +465,8 @@ namespace NcTestRibbon.Shell
           Enabled = rec.Enabled,
           FluidText = InsertWorkbookLoader.FluidDisplayName(rec.Fluid),
           BackPressureText = rec.BackPressureBar.ToString("0.###", CultureInfo.CurrentCulture),
-          MaxOilText = rec.MaxOilRateM3Day.HasValue
-            ? rec.MaxOilRateM3Day.Value.ToString("0.###", CultureInfo.CurrentCulture)
+          MaxOilText = rec.MaxOilRateTDay.HasValue
+            ? rec.MaxOilRateTDay.Value.ToString("0.###", CultureInfo.CurrentCulture)
             : string.Empty,
           Record = rec
         };
