@@ -25,14 +25,21 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx, conf).",
+      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx|xlsm, conf).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
     {
       "intername": "NcTestPadOpt",
       "displayName": "Кустовые площадки",
-      "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
+      "tooltip": "Кустовые площадки: просмотр КП из Excel (xlsx). Правки — в книге; пути в paths.json.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestBlink",
+      "displayName": "Мигание",
+      "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     }
@@ -61,6 +68,11 @@
     {
       "text": "Кустовые площадки",
       "command": "NcTestPadOpt",
+      "style": "large"
+    },
+    {
+      "text": "Мигание",
+      "command": "NcTestBlink",
       "style": "large"
     }
   ]

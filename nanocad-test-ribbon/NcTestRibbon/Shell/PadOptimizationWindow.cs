@@ -1,45 +1,50 @@
 namespace NcTestRibbon.Shell
 {
   using System;
-  using System.Collections.ObjectModel;
+  using System.Collections.Generic;
   using System.Globalization;
+  using System.IO;
+  using System.Linq;
   using System.Windows;
   using System.Windows.Controls;
   using System.Windows.Data;
+  using System.Windows.Input;
   using System.Windows.Media;
+  using Microsoft.Win32;
+  using NcTestRibbon.Cad;
+  using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
 
   /// <summary>
-  /// UI shell of End-variant TopologyInputsWindow («Оптимизация … кустовых площадок»).
-  /// Built in code (no XAML pack URI). Logic is stubbed via StubUi.
+  /// KP table from Excel: profiles, CAD overlay (locked layer), place/rotate, save X/Y.
   /// </summary>
   public sealed class PadOptimizationWindow : Window
   {
-    private readonly ObservableCollection<PadRow> _pads = new ObservableCollection<PadRow>();
-    private readonly TextBox _months;
+    private readonly System.Collections.ObjectModel.ObservableCollection<PadRow> _pads
+      = new System.Collections.ObjectModel.ObservableCollection<PadRow>();
     private readonly TextBox _fluidFile;
-    private readonly TextBox _count;
-    private readonly TextBox _x;
-    private readonly TextBox _y;
-    private readonly TextBox _background;
-    private readonly TextBox _alpha;
+    private readonly TextBox _tablesFile;
     private readonly TextBox _log;
     private readonly TextBlock _status;
-    private readonly ComboBox _mode;
-    private readonly ComboBox _coordinateUnit;
-    private readonly CheckBox _gray;
     private readonly DataGrid _grid;
+    private readonly CheckBox _showOnDrawing;
+    private readonly Button _placeButton;
+    private readonly Button _rotateButton;
+    private readonly Button _saveButton;
+    private PadWorkbookLoader.WorkbookData _book;
 
     public PadOptimizationWindow()
     {
-      Title = "Оптимизация кустовых площадок";
-      Width = 1250;
-      Height = 760;
-      MinWidth = 850;
-      MinHeight = 600;
+      Title = "Кустовые площадки";
+      Width = 1140;
+      Height = 700;
+      MinWidth = 720;
+      MinHeight = 480;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
+      // Closing the window must NOT erase KP entities — they stay on the drawing.
 
-      _pads.Add(new PadRow { Name = "КП-1", X = "0", Y = "0", Liquid = true, Oil = true, Gas = true, FirstLaunch = "1" });
-      _pads.Add(new PadRow { Name = "КП-2", X = "1000", Y = "500", Liquid = true, Oil = true, Gas = false, FirstLaunch = "1" });
+      AppPaths paths = AppPaths.Load();
+      TracingCache.EnsureCreated();
 
       var root = new DockPanel { Margin = new Thickness(8) };
       Content = root;
@@ -55,7 +60,7 @@ namespace NcTestRibbon.Shell
         return row;
       }
 
-      TextBox Field(Panel parent, string label, string value, double width)
+      TextBox Field(Panel parent, string label, string value, double width, bool readOnly = true)
       {
         parent.Children.Add(new TextBlock
         {
@@ -68,13 +73,14 @@ namespace NcTestRibbon.Shell
           Text = value,
           Width = width,
           Padding = new Thickness(4),
-          Margin = new Thickness(3)
+          Margin = new Thickness(3),
+          IsReadOnly = readOnly
         };
         parent.Children.Add(box);
         return box;
       }
 
-      void Button(Panel parent, string label, Action action)
+      void Button(Panel parent, string label, Action action, out Button created)
       {
         var button = new Button
         {
@@ -92,108 +98,75 @@ namespace NcTestRibbon.Shell
           {
             MessageBox.Show(this, ex.Message, "Проверьте исходные данные",
               MessageBoxButton.OK, MessageBoxImage.Warning);
+            Log(ex.Message);
           }
         };
         parent.Children.Add(button);
+        created = button;
       }
 
-      WrapPanel Group(string title)
+      var fluidRow = Row();
+      _fluidFile = Field(fluidRow, "Excel свойств:", paths.FluidProperties ?? string.Empty, 420);
+      Button(fluidRow, "Обзор…", () => BrowseFluidExcel(), out _);
+
+      var tables = Row();
+      _tablesFile = Field(tables, "Таблицы КП (xlsx):", paths.PadsWorkbook ?? string.Empty, 420);
+      Button(tables, "Обзор…", () => BrowsePadsWorkbook(), out _);
+
+      var cadRow = Row();
+      _showOnDrawing = new CheckBox
       {
-        var box = new GroupBox { Header = title, Margin = new Thickness(0, 3, 0, 3) };
-        top.Children.Add(box);
-        var row = new WrapPanel { Margin = new Thickness(4) };
-        box.Content = row;
-        return row;
-      }
-
-      ComboBox Choice(Panel parent, string label, string[] items, string selected)
-      {
-        parent.Children.Add(new TextBlock
-        {
-          Text = label,
-          VerticalAlignment = VerticalAlignment.Center,
-          Margin = new Thickness(5)
-        });
-        var combo = new ComboBox
-        {
-          Width = 160,
-          Margin = new Thickness(3),
-          Padding = new Thickness(4)
-        };
-        foreach (string item in items)
-        {
-          combo.Items.Add(item);
-        }
-
-        combo.SelectedItem = selected;
-        parent.Children.Add(combo);
-        return combo;
-      }
-
-      var first = Row();
-      _months = Field(first, "Месяцев:", "12", 60);
-      Button(first, "Применить месяцы", () =>
-        StubUi.Notify(this, "PadOptimization.ApplyMonths → " + _months.Text));
-      _fluidFile = Field(first, "Excel свойств:", string.Empty, 340);
-      Button(first, "Обзор…", () => StubUi.Notify(this, "PadOptimization.BrowseFluidExcel"));
-      Button(first, "Загрузить свойства", () => StubUi.Notify(this, "PadOptimization.LoadFluidProps"));
-
-      var units = Group("Единицы профилей");
-      Choice(units, "Жидкость", new[] { "м³/сут", "м³/ч", "тыс. м³/сут" }, "м³/сут");
-      Choice(units, "Нефть", new[] { "т/сут" }, "т/сут");
-      Choice(units, "ПНГ", new[] { "м³/сут", "м³/ч", "тыс. м³/сут" }, "м³/сут");
-      units.Children.Add(new TextBlock
-      {
-        Text = "ПНГ: 1 тыс. м³/сут = 1000 м³/сут",
-        Margin = new Thickness(12),
-        VerticalAlignment = VerticalAlignment.Center
-      });
-
-      var collector = Group("Пункт сбора — БУОС");
-      var modePanel = new StackPanel { Orientation = Orientation.Horizontal };
-      collector.Children.Add(modePanel);
-      _mode = Choice(modePanel, "Размещение", new[] { "Фиксированное", "Определить автоматически" }, "Определить автоматически");
-      _count = Field(collector, "Площадок (0 — подобрать):", "0", 45);
-      _x = Field(collector, "X:", "0", 110);
-      _y = Field(collector, "Y:", "0", 110);
-      Button(collector, "Вставить X/Y", () => StubUi.Notify(this, "PadOptimization.PasteXY"));
-
-      void ModeChanged()
-      {
-        bool fixedMode = string.Equals(_mode.SelectedItem as string, "Фиксированное", StringComparison.Ordinal);
-        _x.IsEnabled = fixedMode;
-        _y.IsEnabled = fixedMode;
-        _count.IsEnabled = !fixedMode;
-      }
-
-      _mode.SelectionChanged += (_, __) => ModeChanged();
-      ModeChanged();
-
-      var bg = Group("Космоснимок / растровая подложка");
-      _background = Field(bg, "ECW / GeoTIFF:", string.Empty, 380);
-      Button(bg, "Обзор…", () => StubUi.Notify(this, "PadOptimization.BrowseBackground"));
-      Button(bg, "Отключить", () => { _background.Text = string.Empty; });
-      _alpha = Field(bg, "Прозрачность 0…1:", "0.5", 55);
-      _gray = new CheckBox
-      {
-        Content = "Ч/б",
-        IsChecked = false,
-        Margin = new Thickness(8),
-        VerticalAlignment = VerticalAlignment.Center
+        Content = "Показывать на чертеже",
+        VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(5, 3, 12, 3)
       };
-      bg.Children.Add(_gray);
+      _showOnDrawing.Checked += (_, __) =>
+      {
+        try
+        {
+          RefreshDrawingOverlay(force: true);
+        }
+        catch (Exception ex)
+        {
+          MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+          Log("Показ на чертеже: " + ex.Message);
+          _showOnDrawing.IsChecked = false;
+        }
+      };
+      _showOnDrawing.Unchecked += (_, __) =>
+      {
+        try
+        {
+          CadPadOverlay.Clear();
+          Log("КП на чертеже скрыты (слой " + CadPadOverlay.LayerName + ").");
+        }
+        catch (Exception ex)
+        {
+          Log("Не удалось очистить чертёж: " + ex.Message);
+        }
+      };
+      cadRow.Children.Add(_showOnDrawing);
 
-      var extras = Row();
-      var coordinatePanel = new StackPanel { Orientation = Orientation.Horizontal };
-      extras.Children.Add(coordinatePanel);
-      _coordinateUnit = Choice(coordinatePanel, "Единицы X/Y", new[] { "метры", "километры" }, "метры");
-      Button(extras, "Открыть JSON…", () => StubUi.Notify(this, "PadOptimization.OpenJson"));
-      Button(extras, "Сохранить как…", () => StubUi.Notify(this, "PadOptimization.SaveAs"));
-      Button(extras, "Расчётные параметры", () => StubUi.Notify(this, "PadOptimization.CalcParams"));
+      Button(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
+      _placeButton.IsEnabled = false;
+
+      Button(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
+      _rotateButton.IsEnabled = false;
+
+      Button(cadRow, "Сохранить положения", () => SaveCoordinates(), out _saveButton);
+      _saveButton.IsEnabled = false;
+
+      top.Children.Add(new TextBlock
+      {
+        Text = "0°: Длина по X (широкая), Ширина по Y. «Повернуть вручную» — поворот вокруг центра КП. Закрытие окна объекты не удаляет.",
+        Margin = new Thickness(5, 2, 5, 6),
+        Foreground = Brushes.DarkSlateGray,
+        TextWrapping = TextWrapping.Wrap
+      });
 
       _status = new TextBlock
       {
-        Text = "UI-оболочка. Расчёт / JSON — на сервере позже.",
+        Text = "Откройте таблицы КП (xlsx).",
         Margin = new Thickness(4),
         Foreground = Brushes.DarkSlateGray
       };
@@ -202,101 +175,430 @@ namespace NcTestRibbon.Shell
 
       _log = new TextBox
       {
-        Height = 105,
+        Height = 90,
         IsReadOnly = true,
         AcceptsReturn = true,
         TextWrapping = TextWrapping.Wrap,
-        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-        Text = "Оболочка TopologyInputsWindow / TopologyPadWindow." + Environment.NewLine
-          + "Логика оптимизации и профилей КП отключена (stub)." + Environment.NewLine
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
       };
       DockPanel.SetDock(_log, Dock.Bottom);
       root.Children.Add(_log);
-
-      var buttons = new WrapPanel { Margin = new Thickness(0, 5, 0, 5) };
-      DockPanel.SetDock(buttons, Dock.Bottom);
-      root.Children.Add(buttons);
-
-      Button(buttons, "Добавить КП", () =>
-      {
-        var dialog = new TopologyPadWindowShell("КП-" + (_pads.Count + 1)) { Owner = this };
-        if (dialog.ShowDialog() == true)
-        {
-          _pads.Add(new PadRow
-          {
-            Name = dialog.PadName,
-            X = dialog.PadX,
-            Y = dialog.PadY,
-            Liquid = true,
-            Oil = true,
-            Gas = true,
-            FirstLaunch = "1"
-          });
-          Log("Добавлена КП: " + dialog.PadName);
-        }
-      });
-      Button(buttons, "Вставить КП из Excel", () => StubUi.Notify(this, "PadOptimization.PasteFromExcel"));
-      Button(buttons, "Редактировать / профили", () =>
-      {
-        if (_grid.SelectedItem is not PadRow row)
-        {
-          throw new InvalidOperationException("Выберите КП в таблице.");
-        }
-
-        var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y) { Owner = this };
-        if (dialog.ShowDialog() == true)
-        {
-          row.Name = dialog.PadName;
-          row.X = dialog.PadX;
-          row.Y = dialog.PadY;
-          _grid.Items.Refresh();
-          Log("Обновлена КП: " + row.Name);
-        }
-      });
-      Button(buttons, "Варианты оптимизации", () => StubUi.Notify(this, "PadOptimization.ShowVariants"));
-      Button(buttons, "Удалить", () =>
-      {
-        if (_grid.SelectedItem is PadRow row)
-        {
-          _pads.Remove(row);
-          Log("Удалена КП: " + row.Name);
-        }
-      });
-      Button(buttons, "Сохранить настройки", () => StubUi.Notify(this, "PadOptimization.SaveSettings"));
-      Button(buttons, "Рассчитать оптимальную сеть", () => StubUi.Notify(this, "PadOptimization.CalculateNetwork"));
 
       _grid = new DataGrid
       {
         ItemsSource = _pads,
         AutoGenerateColumns = false,
-        IsReadOnly = true,
+        IsReadOnly = false,
         CanUserAddRows = false,
+        CanUserDeleteRows = false,
         SelectionMode = DataGridSelectionMode.Single
       };
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
       _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
       _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
+      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
+      _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
+      _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
+      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), readOnly: false));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
-      _grid.MouseDoubleClick += (_, __) =>
-      {
-        if (_grid.SelectedItem is PadRow row)
-        {
-          var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y) { Owner = this };
-          if (dialog.ShowDialog() == true)
-          {
-            row.Name = dialog.PadName;
-            row.X = dialog.PadX;
-            row.Y = dialog.PadY;
-            _grid.Items.Refresh();
-          }
-        }
-      };
+      _grid.MouseDoubleClick += Grid_MouseDoubleClick;
+      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
+      _grid.CellEditEnding += (_, __) => UpdateActionButtons();
+      _grid.CurrentCellChanged += (_, __) => UpdateActionButtons();
+      _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
-      Log("Загружена оболочка «Оптимизация кустовых площадок» (без серверной логики).");
+      if (!string.IsNullOrWhiteSpace(paths.FluidProperties) && File.Exists(paths.FluidProperties))
+      {
+        LoadFluidProperties(paths.FluidProperties, remember: false);
+      }
+
+      if (!string.IsNullOrWhiteSpace(paths.PadsWorkbook) && File.Exists(paths.PadsWorkbook))
+      {
+        try
+        {
+          LoadPadsWorkbook(paths.PadsWorkbook, remember: false);
+        }
+        catch (Exception ex)
+        {
+          Log("Не удалось загрузить прошлые таблицы КП: " + ex.Message);
+        }
+      }
+      else
+      {
+        Log("Откройте таблицы КП (xlsx) через «Обзор…».");
+      }
+
+      UpdateActionButtons();
+    }
+
+    private void Grid_LoadingRow(object sender, DataGridRowEventArgs e)
+    {
+      if (e.Row.Item is PadRow row && row.CoordsDirty)
+      {
+        e.Row.Background = Brushes.Yellow;
+      }
+      else
+      {
+        e.Row.ClearValue(Control.BackgroundProperty);
+      }
+    }
+
+    private void UpdateActionButtons()
+    {
+      bool hasRow = _grid.SelectedItem is PadRow { Record: not null };
+      _placeButton.IsEnabled = hasRow;
+      _rotateButton.IsEnabled = hasRow;
+      _saveButton.IsEnabled = _pads.Any(p => p.CoordsDirty);
+    }
+
+    private void Grid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        return;
+      }
+
+      try
+      {
+        OpenPadDetail(row.Record);
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+      }
+    }
+
+    private void OpenPadDetail(PadWorkbookLoader.PadRecord pad)
+    {
+      if (_book == null)
+      {
+        throw new InvalidOperationException("Сначала откройте таблицы КП (xlsx).");
+      }
+
+      PadWorkbookLoader.PadRecord live = _book.Pads.FirstOrDefault(p =>
+        string.Equals(p.Name, pad.Name, StringComparison.OrdinalIgnoreCase)) ?? pad;
+      PadLoadPreview.Result load = PadLoadPreview.Build(live, _book);
+      var detail = new TopologyPadDetailWindow(live, _book, load) { Owner = this };
+      detail.ShowDialog();
+      Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
+    }
+
+    private void ManualRotateSelected()
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        throw new InvalidOperationException("Выберите КП в таблице.");
+      }
+
+      // Ensure the pad exists on the drawing before ROTATE.
+      if (_showOnDrawing.IsChecked != true)
+      {
+        _showOnDrawing.IsChecked = true;
+      }
+      else
+      {
+        CadPadOverlay.UpdatePad(ToGeom(row));
+      }
+
+      Hide();
+      try
+      {
+        if (!CadPadOverlay.TryManualRotate(row.Name, out double x, out double y, out double rot, out bool poseUpdated))
+        {
+          Log("Поворот «" + row.Name + "» отменён.");
+          return;
+        }
+
+        if (poseUpdated)
+        {
+          row.Record.X = x;
+          row.Record.Y = y;
+          row.X = x.ToString("G17", CultureInfo.CurrentCulture);
+          row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
+          row.RotationDeg = CadPadOverlay.NormalizeDegrees(rot);
+          row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+          row.CoordsDirty = true;
+          _grid.Items.Refresh();
+          UpdateActionButtons();
+          Log("Поворот вручную «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+            + "; угол=" + row.RotationText + "°");
+        }
+        else
+        {
+          Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
+        }
+      }
+      finally
+      {
+        Show();
+        Activate();
+        Focus();
+      }
+    }
+
+    private void PlaceSelectedPad()
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        throw new InvalidOperationException("Выберите КП в таблице.");
+      }
+
+      var geom = ToGeom(row);
+      Hide();
+      try
+      {
+        if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
+        {
+          Log("Размещение «" + row.Name + "» отменено.");
+          return;
+        }
+
+        row.Record.X = x;
+        row.Record.Y = y;
+        row.X = x.ToString("G17", CultureInfo.CurrentCulture);
+        row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
+        row.CoordsDirty = true;
+
+        // Always materialize the placed pad on the drawing.
+        if (_showOnDrawing.IsChecked != true)
+        {
+          _showOnDrawing.IsChecked = true;
+        }
+        else
+        {
+          CadPadOverlay.UpdatePad(ToGeom(row));
+        }
+
+        _grid.Items.Refresh();
+        UpdateActionButtons();
+        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+          + "; угол=" + row.RotationText + "°");
+      }
+      finally
+      {
+        Show();
+        Activate();
+        Focus();
+      }
+    }
+
+    private void SaveCoordinates()
+    {
+      if (_book == null || string.IsNullOrWhiteSpace(_book.Path))
+      {
+        throw new InvalidOperationException("Нет открытого файла таблиц КП.");
+      }
+
+      List<PadWorkbookLoader.PadRecord> dirty = _pads
+        .Where(p => p.CoordsDirty && p.Record != null)
+        .Select(p => p.Record)
+        .ToList();
+      if (dirty.Count == 0)
+      {
+        throw new InvalidOperationException("Нет изменённых координат.");
+      }
+
+      MessageBoxResult confirm = MessageBox.Show(
+        this,
+        "Перезаписать положения (X/Y) и «сернистая среда» в файле?\n\n"
+          + _book.Path + "\n\nСтрок: " + dirty.Count,
+        "Сохранить положения",
+        MessageBoxButton.YesNo,
+        MessageBoxImage.Question);
+      if (confirm != MessageBoxResult.Yes)
+      {
+        return;
+      }
+
+      int updated = PadWorkbookLoader.SavePadCoordinates(_book.Path, dirty);
+      foreach (PadRow row in _pads)
+      {
+        row.CoordsDirty = false;
+      }
+
+      _grid.Items.Refresh();
+      UpdateActionButtons();
+      Log("Сохранено координат в Excel: " + updated + " (" + Path.GetFileName(_book.Path) + ")");
+    }
+
+    private void RefreshDrawingOverlay(bool force = false)
+    {
+      if (!force && _showOnDrawing.IsChecked != true)
+      {
+        return;
+      }
+
+      if (_pads.Count == 0)
+      {
+        CadPadOverlay.Clear();
+        Log("Нет КП для отображения.");
+        return;
+      }
+
+      int drawn = CadPadOverlay.ShowPads(_pads.Select(ToGeom));
+      Log("На чертеже обновлено КП: " + drawn
+        + " (слой " + CadPadOverlay.LayerName + ", заблокирован; 0°: Длина→X, Ширина→Y).");
+    }
+
+    private static CadPadOverlay.PadGeom ToGeom(PadRow row)
+    {
+      double width = 150;
+      double length = 250;
+      double.TryParse((row.WidthM ?? string.Empty).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out width);
+      double.TryParse((row.LengthM ?? string.Empty).Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out length);
+      if (row.Record != null)
+      {
+        width = row.Record.WidthM;
+        length = row.Record.LengthM;
+      }
+
+      return new CadPadOverlay.PadGeom
+      {
+        Name = row.Name,
+        X = row.Record?.X ?? 0,
+        Y = row.Record?.Y ?? 0,
+        WidthM = width > 0 ? width : 150,
+        LengthM = length > 0 ? length : 250,
+        RotationDeg = row.RotationDeg
+      };
+    }
+
+    private void BrowseFluidExcel()
+    {
+      var dialog = new OpenFileDialog
+      {
+        Title = "Excel свойств флюида",
+        Filter = "Excel (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|All|*.*",
+        CheckFileExists = true
+      };
+      if (!string.IsNullOrWhiteSpace(_fluidFile.Text) && File.Exists(_fluidFile.Text))
+      {
+        dialog.InitialDirectory = Path.GetDirectoryName(_fluidFile.Text);
+        dialog.FileName = Path.GetFileName(_fluidFile.Text);
+      }
+
+      if (dialog.ShowDialog(this) == true)
+      {
+        LoadFluidProperties(dialog.FileName, remember: true);
+      }
+    }
+
+    private void LoadFluidProperties(string path, bool remember)
+    {
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new FileNotFoundException("Файл свойств флюида не найден.", path);
+      }
+
+      _fluidFile.Text = path;
+      if (remember)
+      {
+        AppPaths.Set(p => p.FluidProperties = path);
+      }
+
+      Log("Свойства загружены: " + Path.GetFileName(path));
+    }
+
+    private void BrowsePadsWorkbook()
+    {
+      var dialog = new OpenFileDialog
+      {
+        Title = "Таблицы КП / Top_tree (xlsx)",
+        Filter = "Excel (*.xlsx)|*.xlsx",
+        CheckFileExists = true
+      };
+      string current = _tablesFile.Text;
+      if (!string.IsNullOrWhiteSpace(current) && File.Exists(current))
+      {
+        dialog.InitialDirectory = Path.GetDirectoryName(current);
+        dialog.FileName = Path.GetFileName(current);
+      }
+
+      if (dialog.ShowDialog(this) != true)
+      {
+        return;
+      }
+
+      LoadPadsWorkbook(dialog.FileName, remember: true);
+    }
+
+    private void LoadPadsWorkbook(string path, bool remember)
+    {
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        throw new InvalidOperationException("Укажите файл таблиц КП (xlsx).");
+      }
+
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      _book = book;
+      _pads.Clear();
+      foreach (PadWorkbookLoader.PadRecord pad in book.Pads)
+      {
+        _pads.Add(new PadRow
+        {
+          Name = pad.Name,
+          X = pad.X.ToString("G17", CultureInfo.CurrentCulture),
+          Y = pad.Y.ToString("G17", CultureInfo.CurrentCulture),
+          WidthM = pad.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
+          LengthM = pad.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
+          SourMedium = pad.SourMedium,
+          Oil = pad.ActiveOil,
+          Liquid = pad.ActiveLiquid,
+          Gas = pad.ActiveGas,
+          FirstLaunch = "1",
+          Record = pad,
+          CoordsDirty = false,
+          RotationDeg = 0,
+          RotationText = "0"
+        });
+      }
+
+      _tablesFile.Text = path;
+      if (remember)
+      {
+        AppPaths.Set(p => p.PadsWorkbook = path);
+      }
+
+      // Overlay sourMedium from sibling / remembered Top_tree JSON when Excel has no column.
+      int fromJson = 0;
+      if (!book.SourMediumFromSheet)
+      {
+        string jsonHint = AppPaths.Load().ProfilesJson;
+        fromJson = PadWorkbookLoader.ApplySourMediumFromJson(book, jsonHint);
+        if (fromJson > 0)
+        {
+          foreach (PadRow row in _pads)
+          {
+            if (row.Record != null)
+            {
+              row.SourMedium = row.Record.SourMedium;
+            }
+          }
+        }
+      }
+
+      foreach (PadRow row in _pads)
+      {
+        row.CoordsDirty = false;
+      }
+
+      string caps = book.CapacitiesFromBuosSheet
+        ? "ёмкости БУОС из листа"
+        : "ёмкости БУОС по умолчанию";
+      Log("Загружено КП: " + book.Pads.Count
+        + "; профилей мес.: " + book.Months
+        + "; " + caps
+        + (fromJson > 0 ? "; sourMedium из JSON: " + fromJson : string.Empty)
+        + " (" + Path.GetFileName(path) + ")");
+      UpdateActionButtons();
+      if (_showOnDrawing.IsChecked == true)
+      {
+        RefreshDrawingOverlay(force: true);
+      }
     }
 
     private void Log(string text)
@@ -312,357 +614,64 @@ namespace NcTestRibbon.Shell
       {
         Header = header,
         Binding = new Binding(path),
+        IsReadOnly = true,
         Width = new DataGridLength(1, DataGridLengthUnitType.Star)
       };
     }
 
-    private static DataGridCheckBoxColumn CheckCol(string header, string path)
+    private static DataGridCheckBoxColumn CheckCol(string header, string path, bool readOnly = true)
     {
       return new DataGridCheckBoxColumn
-      {
-        Header = header,
-        Binding = new Binding(path),
-        Width = 85
-      };
-    }
-
-    public sealed class PadRow
-    {
-      public string Name { get; set; } = string.Empty;
-      public string X { get; set; } = "0";
-      public string Y { get; set; } = "0";
-      public bool Liquid { get; set; } = true;
-      public bool Oil { get; set; } = true;
-      public bool Gas { get; set; } = true;
-      public string FirstLaunch { get; set; } = "1";
-    }
-  }
-
-  /// <summary>
-  /// UI shell of End-variant TopologyPadWindow (per-pad profiles / БУОС load).
-  /// Code-built; calculation stubbed.
-  /// </summary>
-  public sealed class TopologyPadWindowShell : Window
-  {
-    private readonly TextBox _name;
-    private readonly TextBox _x;
-    private readonly TextBox _y;
-    private readonly TextBox _horizon;
-    private readonly TextBox _pressure;
-    private readonly CheckBox _sour;
-    private readonly DataGrid _grid;
-    private readonly ObservableCollection<MonthRow> _rows = new ObservableCollection<MonthRow>();
-
-    public string PadName => (_name.Text ?? string.Empty).Trim();
-    public string PadX => (_x.Text ?? string.Empty).Trim();
-    public string PadY => (_y.Text ?? string.Empty).Trim();
-
-    public TopologyPadWindowShell(string name, string x = "0", string y = "0")
-    {
-      Title = name + " — месячные профили и загрузка БУОС";
-      Width = 1220;
-      Height = 820;
-      MinWidth = 960;
-      MinHeight = 650;
-      WindowStartupLocation = WindowStartupLocation.CenterOwner;
-
-      var root = new DockPanel { Margin = new Thickness(12) };
-      Content = root;
-
-      var buttons = new StackPanel
-      {
-        Orientation = Orientation.Horizontal,
-        HorizontalAlignment = HorizontalAlignment.Right
-      };
-      DockPanel.SetDock(buttons, Dock.Bottom);
-      root.Children.Add(buttons);
-
-      var apply = new Button
-      {
-        Content = "Применить",
-        Margin = new Thickness(5),
-        Padding = new Thickness(16, 6, 16, 6),
-        IsDefault = true
-      };
-      apply.Click += (_, __) =>
-      {
-        if (string.IsNullOrWhiteSpace(PadName))
-        {
-          MessageBox.Show(this, "Укажите имя КП.", Title);
-          return;
-        }
-
-        DialogResult = true;
-      };
-      buttons.Children.Add(apply);
-      buttons.Children.Add(new Button
-      {
-        Content = "Отмена",
-        IsCancel = true,
-        Margin = new Thickness(5),
-        Padding = new Thickness(16, 6, 16, 6)
-      });
-
-      var message = new TextBlock
-      {
-        Text = "UI-оболочка TopologyPadWindow. Расчёт загрузки БУОС — stub.",
-        Foreground = Brushes.Firebrick,
-        Margin = new Thickness(6),
-        TextWrapping = TextWrapping.Wrap
-      };
-      DockPanel.SetDock(message, Dock.Bottom);
-      root.Children.Add(message);
-
-      var tabs = new TabControl();
-      root.Children.Add(tabs);
-
-      var general = new StackPanel { Margin = new Thickness(12) };
-      tabs.Items.Add(new TabItem
-      {
-        Header = "Куст",
-        Content = new ScrollViewer
-        {
-          Content = general,
-          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-        }
-      });
-
-      general.Children.Add(Label("Имя КП"));
-      _name = Box(name);
-      general.Children.Add(_name);
-      general.Children.Add(Label("X (единицы из общих настроек)"));
-      _x = Box(x);
-      general.Children.Add(_x);
-      general.Children.Add(Label("Y"));
-      _y = Box(y);
-      general.Children.Add(_y);
-      var paste = new Button
-      {
-        Content = "Вставить X/Y из буфера",
-        Margin = new Thickness(0, 8, 0, 8),
-        Padding = new Thickness(8, 4, 8, 4),
-        HorizontalAlignment = HorizontalAlignment.Left
-      };
-      paste.Click += (_, __) => StubUi.Notify(this, "TopologyPad.PasteXY");
-      general.Children.Add(paste);
-      general.Children.Add(new TextBlock
-      {
-        Text = "Профили сред редактируются на вкладке «Месяцы и загрузка БУОС».",
-        TextWrapping = TextWrapping.Wrap,
-        Margin = new Thickness(0, 8, 0, 0)
-      });
-
-      var panel = new DockPanel { Margin = new Thickness(6) };
-      tabs.Items.Add(new TabItem { Header = "Месяцы и загрузка БУОС", Content = panel });
-      tabs.SelectedIndex = 1;
-
-      var top = new StackPanel();
-      DockPanel.SetDock(top, Dock.Top);
-      panel.Children.Add(top);
-
-      _sour = new CheckBox { Content = "Сернистая среда", Margin = new Thickness(6, 4, 6, 4) };
-      top.Children.Add(_sour);
-      top.Children.Add(new TextBlock
-      {
-        Text = "Схема транспорта от этой КП",
-        Margin = new Thickness(6)
-      });
-      foreach (string mode in new[] { "Без сепаратора", "Две трубы (вода отдельно)", "Полная сепарация" })
-      {
-        top.Children.Add(new RadioButton
-        {
-          Content = mode,
-          GroupName = "Separation",
-          IsChecked = mode.StartsWith("Без", StringComparison.Ordinal),
-          Margin = new Thickness(6, 2, 6, 2)
-        });
-      }
-
-      var pressureRow = new WrapPanel();
-      top.Children.Add(pressureRow);
-      pressureRow.Children.Add(new TextBlock
-      {
-        Text = "Доступное давление на КП, бар (абс.):",
-        VerticalAlignment = VerticalAlignment.Center,
-        Margin = new Thickness(6)
-      });
-      _pressure = new TextBox { Text = "0", Width = 90, Margin = new Thickness(4), Padding = new Thickness(4) };
-      pressureRow.Children.Add(_pressure);
-
-      var tools = new WrapPanel();
-      top.Children.Add(tools);
-      tools.Children.Add(new TextBlock
-      {
-        Text = "Месяцев:",
-        VerticalAlignment = VerticalAlignment.Center,
-        Margin = new Thickness(6)
-      });
-      _horizon = new TextBox { Text = "12", Width = 55, Margin = new Thickness(4), Padding = new Thickness(4) };
-      tools.Children.Add(_horizon);
-      var applyMonths = new Button
-      {
-        Content = "Применить месяцы",
-        Margin = new Thickness(3),
-        Padding = new Thickness(8, 4, 8, 4)
-      };
-      applyMonths.Click += (_, __) =>
-      {
-        if (!int.TryParse(_horizon.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int months)
-            || months < 1 || months > 600)
-        {
-          MessageBox.Show(this, "Горизонт: 1…600 месяцев.", Title);
-          return;
-        }
-
-        RebuildRows(months);
-        StubUi.Notify(this, "TopologyPad.ApplyMonths → " + months);
-      };
-      tools.Children.Add(applyMonths);
-
-      var cards = new Grid();
-      top.Children.Add(cards);
-      string[] fluids = { "Жидкость", "Нефть", "ПНГ" };
-      for (int i = 0; i < fluids.Length; i++)
-      {
-        cards.ColumnDefinitions.Add(new ColumnDefinition());
-        var card = new StackPanel { Margin = new Thickness(8) };
-        var border = new Border
-        {
-          Child = card,
-          BorderBrush = Brushes.LightGray,
-          BorderThickness = new Thickness(1),
-          CornerRadius = new CornerRadius(4),
-          Margin = new Thickness(4)
-        };
-        Grid.SetColumn(border, i);
-        cards.Children.Add(border);
-        card.Children.Add(new CheckBox
-        {
-          Content = "Учитывать: " + fluids[i],
-          IsChecked = true,
-          FontWeight = FontWeights.SemiBold,
-          Margin = new Thickness(0, 0, 0, 4)
-        });
-        card.Children.Add(new TextBlock
-        {
-          Text = "Нет расчёта: stub UI",
-          Foreground = Brushes.Gray,
-          TextWrapping = TextWrapping.Wrap,
-          Margin = new Thickness(0, 0, 0, 4)
-        });
-        card.Children.Add(new ProgressBar { Minimum = 0, Maximum = 100, Height = 8, Margin = new Thickness(6, 0, 6, 4) });
-        var actions = new WrapPanel();
-        card.Children.Add(actions);
-        string fluid = fluids[i];
-        AddSmall(actions, "К пику", () => StubUi.Notify(this, "TopologyPad.JumpPeak:" + fluid));
-        AddSmall(actions, "Вставить столбец", () => StubUi.Notify(this, "TopologyPad.Paste:" + fluid));
-        AddSmall(actions, "Обнулить", () =>
-        {
-          foreach (MonthRow row in _rows)
-          {
-            if (fluid == "Жидкость") row.Liquid = "0";
-            else if (fluid == "Нефть") row.Oil = "0";
-            else row.Gas = "0";
-          }
-
-          _grid.Items.Refresh();
-        });
-      }
-
-      _grid = new DataGrid
-      {
-        AutoGenerateColumns = false,
-        CanUserAddRows = false,
-        CanUserDeleteRows = false,
-        SelectionMode = DataGridSelectionMode.Single,
-        SelectionUnit = DataGridSelectionUnit.CellOrRowHeader,
-        RowHeaderWidth = 0,
-        FrozenColumnCount = 1,
-        ItemsSource = _rows
-      };
-      _grid.Columns.Add(new DataGridTextColumn
-      {
-        Header = "Месяц",
-        IsReadOnly = true,
-        Binding = new Binding(nameof(MonthRow.Month)),
-        Width = 65
-      });
-      _grid.Columns.Add(Editable("Жидкость\nм³/сут", nameof(MonthRow.Liquid)));
-      _grid.Columns.Add(Editable("Нефть\nт/сут", nameof(MonthRow.Oil)));
-      _grid.Columns.Add(Editable("ПНГ\nм³/сут", nameof(MonthRow.Gas)));
-      _grid.Columns.Add(new DataGridTextColumn
-      {
-        Header = "Ограничивает в месяце",
-        IsReadOnly = true,
-        Binding = new Binding(nameof(MonthRow.Status)),
-        Width = new DataGridLength(1.5, DataGridLengthUnitType.Star),
-        MinWidth = 160
-      });
-      panel.Children.Add(_grid);
-
-      RebuildRows(12);
-    }
-
-    private void RebuildRows(int months)
-    {
-      _rows.Clear();
-      for (int m = 1; m <= months; m++)
-      {
-        _rows.Add(new MonthRow
-        {
-          Month = m.ToString(CultureInfo.InvariantCulture),
-          Liquid = "0",
-          Oil = "0",
-          Gas = "0",
-          Status = "—"
-        });
-      }
-    }
-
-    private static void AddSmall(Panel panel, string title, Action action)
-    {
-      var button = new Button
-      {
-        Content = title,
-        Padding = new Thickness(8, 4, 8, 4),
-        Margin = new Thickness(3)
-      };
-      button.Click += (_, __) => action();
-      panel.Children.Add(button);
-    }
-
-    private static TextBlock Label(string text)
-    {
-      return new TextBlock { Text = text, Margin = new Thickness(0, 8, 0, 3), TextWrapping = TextWrapping.Wrap };
-    }
-
-    private static TextBox Box(string value)
-    {
-      return new TextBox { Text = value, Padding = new Thickness(5) };
-    }
-
-    private static DataGridTextColumn Editable(string header, string path)
-    {
-      return new DataGridTextColumn
       {
         Header = header,
         Binding = new Binding(path)
         {
           Mode = BindingMode.TwoWay,
-          UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
+          UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
         },
-        Width = new DataGridLength(1, DataGridLengthUnitType.Star),
-        MinWidth = 100
+        IsReadOnly = readOnly,
+        Width = header.Length > 10 ? 120 : 85
       };
     }
 
-    public sealed class MonthRow
+    public sealed class PadRow
     {
-      public string Month { get; set; } = string.Empty;
-      public string Liquid { get; set; } = "0";
-      public string Oil { get; set; } = "0";
-      public string Gas { get; set; } = "0";
-      public string Status { get; set; } = "—";
+      private bool _sourMedium;
+
+      public string Name { get; set; } = string.Empty;
+      public string X { get; set; } = "0";
+      public string Y { get; set; } = "0";
+      public string WidthM { get; set; } = "150";
+      public string LengthM { get; set; } = "250";
+      public string RotationText { get; set; } = "0";
+      public double RotationDeg { get; set; }
+
+      public bool SourMedium
+      {
+        get => _sourMedium;
+        set
+        {
+          if (_sourMedium == value)
+          {
+            return;
+          }
+
+          _sourMedium = value;
+          if (Record != null)
+          {
+            Record.SourMedium = value;
+          }
+
+          CoordsDirty = true;
+        }
+      }
+
+      public bool Liquid { get; set; } = true;
+      public bool Oil { get; set; } = true;
+      public bool Gas { get; set; } = true;
+      public string FirstLaunch { get; set; } = "1";
+      public bool CoordsDirty { get; set; }
+      public PadWorkbookLoader.PadRecord Record { get; set; }
     }
   }
 }
