@@ -70,7 +70,8 @@ namespace NcTestRibbon.Shell
         Width = 480,
         ReadOnly = true,
         Margin = new Padding(3),
-        Text = paths.BuosWorkbook ?? string.Empty
+        Text = paths.BuosWorkbook ?? string.Empty,
+        TextAlign = HorizontalAlignment.Right
       };
       fileRow.Controls.Add(_file);
       var browse = new Button { Text = "Обзор…", AutoSize = true, Margin = new Padding(3) };

@@ -91,7 +91,8 @@ namespace NcTestRibbon.Shell
           Text = value ?? string.Empty,
           Width = width,
           Margin = new Padding(3),
-          ReadOnly = true
+          ReadOnly = true,
+          TextAlign = HorizontalAlignment.Right
         };
         parent.Controls.Add(box);
         return box;

@@ -13,7 +13,7 @@ namespace NcTestRibbon.Shell
   {
     private readonly TextBox _font;
     private readonly TextBox _diameter;
-    private readonly Label _path;
+    private readonly TextBox _path;
 
     public InterfaceSettingsWindow()
     {
@@ -69,12 +69,16 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(_diameter, 1, 1);
 
-      _path = new Label
+      _path = new TextBox
       {
         Text = InterfaceConf.FilePath,
-        AutoSize = true,
+        ReadOnly = true,
+        BorderStyle = BorderStyle.None,
+        BackColor = SystemColors.Control,
         ForeColor = Color.DimGray,
-        Margin = new Padding(3, 12, 3, 3)
+        Margin = new Padding(3, 12, 3, 3),
+        TextAlign = HorizontalAlignment.Right,
+        Dock = DockStyle.Fill
       };
       root.SetColumnSpan(_path, 2);
       root.Controls.Add(_path, 0, 2);

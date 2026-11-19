@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.39.zip`](nanocad-test-ribbon-v1.2.39.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.39/nanocad-test-ribbon-v1.2.39.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.40.zip`](nanocad-test-ribbon-v1.2.40.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.40/nanocad-test-ribbon-v1.2.40.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.40 — right-align path fields
+
+- Path TextBoxes in Исходные данные + settings: WinForms `TextAlign=Right`, WPF `TextAlignment=Right`
 
 ## v1.2.39 — CS0104 IWin32Window
 

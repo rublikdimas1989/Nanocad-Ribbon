@@ -21,7 +21,7 @@ namespace NcTestRibbon.Shell
     private readonly FrameworkElement _root;
     private readonly DataGrid _dgRates;
     private readonly TextBlock _statusText;
-    private readonly TextBlock _ratesPath;
+    private readonly TextBox _ratesPath;
     private readonly TextBlock _catalogStatus;
     private readonly TextBlock _emptyHint;
     private readonly ObservableCollection<RateItem> _rates = new ObservableCollection<RateItem>();
@@ -38,7 +38,7 @@ namespace NcTestRibbon.Shell
       Content = _root;
 
       _statusText = Find<TextBlock>("StatusText");
-      _ratesPath = Find<TextBlock>("TxtRatesFilePath");
+      _ratesPath = Find<TextBox>("TxtRatesFilePath");
       _catalogStatus = Find<TextBlock>("TxtPipeCatalogStatus");
       _emptyHint = Find<TextBlock>("TblEmptyHint");
       _dgRates = Find<DataGrid>("DgRates");

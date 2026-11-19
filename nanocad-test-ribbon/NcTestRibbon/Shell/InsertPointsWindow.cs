@@ -70,7 +70,14 @@ namespace NcTestRibbon.Shell
       var fileRow = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
       top.Controls.Add(fileRow);
       fileRow.Controls.Add(new Label { Text = "Таблицы врезок (xlsx):", AutoSize = true, Margin = new Padding(3, 8, 0, 0) });
-      _file = new TextBox { Width = 480, ReadOnly = true, Margin = new Padding(3), Text = paths.InsertsWorkbook ?? string.Empty };
+      _file = new TextBox
+      {
+        Width = 480,
+        ReadOnly = true,
+        Margin = new Padding(3),
+        Text = paths.InsertsWorkbook ?? string.Empty,
+        TextAlign = HorizontalAlignment.Right
+      };
       fileRow.Controls.Add(_file);
       var browse = new Button { Text = "Обзор…", AutoSize = true, Margin = new Padding(3) };
       browse.Click += (_, __) => Guard(BrowseWorkbook);
