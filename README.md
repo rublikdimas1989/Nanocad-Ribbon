@@ -4,11 +4,17 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.52.zip`](nanocad-test-ribbon-v1.2.52.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.52/nanocad-test-ribbon-v1.2.52.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.53.zip`](nanocad-test-ribbon-v1.2.53.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.53/nanocad-test-ribbon-v1.2.53.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.53 — Cartography panel (End-style)
+
+- Ribbon **Картография** (`NcTestCartography`): Forest / Height / космоснимок toggles + opacity %
+- Open buttons (TIF→ECW / Forest / Height) live in the panel; Maps `Forest_geo` / `Height_geo` / `Screen_ESRI` auto-used, else file dialog → insert
+- Locked layers `NC_MAP_FOREST` / `NC_MAP_HEIGHT` / `NC_MAP_SCREEN` (no move/delete); uncheck → layer Off (lightbulb)
 
 ## v1.2.52 — Forest / Height End colorize
 

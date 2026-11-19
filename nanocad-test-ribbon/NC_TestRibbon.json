@@ -58,23 +58,30 @@
       "iconResource": "NC_ICONS.http.ico"
     },
     {
+      "intername": "NcTestCartography",
+      "displayName": "Картография",
+      "tooltip": "Forest / Height / космоснимок: показ + прозрачность; Открыть… (TIF→ECW / colorize). Слои NC_MAP_* locked; uncheck → layer Off.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
       "intername": "NcTestTif",
       "displayName": "TIF→ECW",
-      "tooltip": "GeoTIFF → ECW (сохранить GeoTransform) → вставить как ECW (как Screen_ESRI.ecw).",
+      "tooltip": "Команда: GeoTIFF → Maps\\*_geo (лента — в Картография).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestForest",
       "displayName": "Forest",
-      "tooltip": "Forest.tif (0/1) → End ForestGreen colorize → Maps\\*_geo.tif → вставить.",
+      "tooltip": "Команда: Forest colorize (лента — в Картография).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestHeight",
       "displayName": "Height",
-      "tooltip": "Height.tif → End viridis 7-band colorize → Maps\\*_geo.tif → вставить.",
+      "tooltip": "Команда: Height colorize (лента — в Картография).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     }
@@ -121,18 +128,8 @@
       "style": "large"
     },
     {
-      "text": "TIF→ECW",
-      "command": "NcTestTif",
-      "style": "large"
-    },
-    {
-      "text": "Forest",
-      "command": "NcTestForest",
-      "style": "large"
-    },
-    {
-      "text": "Height",
-      "command": "NcTestHeight",
+      "text": "Картография",
+      "command": "NcTestCartography",
       "style": "large"
     }
   ]

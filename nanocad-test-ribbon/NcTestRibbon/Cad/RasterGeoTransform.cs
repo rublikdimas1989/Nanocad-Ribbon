@@ -100,7 +100,7 @@ namespace NcTestRibbon.Cad
         + "  wrap: " + loadFileHint + " exists=" + File.Exists(loadFileHint) + "\n"
         + "  ECW:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "gdal_ECW_JP2ECW.dll")) + "\n"
         + "  NCS:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "NCSEcw.dll")) + "\n"
-        + "Если stamp ≠ v1.2.52 — старый DLL: NEW folder + INSTALL + NETLOAD.");
+        + "Если stamp ≠ v1.2.53 — старый DLL: NEW folder + INSTALL + NETLOAD.");
     }
 
     public static string PackageStamp()

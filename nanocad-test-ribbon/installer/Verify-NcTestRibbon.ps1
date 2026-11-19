@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
+$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestCartography', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'
 $loadEpplus = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\EPPlus.dll'
@@ -116,6 +116,7 @@ Write-Host '  NcTestBlink'
 Write-Host '  NcTestBlinkOff'
 Write-Host '  NcTestEcw'
 Write-Host '  NcTestRaster'
+Write-Host '  NcTestCartography'
 Write-Host '  NcTestTif'
 Write-Host '  NcTestForest'
 Write-Host '  NcTestHeight'

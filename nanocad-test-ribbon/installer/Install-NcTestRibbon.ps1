@@ -329,7 +329,7 @@ function Copy-RibbonDependencies {
     }
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestCartography', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.

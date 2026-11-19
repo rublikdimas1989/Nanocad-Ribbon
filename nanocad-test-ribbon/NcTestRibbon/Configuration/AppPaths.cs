@@ -45,6 +45,19 @@ namespace NcTestRibbon.Configuration
     /// <summary>Remember «Показывать на чертеже» for insert points.</summary>
     public bool ShowInsertsOnDrawing { get; set; }
 
+    /// <summary>Cartography: Forest / Height / Screen_ESRI visibility + opacity %.</summary>
+    public bool ShowForestMap { get; set; }
+
+    public bool ShowHeightMap { get; set; }
+
+    public bool ShowScreenMap { get; set; }
+
+    public int ForestOpacity { get; set; } = 50;
+
+    public int HeightOpacity { get; set; } = 100;
+
+    public int ScreenOpacity { get; set; } = 100;
+
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
       WriteIndented = true,

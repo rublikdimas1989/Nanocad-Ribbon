@@ -32,12 +32,28 @@ namespace NcTestRibbon.Cad
 
     public static Result Attach(string rasterPath, bool writeWorldSidecar = true)
     {
+      return Attach(rasterPath, writeWorldSidecar, LayerName, lockLayer: false, opacityPercent: 100);
+    }
+
+    public static Result Attach(
+      string rasterPath,
+      bool writeWorldSidecar,
+      string layerName,
+      bool lockLayer,
+      int opacityPercent)
+    {
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
       if (string.IsNullOrWhiteSpace(rasterPath) || !File.Exists(rasterPath))
       {
         throw new FileNotFoundException("Растр не найден.", rasterPath);
       }
+
+      string layer = string.IsNullOrWhiteSpace(layerName) ? LayerName : layerName.Trim();
+      int opacity = opacityPercent;
+      if (opacity < 0) opacity = 0;
+      if (opacity > 100) opacity = 100;
+      int fade = 100 - opacity;
 
       RasterGeoTransform geo = RasterGeoTransform.Resolve(rasterPath, out string geoNote);
       string worldWritten = string.Empty;
@@ -61,7 +77,7 @@ namespace NcTestRibbon.Cad
       using (doc.LockDocument())
       using (Transaction tr = db.TransactionManager.StartTransaction())
       {
-        EnsureLayer(tr, db);
+        EnsureLayer(tr, db, layer, unlockForWrite: true);
 
         RasterImageDef def = new RasterImageDef();
         ObjectId defId = AddImageDef(tr, db, def, Path.GetFileNameWithoutExtension(rasterPath));
@@ -105,12 +121,24 @@ namespace NcTestRibbon.Cad
         image.ImageDefId = defId;
         image.ShowImage = true;
         image.Orientation = new CoordinateSystem3d(origin, uAxis, vAxis);
-        image.Layer = LayerName;
+        image.Layer = layer;
+        try { image.Fade = fade; }
+        catch { /* older host without Fade */ }
 
         BlockTableRecord model = (BlockTableRecord)tr.GetObject(
           SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
         imageId = model.AppendEntity(image);
         tr.AddNewlyCreatedDBObject(image, true);
+
+        if (lockLayer)
+        {
+          LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+          LayerTableRecord record = (LayerTableRecord)tr.GetObject(layers[layer], OpenMode.ForWrite);
+          record.IsLocked = true;
+          record.IsOff = false;
+          record.IsFrozen = false;
+        }
+
         tr.Commit();
       }
 
@@ -165,16 +193,30 @@ namespace NcTestRibbon.Cad
 
     private static void EnsureLayer(Transaction tr, Database db)
     {
+      EnsureLayer(tr, db, LayerName, unlockForWrite: true);
+    }
+
+    private static void EnsureLayer(Transaction tr, Database db, string layerName, bool unlockForWrite)
+    {
       LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-      if (layers.Has(LayerName))
+      LayerTableRecord layer;
+      if (!layers.Has(layerName))
       {
-        return;
+        layers.UpgradeOpen();
+        layer = new LayerTableRecord { Name = layerName };
+        layers.Add(layer);
+        tr.AddNewlyCreatedDBObject(layer, true);
+      }
+      else
+      {
+        layer = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
       }
 
-      layers.UpgradeOpen();
-      LayerTableRecord layer = new LayerTableRecord { Name = LayerName };
-      layers.Add(layer);
-      tr.AddNewlyCreatedDBObject(layer, true);
+      layer.IsFrozen = false;
+      if (unlockForWrite)
+      {
+        layer.IsLocked = false;
+      }
     }
 
     public static void ZoomToImage(ObjectId imageId)

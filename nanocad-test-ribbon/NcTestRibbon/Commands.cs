@@ -26,6 +26,7 @@ namespace NcTestRibbon
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
     private static SourceDataWindow _sourceDataLive;
+    private static CartographyWindow _cartographyLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -282,7 +283,18 @@ namespace NcTestRibbon
     }
 
     /// <summary>
+    /// «Картография» — Forest / Height / космоснимок toggles + opacity (End-style).
+    /// Open/colorize buttons live in the panel (ribbon TIF/Forest/Height moved here).
+    /// </summary>
+    [CommandMethod("NcTestCartography")]
+    public void NcTestCartography()
+    {
+      OpenCartographyForm("NcTestCartography");
+    }
+
+    /// <summary>
     /// GeoTIFF → ECW (NcGdalGeo translate / CreateCopy, preserve GeoTransform) then attach like ECW.
+    /// Kept as command; ribbon open lives in Картография.
     /// </summary>
     [CommandMethod("NcTestTif")]
     public void NcTestTif()
@@ -302,6 +314,61 @@ namespace NcTestRibbon
     public void NcTestHeight()
     {
       AttachGeoreferencedRaster("NcTestHeight", RasterAttachMode.ColorizeHeight);
+    }
+
+    private void OpenCartographyForm(string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_cartographyLive != null && !_cartographyLive.IsDisposed)
+        {
+          _cartographyLive.BringToFront();
+          _cartographyLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open.");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        CartographyWindow form = new CartographyWindow();
+        _cartographyLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_cartographyLive, form))
+          {
+            _cartographyLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Картография open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     private enum RasterAttachMode
