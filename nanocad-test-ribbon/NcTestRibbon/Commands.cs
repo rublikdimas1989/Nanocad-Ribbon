@@ -9,6 +9,7 @@ namespace NcTestRibbon
   using System.Windows.Interop;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
+  using NcTestRibbon.Cad;
   using NcTestRibbon.Shell;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
@@ -98,13 +99,47 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Opens pad-optimization shell (TopologyInputsWindow / TopologyPadWindow UI).
-    /// Code-built WPF — no XAML pack URI.
+    /// Display-only KP table from Excel (paths.json). Edit in workbook.
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
     {
       OpenWpfWindow(ed: null, "NcTestPadOpt", () => new PadOptimizationWindow());
+    }
+
+    /// <summary>
+    /// Toggle End-style CAD blink on a selected polyline/curve.
+    /// Pickfirst (or prompt) → blink until the same command / ribbon button is pressed again.
+    /// </summary>
+    [CommandMethod("NcTestBlink", CommandFlags.UsePickSet | CommandFlags.Redraw)]
+    public void NcTestBlink()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      if (ed == null)
+      {
+        return;
+      }
+
+      try
+      {
+        CadSegmentBlinker.ToggleFromSelection(ed);
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestBlink", ex);
+        CadSegmentBlinker.Stop();
+      }
+    }
+
+    /// <summary>Force-stop blink (same as releasing the ribbon toggle).</summary>
+    [CommandMethod("NcTestBlinkOff")]
+    public void NcTestBlinkOff()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      CadSegmentBlinker.Stop();
+      ed?.WriteMessage("\nNcTestBlinkOff: мигание ВЫКЛ.");
     }
 
     /// <summary>Small WinForms smoke dialog (fallback).</summary>
