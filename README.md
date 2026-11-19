@@ -8,7 +8,7 @@
   Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.44/nanocad-test-ribbon-v1.2.44.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
 
-## v1.2.44 — PathTextDisplay FlowDirection (TCON-60)
+## v1.2.44 — PathTextDisplay FlowDirection (TCON-61)
 
 - Qualify `System.Windows.FlowDirection` / `TextAlignment` for WPF path helpers (CS0104 vs Forms)
 
