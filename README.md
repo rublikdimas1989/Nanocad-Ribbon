@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.43.zip`](nanocad-test-ribbon-v1.2.43.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/nanocad-test-ribbon-v1.2.43.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.44.zip`](nanocad-test-ribbon-v1.2.44.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.44/nanocad-test-ribbon-v1.2.44.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.44 — PathTextDisplay FlowDirection (TCON-60)
+
+- Qualify `System.Windows.FlowDirection` / `TextAlignment` for WPF path helpers (CS0104 vs Forms)
 
 ## v1.2.43 — PathTextDisplay Control ambiguity (TCON-60)
 

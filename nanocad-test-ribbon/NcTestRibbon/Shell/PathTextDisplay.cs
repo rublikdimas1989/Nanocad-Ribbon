@@ -105,8 +105,8 @@ namespace NcTestRibbon.Shell
         return;
       }
 
-      box.FlowDirection = FlowDirection.LeftToRight;
-      box.TextAlignment = TextAlignment.Left;
+      box.FlowDirection = System.Windows.FlowDirection.LeftToRight;
+      box.TextAlignment = System.Windows.TextAlignment.Left;
     }
 
     public static void ShowEnd(WpfTextBox box)
