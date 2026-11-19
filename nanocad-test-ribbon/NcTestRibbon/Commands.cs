@@ -11,6 +11,7 @@ namespace NcTestRibbon
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
   using NcTestRibbon.Cad;
+  using NcTestRibbon.Configuration;
   using NcTestRibbon.Shell;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
@@ -262,6 +263,119 @@ namespace NcTestRibbon
       Editor ed = doc?.Editor;
       CadSegmentBlinker.Stop();
       ed?.WriteMessage("\nNcTestBlinkOff: мигание ВЫКЛ.");
+    }
+
+    /// <summary>
+    /// Insert ECW/raster with End-style georef (world coords + scale), not plain IMAGEATTACH.
+    /// </summary>
+    [CommandMethod("NcTestEcw")]
+    public void NcTestEcw()
+    {
+      AttachGeoreferencedRaster("NcTestEcw");
+    }
+
+    /// <summary>Alias for NcTestEcw (any georeferenced raster: ECW/TIFF/JPG/…).</summary>
+    [CommandMethod("NcTestRaster")]
+    public void NcTestRaster()
+    {
+      AttachGeoreferencedRaster("NcTestRaster");
+    }
+
+    private void AttachGeoreferencedRaster(string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        AppPaths paths = AppPaths.Load();
+        string initial = paths.Background;
+        string initialDir = string.Empty;
+        if (!string.IsNullOrWhiteSpace(initial))
+        {
+          try
+          {
+            string dir = Path.GetDirectoryName(initial);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+              initialDir = dir;
+            }
+          }
+          catch
+          {
+          }
+        }
+
+        using (OpenFileDialog dlg = new OpenFileDialog())
+        {
+          dlg.Title = "Растр с геопривязкой (ECW / TIFF / …)";
+          dlg.Filter =
+            "Растры (*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp)|*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|"
+            + "ECW (*.ecw)|*.ecw|GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          dlg.FilterIndex = 1;
+          dlg.CheckFileExists = true;
+          dlg.Multiselect = false;
+          if (!string.IsNullOrEmpty(initialDir))
+          {
+            dlg.InitialDirectory = initialDir;
+          }
+
+          if (!string.IsNullOrWhiteSpace(initial) && File.Exists(initial))
+          {
+            dlg.FileName = initial;
+          }
+
+          IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+          DialogResult pick = hwnd != IntPtr.Zero
+            ? dlg.ShowDialog(new WindowWrapper(hwnd))
+            : dlg.ShowDialog();
+          if (pick != DialogResult.OK || string.IsNullOrWhiteSpace(dlg.FileName))
+          {
+            ed?.WriteMessage("\n" + label + ": отменено.");
+            return;
+          }
+
+          string rasterPath = dlg.FileName;
+          AppPaths.Set(p => p.Background = rasterPath);
+
+          CadRasterAttach.Result result = CadRasterAttach.Attach(rasterPath, writeWorldSidecar: true);
+          CadRasterAttach.ZoomToImage(result.ImageId);
+
+          string msg =
+            label + " — вставлено\n\n"
+            + Path.GetFileName(result.Path) + "\n"
+            + "Геопривязка: " + result.GeoSource + "\n"
+            + "UL (мир): X=" + result.OriginX.ToString("R")
+            + "  Y=" + result.OriginY.ToString("R") + "\n"
+            + "Пиксель: dX=" + result.PixelSizeX.ToString("R")
+            + "  dY=" + result.PixelSizeY.ToString("R") + "\n"
+            + "Размер: " + result.WidthPx + "×" + result.HeightPx + " px\n"
+            + (string.IsNullOrEmpty(result.WorldFileWritten)
+              ? string.Empty
+              : "World: " + Path.GetFileName(result.WorldFileWritten) + "\n")
+            + "Слой: " + CadRasterAttach.LayerName;
+
+          ed?.WriteMessage("\n" + label + ": OK — " + Path.GetFileName(result.Path)
+            + " (" + result.GeoSource + ")");
+          CadApp.ShowAlertDialog(msg);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     /// <summary>Small WinForms smoke dialog (fallback).</summary>

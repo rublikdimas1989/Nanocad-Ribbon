@@ -49,6 +49,13 @@
       "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestEcw",
+      "displayName": "ECW/растр",
+      "tooltip": "Вставить ECW/растр с End-геопривязкой (world coords + масштаб), не plain IMAGEATTACH.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
     }
   ],
   "buttons": [
@@ -85,6 +92,11 @@
     {
       "text": "Мигание",
       "command": "NcTestBlink",
+      "style": "large"
+    },
+    {
+      "text": "ECW/растр",
+      "command": "NcTestEcw",
       "style": "large"
     }
   ]

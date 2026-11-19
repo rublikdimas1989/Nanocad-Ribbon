@@ -4,9 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.41.zip`](nanocad-test-ribbon-v1.2.41.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.41/nanocad-test-ribbon-v1.2.41.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.42.zip`](nanocad-test-ribbon-v1.2.42.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.42/nanocad-test-ribbon-v1.2.42.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.42 — ECW End-style georef attach
+
+- `NcTestEcw` / `NcTestRaster`: insert ECW/raster with world coords + scale (RasterImage Orientation from GDAL/world), not plain IMAGEATTACH scale=1
+- Resolves geo via world/TAF sidecar or `gdalinfo -json`; writes `.eww`/world sidecar; ribbon «ECW/растр»
 
 ## v1.2.41 — path TextBox scroll to filename
 
