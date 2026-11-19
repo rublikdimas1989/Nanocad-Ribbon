@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.40.zip`](nanocad-test-ribbon-v1.2.40.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.40/nanocad-test-ribbon-v1.2.40.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.41.zip`](nanocad-test-ribbon-v1.2.41.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.41/nanocad-test-ribbon-v1.2.41.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.41 — path TextBox scroll to filename
+
+- LTR paths; after set Text: SelectionStart=Length + ScrollToCaret (and on Load/Shown) so filename stays visible
 
 ## v1.2.40 — right-align path fields
 

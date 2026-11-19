@@ -71,17 +71,17 @@ namespace NcTestRibbon.Shell
 
       _path = new TextBox
       {
-        Text = InterfaceConf.FilePath,
         ReadOnly = true,
         BorderStyle = BorderStyle.None,
         BackColor = SystemColors.Control,
         ForeColor = Color.DimGray,
         Margin = new Padding(3, 12, 3, 3),
-        TextAlign = HorizontalAlignment.Right,
         Dock = DockStyle.Fill
       };
       root.SetColumnSpan(_path, 2);
       root.Controls.Add(_path, 0, 2);
+      PathTextDisplay.SetPath(_path, InterfaceConf.FilePath);
+      PathTextDisplay.HookShowEndOnVisible(_path, this);
 
       var help = new Label
       {

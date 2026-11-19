@@ -88,13 +88,13 @@ namespace NcTestRibbon.Shell
         });
         var box = new TextBox
         {
-          Text = value ?? string.Empty,
           Width = width,
           Margin = new Padding(3),
-          ReadOnly = true,
-          TextAlign = HorizontalAlignment.Right
+          ReadOnly = true
         };
         parent.Controls.Add(box);
+        PathTextDisplay.SetPath(box, value);
+        PathTextDisplay.HookShowEndOnVisible(box, this);
         return box;
       }
 
@@ -835,7 +835,7 @@ namespace NcTestRibbon.Shell
         throw new FileNotFoundException("Файл свойств флюида не найден.", path);
       }
 
-      _fluidFile.Text = path;
+      PathTextDisplay.SetPath(_fluidFile, path);
       if (remember)
       {
         AppPaths.Set(p => p.FluidProperties = path);
@@ -897,7 +897,7 @@ namespace NcTestRibbon.Shell
         _pads.Add(row);
       }
 
-      _tablesFile.Text = path;
+      PathTextDisplay.SetPath(_tablesFile, path);
       if (remember)
       {
         AppPaths.Set(p => p.PadsWorkbook = path);

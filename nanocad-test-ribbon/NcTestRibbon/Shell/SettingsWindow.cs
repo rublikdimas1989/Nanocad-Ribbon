@@ -18,8 +18,9 @@ namespace NcTestRibbon.Shell
       Margin = new Thickness(0, 6, 0, 0),
       FontSize = 11,
       Foreground = System.Windows.Media.Brushes.Gray,
-      TextWrapping = TextWrapping.Wrap,
-      TextAlignment = TextAlignment.Right
+      TextWrapping = TextWrapping.NoWrap,
+      TextAlignment = TextAlignment.Left,
+      FlowDirection = FlowDirection.LeftToRight
     };
 
     public SettingsWindow()

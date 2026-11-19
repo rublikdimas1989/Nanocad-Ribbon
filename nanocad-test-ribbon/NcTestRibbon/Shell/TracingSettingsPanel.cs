@@ -49,7 +49,8 @@ namespace NcTestRibbon.Shell
 
       if (_ratesPath != null)
       {
-        _ratesPath.Text = TracingCache.ResolveRatesFilePath();
+        PathTextDisplay.SetPath(_ratesPath, TracingCache.ResolveRatesFilePath());
+        _ratesPath.Loaded += (_, __) => PathTextDisplay.ShowEnd(_ratesPath);
       }
 
       Wire(Find<ComboBox>("DownsampleFactor"), (_, __) => { });
@@ -305,7 +306,7 @@ namespace NcTestRibbon.Shell
         string ratesPath = TracingCache.ResolveRatesFilePath();
         if (_ratesPath != null)
         {
-          _ratesPath.Text = ratesPath;
+          PathTextDisplay.SetPath(_ratesPath, ratesPath);
         }
 
         if (!string.IsNullOrWhiteSpace(ratesPath) && System.IO.File.Exists(ratesPath))

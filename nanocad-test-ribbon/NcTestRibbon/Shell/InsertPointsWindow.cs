@@ -74,11 +74,11 @@ namespace NcTestRibbon.Shell
       {
         Width = 480,
         ReadOnly = true,
-        Margin = new Padding(3),
-        Text = paths.InsertsWorkbook ?? string.Empty,
-        TextAlign = HorizontalAlignment.Right
+        Margin = new Padding(3)
       };
       fileRow.Controls.Add(_file);
+      PathTextDisplay.SetPath(_file, paths.InsertsWorkbook);
+      PathTextDisplay.HookShowEndOnVisible(_file, this);
       var browse = new Button { Text = "Обзор…", AutoSize = true, Margin = new Padding(3) };
       browse.Click += (_, __) => Guard(BrowseWorkbook);
       fileRow.Controls.Add(browse);
@@ -523,7 +523,7 @@ namespace NcTestRibbon.Shell
         _rows.Add(row);
       }
 
-      _file.Text = path;
+      PathTextDisplay.SetPath(_file, path);
       if (remember)
       {
         AppPaths.Set(p => p.InsertsWorkbook = path);
