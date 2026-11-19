@@ -2,6 +2,7 @@ namespace NcTestRibbon.Shell
 {
   using System;
   using System.Collections.Generic;
+  using System.ComponentModel;
   using System.Globalization;
   using System.IO;
   using System.Linq;
@@ -160,7 +161,7 @@ namespace NcTestRibbon.Shell
 
       top.Children.Add(new TextBlock
       {
-        Text = "В таблице правятся только X/Y и угол. «Сернистая среда» — из Excel (Да/Нет), только просмотр. «Повернуть вручную» — вокруг центра КП.",
+        Text = "Таблица только для просмотра (все поля из Excel). Положение/угол — только «Задать положение вручную» / «Повернуть вручную» на чертеже.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -190,25 +191,27 @@ namespace NcTestRibbon.Shell
       {
         ItemsSource = _pads,
         AutoGenerateColumns = false,
-        IsReadOnly = false,
+        IsReadOnly = true,
         CanUserAddRows = false,
         CanUserDeleteRows = false,
-        SelectionMode = DataGridSelectionMode.Single
+        CanUserSortColumns = true,
+        SelectionMode = DataGridSelectionMode.Single,
+        SelectionUnit = DataGridSelectionUnit.FullRow
       };
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
-      _grid.Columns.Add(TextCol("X", nameof(PadRow.X), readOnly: false));
-      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y), readOnly: false));
-      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText), readOnly: false));
+      _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
+      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
+      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
       _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
       _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
-      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), readOnly: true));
+      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium)));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
       _grid.MouseDoubleClick += Grid_MouseDoubleClick;
       _grid.SelectionChanged += (_, __) => UpdateActionButtons();
-      _grid.CellEditEnding += Grid_CellEditEnding;
+      _grid.BeginningEdit += (_, e) => e.Cancel = true;
       _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
@@ -246,77 +249,6 @@ namespace NcTestRibbon.Shell
       {
         e.Row.ClearValue(Control.BackgroundProperty);
       }
-    }
-
-    private void Grid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
-    {
-      if (e.EditAction != DataGridEditAction.Commit || e.Row?.Item is not PadRow row || row.Record == null)
-      {
-        UpdateActionButtons();
-        return;
-      }
-
-      string header = e.Column?.Header as string ?? string.Empty;
-      if (e.EditingElement is TextBox box)
-      {
-        string text = box.Text ?? string.Empty;
-        if (header == "X" && TryParseCoord(text, out double x))
-        {
-          row.X = x.ToString("G17", CultureInfo.CurrentCulture);
-          row.Record.X = x;
-          row.CoordsDirty = true;
-        }
-        else if (header == "Y" && TryParseCoord(text, out double y))
-        {
-          row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
-          row.Record.Y = y;
-          row.CoordsDirty = true;
-        }
-        else if (header == "Угол °" && TryParseAngle(text, out double angle))
-        {
-          row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
-          row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
-          row.CoordsDirty = true;
-          if (_showOnDrawing.IsChecked == true)
-          {
-            try
-            {
-              CadPadOverlay.UpdatePad(ToGeom(row));
-            }
-            catch (Exception ex)
-            {
-              Log("Обновление угла на чертеже: " + ex.Message);
-            }
-          }
-        }
-      }
-
-      UpdateActionButtons();
-      _grid.Items.Refresh();
-    }
-
-    private static bool TryParseCoord(string text, out double value)
-    {
-      value = 0;
-      if (string.IsNullOrWhiteSpace(text))
-      {
-        return false;
-      }
-
-      text = text.Trim().Replace(',', '.');
-      return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
-        || double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
-    }
-
-    private static bool TryParseAngle(string text, out double angle)
-    {
-      angle = 0;
-      if (!TryParseCoord(text, out angle))
-      {
-        return false;
-      }
-
-      return double.IsFinite(angle) && angle >= 0 && angle <= 360;
     }
 
     private void UpdateActionButtons()
@@ -393,8 +325,6 @@ namespace NcTestRibbon.Shell
           row.RotationDeg = CadPadOverlay.NormalizeDegrees(rot);
           row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
           row.CoordsDirty = true;
-          _grid.Items.Refresh();
-          UpdateActionButtons();
           Log("Поворот вручную «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
             + "; угол=" + row.RotationText + "°");
         }
@@ -403,6 +333,8 @@ namespace NcTestRibbon.Shell
           Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
         }
       });
+      SafeRefreshGrid();
+      UpdateActionButtons();
     }
 
     private void PlaceSelectedPad()
@@ -437,11 +369,11 @@ namespace NcTestRibbon.Shell
           CadPadOverlay.UpdatePad(ToGeom(row));
         }
 
-        _grid.Items.Refresh();
-        UpdateActionButtons();
         Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
       });
+      SafeRefreshGrid();
+      UpdateActionButtons();
     }
 
     /// <summary>
@@ -453,6 +385,7 @@ namespace NcTestRibbon.Shell
     {
       Visibility previous = Visibility;
       bool wasEnabled = IsEnabled;
+      CancelGridEdit();
       try
       {
         IsEnabled = false;
@@ -490,6 +423,9 @@ namespace NcTestRibbon.Shell
           {
             Activate();
           }
+
+          // Rebind after restore so rows stay visible (Refresh during EditItem emptied the grid).
+          SafeRefreshGrid();
         }
         catch (Exception ex)
         {
@@ -502,6 +438,86 @@ namespace NcTestRibbon.Shell
           {
           }
         }
+      }
+    }
+
+    /// <summary>
+    /// End any pending DataGrid / IEditableCollectionView edit before Refresh/rebind.
+    /// Fixes: InvalidOperationException «Refresh не разрешено во время AddNew или EditItem».
+    /// </summary>
+    private void CancelGridEdit()
+    {
+      try
+      {
+        _grid.CancelEdit(DataGridEditingUnit.Cell);
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        _grid.CancelEdit(DataGridEditingUnit.Row);
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        if (_grid.Items is IEditableCollectionView editable)
+        {
+          if (editable.IsAddingNew)
+          {
+            editable.CancelNew();
+          }
+
+          if (editable.IsEditingItem)
+          {
+            editable.CancelEdit();
+          }
+        }
+      }
+      catch
+      {
+      }
+    }
+
+    private void SafeRefreshGrid()
+    {
+      try
+      {
+        CancelGridEdit();
+        try
+        {
+          _grid.Items.Refresh();
+        }
+        catch (InvalidOperationException)
+        {
+          RebindPadsPreservingSelection();
+        }
+      }
+      catch (Exception ex)
+      {
+        WriteCrashLog("SafeRefreshGrid", ex);
+        try
+        {
+          RebindPadsPreservingSelection();
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private void RebindPadsPreservingSelection()
+    {
+      object selected = _grid.SelectedItem;
+      _grid.ItemsSource = null;
+      _grid.ItemsSource = _pads;
+      if (selected is PadRow row && _pads.Contains(row))
+      {
+        _grid.SelectedItem = row;
       }
     }
 
@@ -610,7 +626,7 @@ namespace NcTestRibbon.Shell
         row.CoordsDirty = false;
       }
 
-      _grid.Items.Refresh();
+      SafeRefreshGrid();
       UpdateActionButtons();
       Log("Сохранено координат в Excel: " + updated + " (" + Path.GetFileName(_book.Path) + ")");
     }

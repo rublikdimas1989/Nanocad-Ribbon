@@ -4,11 +4,10 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.24.zip`](nanocad-test-ribbon-v1.2.24.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.24/nanocad-test-ribbon-v1.2.24.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.25.zip`](nanocad-test-ribbon-v1.2.25.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.25/nanocad-test-ribbon-v1.2.25.zip
 
-## v1.2.24 — crash harden (WPF + zoom)
+## v1.2.25 — grid display-only + safe refresh (TCON-45)
 
-- Place/rotate: no `Hide()`/`Show()` on modal WPF (use `Visibility.Collapsed`) — avoids Qt↔WPF re-entry crash
-- Zoom: no `ViewTableRecord.Dispose` after `SetCurrentView`; swallow all zoom errors
-- Crash log: `%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\Settings\nc_test_ribbon_crash.log`
+- Entire KP grid **read-only** (X/Y/угол too) — position only via place/rotate on drawing
+- Fixes empty grid: cancel EditItem before Refresh; safe rebind after Visibility restore
