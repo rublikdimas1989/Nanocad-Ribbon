@@ -329,7 +329,7 @@ function Copy-RibbonDependencies {
     }
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -542,7 +542,7 @@ Write-Host ''
 Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
-Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt'
+Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt / NcTestBlink'
 Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
 Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''

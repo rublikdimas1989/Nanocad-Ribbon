@@ -35,6 +35,13 @@
       "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestBlink",
+      "displayName": "Мигание",
+      "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
     }
   ],
   "buttons": [
@@ -61,6 +68,11 @@
     {
       "text": "Кустовые площадки",
       "command": "NcTestPadOpt",
+      "style": "large"
+    },
+    {
+      "text": "Мигание",
+      "command": "NcTestBlink",
       "style": "large"
     }
   ]

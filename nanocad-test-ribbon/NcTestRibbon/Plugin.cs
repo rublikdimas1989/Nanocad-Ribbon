@@ -9,6 +9,7 @@ namespace NcTestRibbon
   using System;
   using System.IO;
   using System.Reflection;
+  using NcTestRibbon.Cad;
   using Teigha.Runtime;
 
   public class Plugin : IExtensionApplication
@@ -21,6 +22,14 @@ namespace NcTestRibbon
 
     public void Terminate()
     {
+      try
+      {
+        CadSegmentBlinker.Stop();
+      }
+      catch
+      {
+      }
+
       AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
     }
 

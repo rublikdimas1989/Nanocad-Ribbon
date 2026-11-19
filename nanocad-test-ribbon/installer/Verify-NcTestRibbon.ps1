@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
+$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink')
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'
 $loadEpplus = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\EPPlus.dll'
@@ -112,6 +112,8 @@ Write-Host '  NcTestWpf'
 Write-Host '  NcTestSettings'
 Write-Host '  NcTestInitialData'
 Write-Host '  NcTestPadOpt'
+Write-Host '  NcTestBlink'
+Write-Host '  NcTestBlinkOff'
 Write-Host 'If unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL path above.'
 
 if ($fail) {

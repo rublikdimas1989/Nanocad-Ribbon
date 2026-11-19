@@ -4,28 +4,36 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.12.zip`](nanocad-test-ribbon-v1.2.12.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.12.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.13.zip`](nanocad-test-ribbon-v1.2.13.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.13.zip
 - Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
 
 Распаковывайте zip в **новую** пустую папку (не поверх старой).
 
 Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Что внутри (v1.2.12)
+## Что внутри (v1.2.13)
 
-UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
+UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding + CAD blink:
 
-| Команда | Окно |
-|---------|------|
+| Команда | Окно / действие |
+|---------|-----------------|
 | `NcTestWpf` | `MainWindow` — «Трассировка трубопровода» |
 | `NcTestSettings` | «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
 | `NcTestPadOpt` | «Оптимизация кустовых площадок» (TopologyInputs/Pad) |
+| `NcTestBlink` | **Toggle** мигания выбранной полилинии (Highlight 200 мс, как End) |
+| `NcTestBlinkOff` | выключить мигание |
 | `NcTestHello` / `NcTestHttp` | прежние тесты |
 | `NcTestDemo` | маленький WinForms smoke |
 
-Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Настройки** / **Кустовые площадки**. Клики в UI → MessageBox «сервер позже».
+Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Настройки** / **Кустовые площадки** / **Мигание**.
+
+### Мигание
+
+1. Выделите полилинию в чертеже.  
+2. Нажмите **Мигание** (или `NcTestBlink`).  
+3. Снова нажмите ту же кнопку — **отжать** / стоп.
 
 ## Быстрый старт
 
@@ -39,9 +47,9 @@ cd ..\installer
 .\VERIFY.bat
 ```
 
-nanoCAD: `NcTestSettings` / `NcTestWpf` / `NcTestPadOpt`.
+nanoCAD: `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestPadOpt`.
 
-## Local rates + pads (v1.2.12)
+## Local rates + pads (v1.2.12+)
 
 - Rates: `Price.xlsx` / `Price.xlsm`; remembered in `Tracing_cache\Settings\paths.json`.
 - Pad window (`NcTestPadOpt`): open KP/Top_tree **xlsx** tables; last path in `paths.json`; pad **Ширина/Длина** (default 150×250).
