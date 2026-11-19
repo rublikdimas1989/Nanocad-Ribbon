@@ -8,13 +8,15 @@
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
     <!-- Product / File version. AssemblyVersion stays 1.0.0.0 for any remaining Page shells. -->
-    <Version>1.2.8</Version>
+    <Version>1.2.22</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.8.0</FileVersion>
-    <InformationalVersion>1.2.8+LocalRates</InformationalVersion>
+    <FileVersion>1.2.22.0</FileVersion>
+    <InformationalVersion>1.2.22+KpRotateZoomFit</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <EnableDefaultPageItems>true</EnableDefaultPageItems>
+    <!-- Ensure NuGet deps (EPPlus + transitive) copy next to NC_TestRibbon.dll. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
 
@@ -35,8 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- End-variant Price.xlsx reader (InitialData / TopologyRates path). -->
-    <PackageReference Include="EPPlus" Version="8.6.3" />
+    <!-- End-variant Price.xlsx / Price.xlsm reader (InitialData / TopologyRates path). -->
+    <PackageReference Include="EPPlus" Version="8.6.3">
+      <PrivateAssets>none</PrivateAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -128,6 +132,25 @@
     <Error
       Condition="!Exists('$(NcSdkDir)include-x64\hostmgd.dll')"
       Text="nanoCAD SDK not found: '$(NcSdkDir)include-x64\hostmgd.dll'. Edit Directory.Build.props or pass -p:NcSdkDir=..." />
+  </Target>
+
+  <!--
+    Refresh installer\deps with NuGet lockfile assemblies so the release zip /
+    INSTALL always ship EPPlus next to NC_TestRibbon.dll (nanoCAD LoadFile).
+  -->
+  <Target Name="SyncEpplusDepsToInstaller" AfterTargets="Build">
+    <PropertyGroup>
+      <_InstallerDepsDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\installer\deps'))</_InstallerDepsDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PluginDeps Include="$(TargetDir)*.dll"
+                   Exclude="$(TargetDir)$(TargetName).dll;$(TargetDir)hostmgd.dll;$(TargetDir)hostdbmgd.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(_InstallerDepsDir)" />
+    <Copy SourceFiles="@(_PluginDeps)" DestinationFolder="$(_InstallerDepsDir)" SkipUnchangedFiles="true" />
+    <Message Importance="high"
+             Text="Synced @(_PluginDeps->'%(Filename)%(Extension)') to installer\deps for packaging."
+             Condition="'@(_PluginDeps)' != ''" />
   </Target>
 
 </Project>
