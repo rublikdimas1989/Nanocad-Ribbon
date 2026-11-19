@@ -20,6 +20,9 @@ namespace NcTestRibbon.Configuration
     /// <summary>Last opened inserts / tie-ins workbook (xlsx, sheet «Врезки»).</summary>
     public string InsertsWorkbook { get; set; } = string.Empty;
 
+    /// <summary>Last opened BUOS variants workbook (xlsx, sheet «БУОС»).</summary>
+    public string BuosWorkbook { get; set; } = string.Empty;
+
     /// <summary>Last rates workbook (Price.xlsx / .xlsm or custom path).</summary>
     public string PriceWorkbook { get; set; } = string.Empty;
 

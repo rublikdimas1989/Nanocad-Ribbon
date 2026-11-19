@@ -4,10 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.31.zip`](nanocad-test-ribbon-v1.2.31.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.31/nanocad-test-ribbon-v1.2.31.zip
-- **Sample inserts xlsx:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.31/Topology_Inserts.xlsx
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.32.zip`](nanocad-test-ribbon-v1.2.32.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.32/nanocad-test-ribbon-v1.2.32.zip
+- **Sample inserts:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
+- **Sample BUOS:** [`Topology_Buos.xlsx`](Topology_Buos.xlsx)
+
+## v1.2.32 — Варианты БУОС (catalog)
+
+- `NcTestBuos` — End TopologyBuosType catalogue (Excel «БУОС»), no site coordinates
+- Sample `Topology_Buos.xlsx`; path `paths.json` → `buosWorkbook`
 
 ## v1.2.31 — inserts unique «Имя» + oil т/сут (TCON-49)
 

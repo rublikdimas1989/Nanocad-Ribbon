@@ -26,6 +26,7 @@ namespace NcTestRibbon
     private static bool _wpfAppCreated;
     private static PadOptimizationWindow _padOptLive;
     private static InsertPointsWindow _insertsLive;
+    private static BuosVariantsWindow _buosLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -183,6 +184,59 @@ namespace NcTestRibbon
     public void NcTestInserts()
     {
       OpenInsertsForm();
+    }
+
+    /// <summary>
+    /// BUOS type catalogue (End TopologyBuosType) — Excel, no site coordinates.
+    /// </summary>
+    [CommandMethod("NcTestBuos")]
+    public void NcTestBuos()
+    {
+      OpenBuosForm();
+    }
+
+    private void OpenBuosForm()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestBuos";
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_buosLive != null && !_buosLive.IsDisposed)
+        {
+          _buosLive.BringToFront();
+          _buosLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open (modeless).");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        BuosVariantsWindow form = new BuosVariantsWindow();
+        _buosLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_buosLive, form))
+          {
+            _buosLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": modeless open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+      }
     }
 
     /// <summary>
