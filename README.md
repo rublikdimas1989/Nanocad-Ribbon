@@ -4,10 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.29.zip`](nanocad-test-ribbon-v1.2.29.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/nanocad-test-ribbon-v1.2.29.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.30.zip`](nanocad-test-ribbon-v1.2.30.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.30/nanocad-test-ribbon-v1.2.30.zip
 - **Sample inserts xlsx:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/Topology_Inserts.xlsx
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.30/Topology_Inserts.xlsx
+
+## v1.2.30 — zoom before insert place
+
+- `NcTestInserts` «Задать положение вручную» zooms to the insert (or planned X/Y) before GetPoint — same rule as KP pads/rotate
 
 ## v1.2.29 — Topology inserts (врезки) + interface.conf
 

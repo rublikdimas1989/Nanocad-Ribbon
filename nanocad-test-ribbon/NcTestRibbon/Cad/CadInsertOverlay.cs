@@ -119,6 +119,9 @@ namespace NcTestRibbon.Cad
       Editor ed = doc.Editor
         ?? throw new InvalidOperationException("Нет редактора активного чертежа.");
 
+      // Always zoom to the insert (or its planned position) before place — same rule as KP pads.
+      SafeZoomToInsertOrPoint(ed, doc, point);
+
       try
       {
         ed.WriteMessage("\nУкажите новое положение врезки «" + point.Name + "»…");
@@ -144,6 +147,189 @@ namespace NcTestRibbon.Cad
       y = res.Value.Y;
       ed.WriteMessage("\nВрезка «" + point.Name + "»: X=" + x.ToString("G17") + " Y=" + y.ToString("G17"));
       return true;
+    }
+
+    /// <summary>
+    /// Best-effort zoom before place. Must never throw into the unmanaged host.
+    /// </summary>
+    private static void SafeZoomToInsertOrPoint(Editor ed, Document doc, InsertGeom point)
+    {
+      try
+      {
+        if (ed == null || doc == null || point == null)
+        {
+          return;
+        }
+
+        ObjectId[] ids = FindInsertIdsReadOnly(doc, point.Name);
+        if (ids.Length > 0
+          && TryGetEntityExtents(doc, ids, out double minX, out double minY, out double maxX, out double maxY))
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+          return;
+        }
+
+        InterfaceConf ui = InterfaceConf.Load();
+        double radius = Math.Max(ui.InsertCircleDiameterM, 1.0) / 2.0;
+        double pad = Math.Max(ui.LabelFontHeightM, radius) * 2.0;
+        if (!double.IsFinite(point.X) || !double.IsFinite(point.Y))
+        {
+          return;
+        }
+
+        ApplyViewExtentsSafe(
+          ed,
+          point.X - radius - pad,
+          point.Y - radius - pad,
+          point.X + radius + pad,
+          point.Y + radius + pad);
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
+    private static ObjectId[] FindInsertIdsReadOnly(Document doc, string name)
+    {
+      try
+      {
+        if (doc?.Database == null || string.IsNullOrWhiteSpace(name))
+        {
+          return Array.Empty<ObjectId>();
+        }
+
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          var found = new List<ObjectId>();
+          foreach (ObjectId id in model)
+          {
+            if (!id.IsValid || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+            if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+            {
+              continue;
+            }
+
+            if (string.Equals(ReadName(tr, ent), name, StringComparison.OrdinalIgnoreCase))
+            {
+              found.Add(id);
+            }
+          }
+
+          tr.Commit();
+          return found.ToArray();
+        }
+      }
+      catch
+      {
+        return Array.Empty<ObjectId>();
+      }
+    }
+
+    private static bool TryGetEntityExtents(
+      Document doc,
+      ObjectId[] ids,
+      out double minX,
+      out double minY,
+      out double maxX,
+      out double maxY)
+    {
+      minX = double.PositiveInfinity;
+      minY = double.PositiveInfinity;
+      maxX = double.NegativeInfinity;
+      maxY = double.NegativeInfinity;
+      bool any = false;
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          foreach (ObjectId id in ids)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+            if (ent == null)
+            {
+              continue;
+            }
+
+            try
+            {
+              Extents3d ext = ent.GeometricExtents;
+              minX = Math.Min(minX, ext.MinPoint.X);
+              minY = Math.Min(minY, ext.MinPoint.Y);
+              maxX = Math.Max(maxX, ext.MaxPoint.X);
+              maxY = Math.Max(maxY, ext.MaxPoint.Y);
+              any = true;
+            }
+            catch
+            {
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+        return false;
+      }
+
+      return any
+        && double.IsFinite(minX) && double.IsFinite(minY)
+        && double.IsFinite(maxX) && double.IsFinite(maxY)
+        && maxX >= minX && maxY >= minY;
+    }
+
+    private static void ApplyViewExtentsSafe(
+      Editor ed,
+      double minX,
+      double minY,
+      double maxX,
+      double maxY)
+    {
+      if (ed == null
+        || !double.IsFinite(minX) || !double.IsFinite(minY)
+        || !double.IsFinite(maxX) || !double.IsFinite(maxY)
+        || maxX < minX || maxY < minY)
+      {
+        return;
+      }
+
+      double width = Math.Max(maxX - minX, 1.0) * 1.7;
+      double height = Math.Max(maxY - minY, 1.0) * 1.7;
+      double cx = (minX + maxX) / 2.0;
+      double cy = (minY + maxY) / 2.0;
+      ViewTableRecord view = null;
+      try
+      {
+        view = ed.GetCurrentView();
+        if (view == null)
+        {
+          return;
+        }
+
+        view.CenterPoint = new Point2d(cx, cy);
+        view.Height = height;
+        view.Width = width;
+        ed.SetCurrentView(view);
+      }
+      catch
+      {
+      }
+      // Do not Dispose ViewTableRecord after SetCurrentView (HostMgd/Teigha can AV).
     }
 
     private static void AddCircle(Transaction tr, BlockTableRecord model, Database db, InsertGeom point, double diameter)
