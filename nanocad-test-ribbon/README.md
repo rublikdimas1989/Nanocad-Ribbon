@@ -3,16 +3,16 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.8**): `nanocad-test-ribbon-v1.2.8.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.8.zip  
+Актуальный zip с GitHub (версия **1.2.9**): `nanocad-test-ribbon-v1.2.9.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.9.zip  
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.8**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.9**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
-3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
+3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
 
 | Команда | Что делает |
@@ -41,6 +41,7 @@ nanocad-test-ribbon/
     INSTALL.bat / Install-NcTestRibbon.ps1
     VERIFY.bat / Verify-NcTestRibbon.ps1
     UNINSTALL.bat / Uninstall-NcTestRibbon.ps1
+    deps/                     ← EPPlus 8.6.3 + transitive DLLs (copied to LoadFile)
     NcBootstrap.dll / .json / .deps.json
     icons/load_chart.ico
   NcTestRibbon/
@@ -82,6 +83,7 @@ NcTestPadOpt
 - копирует **NcBootstrap** в `%LOCALAPPDATA%\ASDC\NcBootstrap` и регистрирует его в Startup (`Type=sMGD`) всех найденных профилей;
 - **принудительно перезаписывает** `NC_TestRibbon.dll` + `NC_TestRibbon.json` в `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD`  
   (ищет сначала `..\NcTestRibbon\bin\Release\net6.0-windows\`, иначе Debug / `installer\payload\`; JSON берётся из корня пакета);
+- copies `installer\deps\*.dll` (EPPlus 8.6.3 + transitive) — and any matching NuGet DLLs from the build output — next to the plugin in LoadFile;
 - проверяет, что DLL содержит имена команд `NcTestHello`, `NcTestHttp`, `NcTestWpf`;
 - **не** ставит панель «Рамки» / `NC_RibbonExecDoc` — при установке удаляет их DLL/JSON из LoadFile, Startup и кэш `.cfg`/`.cuix` профиля;
 - `NcBootstrap.json` с пустым `serverUrl` (локальный режим, без синхронизации ASDC, чтобы «Загрузить» снова не подтянуло «Рамки»);

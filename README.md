@@ -4,15 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.8.zip`](nanocad-test-ribbon-v1.2.8.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.8.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.9.zip`](nanocad-test-ribbon-v1.2.9.zip)  
+  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.9.zip
 - Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
 
 Распаковывайте zip в **новую** пустую папку (не поверх старой).
 
 Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
 
-## Что внутри (v1.2.8)
+## Что внутри (v1.2.9)
 
 UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
 
@@ -41,6 +41,8 @@ cd ..\installer
 
 nanoCAD: `NcTestSettings` / `NcTestWpf` / `NcTestPadOpt`.
 
-## Local rates (v1.2.8)
+## Local rates (v1.2.9)
 
-Tab «Настройки трассировки» loads rates from `%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\Settings\Price.xlsx` (EPPlus) and saves medium transitions into `tracing.conf` (JSON AppSettings). Place the End Price.xlsx workbook there. Unpack zip into a **NEW** empty folder.
+Tab «Настройки трассировки» loads rates from `%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\Settings\Price.xlsx` (EPPlus) and saves medium transitions into `tracing.conf` (JSON AppSettings). Place the End Price.xlsx workbook there.
+
+**v1.2.9:** `installer\deps\` ships `EPPlus.dll` (8.6.3) + transitive deps; `INSTALL.bat` copies them next to `NC_TestRibbon.dll` in LoadFile. Unpack zip into a **NEW** empty folder, rebuild Release, run INSTALL, then `NcTestSettings`.
