@@ -13,7 +13,7 @@ namespace NcTestRibbon.Shell
 
   /// <summary>
   /// Tab «Настройки трассировки»: local End-variant logic —
-  /// Price.xlsx rates + PipeMedium transitions saved to tracing.conf.
+  /// Price.xlsx / Price.xlsm rates + PipeMedium transitions saved to tracing.conf.
   /// </summary>
   public class TracingSettingsPanel : UserControl
   {
@@ -48,7 +48,7 @@ namespace NcTestRibbon.Shell
 
       if (_ratesPath != null)
       {
-        _ratesPath.Text = TracingCache.PriceXlsx;
+        _ratesPath.Text = TracingCache.ResolveRatesFilePath();
       }
 
       Wire(Find<ComboBox>("DownsampleFactor"), (_, __) => { });
@@ -71,13 +71,14 @@ namespace NcTestRibbon.Shell
         AppSettings.Initialize();
         LoadGeneralFromConfig();
         InitializeMediumEditors();
-        if (File.Exists(TracingCache.PriceXlsx) && new FileInfo(TracingCache.PriceXlsx).Length > 0)
+        if (TracingCache.RatesFileExists())
         {
           ApplyRates(showErrors: false);
         }
         else if (_statusText != null)
         {
-          _statusText.Text = "Положите Price.xlsx в Tracing_cache\\Settings\\ и нажмите «Применить расценки».";
+          _statusText.Text =
+            "Положите Price.xlsx или Price.xlsm в Tracing_cache\\Settings\\ и нажмите «Применить расценки».";
         }
       }
       catch (Exception ex)
@@ -101,7 +102,7 @@ namespace NcTestRibbon.Shell
       }
 
       using SettingsSection section = AppSettings.OpenSection(AppSettings.General);
-      section.SetValue("RatesFilePath", TracingCache.PriceXlsx);
+      section.SetValue("RatesFilePath", TracingCache.ResolveRatesFilePath());
       section.SetValue("BlockX", TextOf("BlockX"));
       section.SetValue("BlockY", TextOf("BlockY"));
       section.SetValue("BlockW", TextOf("BlockW"));
@@ -278,7 +279,7 @@ namespace NcTestRibbon.Shell
       try
       {
         UpdatePipeCatalogSelection();
-        if (File.Exists(TracingCache.PriceXlsx) && new FileInfo(TracingCache.PriceXlsx).Length > 0)
+        if (TracingCache.RatesFileExists())
         {
           ApplyRates(showErrors: false);
         }
@@ -300,9 +301,15 @@ namespace NcTestRibbon.Shell
           ? _mediumOptions[pipeMedium]
           : PipeMediumSettings.TextDefaults;
 
+        string ratesPath = TracingCache.ResolveRatesFilePath();
+        if (_ratesPath != null)
+        {
+          _ratesPath.Text = ratesPath;
+        }
+
         var request = new TracingRatesLoader.Request
         {
-          RatesFilePath = TracingCache.PriceXlsx,
+          RatesFilePath = ratesPath,
           EnvironmentLabel = ComboText("CmbEnvironment"),
           DiameterText = ComboText("CmbDiameter"),
           ThicknessText = ComboText("CmbThickness"),
@@ -348,7 +355,9 @@ namespace NcTestRibbon.Shell
 
         if (_statusText != null)
         {
-          _statusText.Text = "Расценки загружены локально из Price.xlsx (" + _rates.Count + ").";
+          _statusText.Text =
+            "Расценки загружены локально из " + Path.GetFileName(ratesPath)
+            + " (" + _rates.Count + ").";
         }
       }
       catch (Exception ex)

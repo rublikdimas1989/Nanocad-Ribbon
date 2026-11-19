@@ -3,14 +3,14 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.9**): `nanocad-test-ribbon-v1.2.9.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.9.zip  
+Актуальный zip с GitHub (версия **1.2.10**): `nanocad-test-ribbon-v1.2.10.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.10.zip  
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.9**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.10**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -263,7 +263,7 @@ Pad-окно (`NcTestPadOpt`) собрано в коде без XAML.
 
 ## Tracing_cache
 
-`%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`. Создаётся при открытии «Настройки».
+`%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\` — `Settings\` (Price.xlsx or Price.xlsm, tracing.conf, trench_road.conf), `Maps\`, `SourceData\`. Создаётся при открытии «Настройки». Rates prefer `.xlsx`, else `.xlsm` (EPPlus; macros ignored).
 
 ## Settings without pack URI
 
