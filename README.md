@@ -4,11 +4,17 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.49.zip`](nanocad-test-ribbon-v1.2.49.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.49/nanocad-test-ribbon-v1.2.49.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.50.zip`](nanocad-test-ribbon-v1.2.50.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.50/nanocad-test-ribbon-v1.2.50.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.50 — ECW encode license / free Maps encode
+
+- `NcTestTif`: resolve Hexagon `ECW_ENCODE_COMPANY`+`KEY` from env / `Tracing_cache\Settings\ecw_encode.conf` / End LoadFile conf
+- With OEM → `Maps\<name>.ecw` then attach; without → **free** `Maps\<name>.tif` (End Forest.tif style, GT preserved)
+- Example: `installer/ecw_encode.conf.example`
 
 ## v1.2.49 — slim releases + TIF→ECW
 

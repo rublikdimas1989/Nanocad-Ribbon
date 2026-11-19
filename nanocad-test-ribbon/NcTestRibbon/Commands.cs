@@ -361,9 +361,11 @@ namespace NcTestRibbon
           string convertNote = string.Empty;
           if (tifToEcw)
           {
-            ed?.WriteMessage("\n" + label + ": TIF→ECW…");
+            ed?.WriteMessage("\n" + label + ": TIF→Maps (ECW if OEM license, else free GeoTIFF)…");
             CadTifToEcw.ConvertResult converted = CadTifToEcw.Convert(pickedPath);
-            rasterPath = converted.EcwPath;
+            rasterPath = !string.IsNullOrWhiteSpace(converted.OutputPath)
+              ? converted.OutputPath
+              : converted.EcwPath;
             convertNote = converted.Note;
             ed?.WriteMessage("\n" + label + ": " + convertNote);
             AppPaths.Set(p => p.Background = rasterPath);

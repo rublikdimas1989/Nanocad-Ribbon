@@ -114,10 +114,12 @@ namespace NcGdalGeo
         return 1;
       }
 
-      string dstExt = Path.GetExtension(dstPath) ?? string.Empty;
-      if (!dstExt.Equals(".ecw", StringComparison.OrdinalIgnoreCase))
+      string dstExt = (Path.GetExtension(dstPath) ?? string.Empty).ToLowerInvariant();
+      bool wantEcw = dstExt == ".ecw";
+      bool wantTif = dstExt == ".tif" || dstExt == ".tiff";
+      if (!wantEcw && !wantTif)
       {
-        WriteErr("Destination must be .ecw: " + dstPath);
+        WriteErr("Destination must be .ecw or .tif/.tiff: " + dstPath);
         return 1;
       }
 
@@ -130,6 +132,18 @@ namespace NcGdalGeo
       if (File.Exists(dstPath))
       {
         File.Delete(dstPath);
+      }
+
+      string company = Environment.GetEnvironmentVariable("ECW_ENCODE_COMPANY");
+      string key = Environment.GetEnvironmentVariable("ECW_ENCODE_KEY");
+      bool haveLicense = !string.IsNullOrWhiteSpace(company) && !string.IsNullOrWhiteSpace(key);
+      string driverName = wantEcw ? "ECW" : "GTiff";
+      if (haveLicense)
+      {
+        Gdal.SetConfigOption("ECW_ENCODE_COMPANY", company.Trim());
+        Gdal.SetConfigOption("ECW_ENCODE_KEY", key.Trim());
+        Environment.SetEnvironmentVariable("ECW_ENCODE_COMPANY", company.Trim());
+        Environment.SetEnvironmentVariable("ECW_ENCODE_KEY", key.Trim());
       }
 
       using (Dataset src = Gdal.Open(srcPath, Access.GA_ReadOnly))
@@ -149,27 +163,43 @@ namespace NcGdalGeo
           return 1;
         }
 
-        Driver ecw = Gdal.GetDriverByName("ECW");
-        if (ecw == null)
+        Driver drv = Gdal.GetDriverByName(driverName);
+        if (drv == null)
         {
-          WriteErr("ECW driver MISSING (need gdal_ECW_JP2ECW.dll + NCSEcw.dll under plugins).");
+          WriteErr(driverName + " driver MISSING. last=" + Gdal.GetLastErrorMsg());
           return 1;
         }
 
-        // Same idea as gdal_translate -of ECW: CreateCopy preserves GT/projection.
-        string[] options =
+        var optList = new List<string>();
+        if (wantEcw)
         {
-          "TARGET=95",
-          "LARGE_OK=YES"
-        };
+          if (!haveLicense)
+          {
+            WriteErr("ECW_ENCODE_KEY/COMPANY required for ECW CreateCopy. "
+              + "Set env or Tracing_cache\\Settings\\ecw_encode.conf (End-style OEM license).");
+            return 3;
+          }
 
-        // CreateCopy(path, src, bStrict, options, callback, callbackData)
-        using (Dataset dst = ecw.CreateCopy(dstPath, src, 0, options, null, null))
+          optList.Add("TARGET=95");
+          optList.Add("LARGE_OK=YES");
+          optList.Add("ECW_ENCODE_COMPANY=" + company.Trim());
+          optList.Add("ECW_ENCODE_KEY=" + key.Trim());
+        }
+        else
+        {
+          // Free encode path (End Forest.tif style): GeoTIFF keeps embedded GT.
+          optList.Add("COMPRESS=LZW");
+          optList.Add("TILED=YES");
+          optList.Add("BIGTIFF=IF_SAFER");
+        }
+
+        string[] options = optList.ToArray();
+        using (Dataset dst = drv.CreateCopy(dstPath, src, 0, options, null, null))
         {
           if (dst == null)
           {
-            WriteErr("ECW CreateCopy null: " + Gdal.GetLastErrorMsg());
-            return 1;
+            WriteErr(driverName + " CreateCopy null: " + Gdal.GetLastErrorMsg());
+            return wantEcw ? 3 : 1;
           }
 
           dst.FlushCache();
@@ -178,16 +208,15 @@ namespace NcGdalGeo
 
       if (!File.Exists(dstPath) || new FileInfo(dstPath).Length < 16)
       {
-        WriteErr("ECW output missing/empty after CreateCopy. last=" + Gdal.GetLastErrorMsg());
+        WriteErr("Output missing/empty after CreateCopy. last=" + Gdal.GetLastErrorMsg());
         return 1;
       }
 
-      // Re-open to confirm embedded GT survived (attach path uses NcGdalGeo geo).
       using (Dataset verify = Gdal.Open(dstPath, Access.GA_ReadOnly))
       {
         if (verify == null)
         {
-          WriteErr("Created ECW but reopen failed: " + Gdal.GetLastErrorMsg());
+          WriteErr("Created file but reopen failed: " + Gdal.GetLastErrorMsg());
           return 1;
         }
 
@@ -195,7 +224,7 @@ namespace NcGdalGeo
         verify.GetGeoTransform(vgt);
         if (!IsUsableGeoTransform(vgt))
         {
-          WriteErr("Created ECW but GeoTransform lost on reopen.");
+          WriteErr("Created file but GeoTransform lost on reopen.");
           return 1;
         }
 
@@ -205,11 +234,12 @@ namespace NcGdalGeo
           ["action"] = "translate",
           ["src"] = srcPath,
           ["dst"] = dstPath,
-          ["driver"] = verify.GetDriver() != null ? verify.GetDriver().ShortName : "ECW",
+          ["driver"] = verify.GetDriver() != null ? verify.GetDriver().ShortName : driverName,
           ["width"] = verify.RasterXSize,
           ["height"] = verify.RasterYSize,
           ["geoTransform"] = vgt,
           ["bytes"] = new FileInfo(dstPath).Length,
+          ["license"] = haveLicense,
           ["nativeDir"] = nativeDir,
           ["version"] = Gdal.VersionInfo("--version") ?? ""
         };

@@ -9,8 +9,8 @@ namespace NcTestRibbon.Cad
   using NcTestRibbon.Shell;
 
   /// <summary>
-  /// Convert GeoTIFF → ECW via out-of-process NcGdalGeo translate (preserves GeoTransform),
-  /// then attach like a normal ECW (Screen_ESRI.ecw path).
+  /// GeoTIFF → Maps\&lt;name&gt;.ecw (OEM license) or free Maps\&lt;name&gt;.tif (End Forest.tif style),
+  /// then attach with preserved GeoTransform.
   /// </summary>
   public static class CadTifToEcw
   {
@@ -18,8 +18,10 @@ namespace NcTestRibbon.Cad
     {
       public string SourcePath { get; set; } = string.Empty;
       public string EcwPath { get; set; } = string.Empty;
+      public string OutputPath { get; set; } = string.Empty;
       public string Note { get; set; } = string.Empty;
       public double[] GeoTransform { get; set; }
+      public bool UsedFreeEncode { get; set; }
     }
 
     public static ConvertResult Convert(string tifPath)
@@ -44,17 +46,52 @@ namespace NcTestRibbon.Cad
           + "из v1.2.48+ или nanocad-gdal-runtime zip.");
       }
 
-      string ecwPath = PreferEcwOutputPath(tifPath);
-      string ecwDir = Path.GetDirectoryName(ecwPath);
-      if (!string.IsNullOrEmpty(ecwDir))
+      EcwEncodeLicense.License lic = EcwEncodeLicense.TryResolve(out string licDiag);
+      string mapsEcw = PreferMapsOutputPath(tifPath, ".ecw");
+      EnsureParentDir(mapsEcw);
+
+      if (lic.IsComplete)
       {
-        Directory.CreateDirectory(ecwDir);
+        ConvertResult ecw = RunTranslate(exe, tifPath, mapsEcw, lic, licDiag);
+        if (ecw != null)
+        {
+          return ecw;
+        }
       }
 
+      // Free encode (End Forest.tif style): GeoTIFF in Maps with embedded GT — no OEM key.
+      string mapsTif = PreferMapsOutputPath(tifPath, ".tif");
+      EnsureParentDir(mapsTif);
+      ConvertResult free = RunTranslate(exe, tifPath, mapsTif, license: null, licDiag);
+      if (free == null)
+      {
+        throw new InvalidOperationException(
+          "TIF→растр не удался.\n"
+          + "Для ECW нужен OEM: " + EcwEncodeLicense.ExampleConfPath + "\n"
+          + "  ECW_ENCODE_COMPANY=...\n  ECW_ENCODE_KEY=...\n"
+          + "(или env / End LoadFile ecw_encode.conf)\n\n"
+          + "License probe:\n" + Truncate(licDiag, 1200));
+      }
+
+      free.UsedFreeEncode = true;
+      free.Note = RasterGeoTransform.PackageStamp()
+        + " free encode → " + Path.GetFileName(free.OutputPath)
+        + " (End Forest.tif style; ECW OEM missing — put key in "
+        + Path.GetFileName(EcwEncodeLicense.ExampleConfPath) + ")";
+      return free;
+    }
+
+    private static ConvertResult RunTranslate(
+      string exe,
+      string src,
+      string dst,
+      EcwEncodeLicense.License license,
+      string licDiag)
+    {
       var psi = new ProcessStartInfo
       {
         FileName = exe,
-        Arguments = "translate \"" + tifPath + "\" \"" + ecwPath + "\"",
+        Arguments = "translate \"" + src + "\" \"" + dst + "\"",
         UseShellExecute = false,
         RedirectStandardOutput = true,
         RedirectStandardError = true,
@@ -63,10 +100,22 @@ namespace NcTestRibbon.Cad
         WorkingDirectory = Path.GetDirectoryName(exe) ?? string.Empty
       };
 
+      if (license != null && license.IsComplete)
+      {
+        psi.Environment["ECW_ENCODE_COMPANY"] = license.Company;
+        psi.Environment["ECW_ENCODE_KEY"] = license.Key;
+      }
+      else
+      {
+        // Avoid inheriting a partial/broken env pair into the child.
+        psi.Environment.Remove("ECW_ENCODE_COMPANY");
+        psi.Environment.Remove("ECW_ENCODE_KEY");
+      }
+
       using Process proc = Process.Start(psi);
       if (proc == null)
       {
-        throw new InvalidOperationException("NcGdalGeo Process.Start returned null.");
+        return null;
       }
 
       string stdout = proc.StandardOutput.ReadToEnd();
@@ -74,14 +123,20 @@ namespace NcTestRibbon.Cad
       if (!proc.WaitForExit(600000))
       {
         try { proc.Kill(); } catch { /* ignore */ }
-        throw new TimeoutException("NcGdalGeo translate timed out for " + Path.GetFileName(tifPath));
+        throw new TimeoutException("NcGdalGeo translate timed out for " + Path.GetFileName(src));
       }
 
       if (string.IsNullOrWhiteSpace(stdout))
       {
+        if (proc.ExitCode == 3)
+        {
+          return null; // license required — caller may free-fallback
+        }
+
         throw new InvalidOperationException(
           "NcGdalGeo translate empty stdout exit=" + proc.ExitCode
-          + " stderr=" + Truncate(stderr, 500));
+          + " stderr=" + Truncate(stderr, 500)
+          + "\n" + Truncate(licDiag, 400));
       }
 
       using JsonDocument doc = JsonDocument.Parse(stdout.Trim());
@@ -89,13 +144,19 @@ namespace NcTestRibbon.Cad
       if (root.TryGetProperty("ok", out JsonElement okEl) && okEl.ValueKind == JsonValueKind.False)
       {
         string err = root.TryGetProperty("error", out JsonElement e) ? e.GetString() : stdout;
-        throw new InvalidOperationException("TIF→ECW failed: " + Truncate(err ?? stdout, 1200));
+        if (proc.ExitCode == 3
+          || (err != null && err.IndexOf("ECW_ENCODE", StringComparison.OrdinalIgnoreCase) >= 0))
+        {
+          return null;
+        }
+
+        throw new InvalidOperationException("Translate failed: " + Truncate(err ?? stdout, 1200));
       }
 
-      string dst = root.TryGetProperty("dst", out JsonElement d) ? d.GetString() : ecwPath;
-      if (string.IsNullOrWhiteSpace(dst) || !File.Exists(dst))
+      string outPath = root.TryGetProperty("dst", out JsonElement d) ? d.GetString() : dst;
+      if (string.IsNullOrWhiteSpace(outPath) || !File.Exists(outPath))
       {
-        throw new InvalidOperationException("TIF→ECW: output ECW missing after translate.");
+        throw new InvalidOperationException("Translate: output missing after CreateCopy.");
       }
 
       double[] gt = null;
@@ -108,33 +169,48 @@ namespace NcTestRibbon.Cad
         }
       }
 
+      string driver = root.TryGetProperty("driver", out JsonElement dr) ? (dr.GetString() ?? "") : "";
+      bool isEcw = outPath.EndsWith(".ecw", StringComparison.OrdinalIgnoreCase);
       return new ConvertResult
       {
-        SourcePath = tifPath,
-        EcwPath = dst,
+        SourcePath = src,
+        EcwPath = isEcw ? outPath : string.Empty,
+        OutputPath = outPath,
         GeoTransform = gt,
+        UsedFreeEncode = !isEcw,
         Note = RasterGeoTransform.PackageStamp()
-          + " TIF→ECW via NcGdalGeo translate → " + Path.GetFileName(dst)
+          + (isEcw
+            ? " TIF→ECW (" + driver + ") license=" + (license?.Source ?? "?")
+            : " TIF→GTiff free encode (" + driver + ")")
+          + " → " + Path.GetFileName(outPath)
       };
     }
 
-    /// <summary>
-    /// Tracing_cache\Maps\{name}.ecw (preferred) or next to source if Maps unavailable.
-    /// </summary>
-    public static string PreferEcwOutputPath(string tifPath)
+    /// <summary>Tracing_cache\Maps\{name}.ecw|.tif</summary>
+    public static string PreferMapsOutputPath(string tifPath, string extension)
     {
       string baseName = Path.GetFileNameWithoutExtension(tifPath) ?? "raster";
+      string ext = extension.StartsWith(".", StringComparison.Ordinal) ? extension : "." + extension;
       try
       {
         TracingCache.EnsureCreated();
         Directory.CreateDirectory(TracingCache.MapsDir);
-        return Path.Combine(TracingCache.MapsDir, baseName + ".ecw");
+        return Path.Combine(TracingCache.MapsDir, baseName + ext);
       }
       catch
       {
-        return Path.Combine(
-          Path.GetDirectoryName(tifPath) ?? ".",
-          baseName + "_nc.ecw");
+        return Path.Combine(Path.GetDirectoryName(tifPath) ?? ".", baseName + "_nc" + ext);
+      }
+    }
+
+    public static string PreferEcwOutputPath(string tifPath) => PreferMapsOutputPath(tifPath, ".ecw");
+
+    private static void EnsureParentDir(string path)
+    {
+      string dir = Path.GetDirectoryName(path);
+      if (!string.IsNullOrEmpty(dir))
+      {
+        Directory.CreateDirectory(dir);
       }
     }
 

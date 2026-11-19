@@ -521,6 +521,20 @@ else {
     throw 'NcGdalGeo.exe not found. Slim plugin zip reuses LoadFile tools from 1.2.48 / gdal-runtime.'
 }
 
+# Seed ECW OEM encode example (optional; without it NcTestTif uses free Maps\*.tif).
+$encodeExampleSrc = Join-Path $src 'ecw_encode.conf.example'
+if (-not (Test-Path $encodeExampleSrc)) {
+    $encodeExampleSrc = Join-Path $pkgRoot 'installer\ecw_encode.conf.example'
+}
+$settingsDir = Join-Path $syncFolder 'Tracing_cache\Settings'
+if (Test-Path $encodeExampleSrc) {
+    New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+    $encodeExampleDest = Join-Path $settingsDir 'ecw_encode.conf.example'
+    Copy-Item $encodeExampleSrc $encodeExampleDest -Force
+    Write-Host ("ECW encode example: {0}" -f $encodeExampleDest)
+}
+
+
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {
     Write-Host ''
