@@ -232,7 +232,7 @@ namespace NcTestRibbon.Shell
         }
 
         DialogResult apply = MessageBox.Show(
-          FindForm() ?? (IWin32Window)this,
+          FindForm() ?? (System.Windows.Forms.IWin32Window)this,
           "Применить новые координаты?",
           "Точки врезки",
           MessageBoxButtons.YesNo,

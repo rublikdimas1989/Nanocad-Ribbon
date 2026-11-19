@@ -3,13 +3,13 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.38**): `nanocad-test-ribbon-v1.2.38.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.38.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.38/nanocad-test-ribbon-v1.2.38.zip  
+Актуальный zip с GitHub (версия **1.2.39**): `nanocad-test-ribbon-v1.2.39.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.39.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.39/nanocad-test-ribbon-v1.2.39.zip  
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.38/Topology_Inserts.xlsx)  
-Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.38/Topology_Buos.xlsx)  
-Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.38/Topology_Nodes.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.39/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.39/Topology_Buos.xlsx)  
+Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.39/Topology_Nodes.xlsx)  
 
 
 
@@ -31,7 +31,7 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.38**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.39**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
