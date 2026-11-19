@@ -4,11 +4,17 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.55.zip`](nanocad-test-ribbon-v1.2.55.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.55/nanocad-test-ribbon-v1.2.55.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.56.zip`](nanocad-test-ribbon-v1.2.56.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.56/nanocad-test-ribbon-v1.2.56.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.56 — Transparency sticks (unlock while Cartography open)
+
+- Opacity UI sets `RasterImage.Transparency` 0–90 (Properties shows number, not ByLayer)
+- While «Картография» open → unlock `NC_MAP_*`; on close → re-lock
+- Locked layers were swallowing Transparency writes without throwing
 
 ## v1.2.55 — RasterImage Transparency (not Fade)
 

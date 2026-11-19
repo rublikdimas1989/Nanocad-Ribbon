@@ -103,7 +103,18 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(_status, 0, 4);
 
-      Load += (_, __) => RefreshFromDrawingAndPaths();
+      Load += (_, __) =>
+      {
+        // Unlock NC_MAP_* while this window is open so Transparency writes stick.
+        try { CadMapRaster.BeginCartographyEditing(); }
+        catch { }
+        RefreshFromDrawingAndPaths();
+      };
+      FormClosing += (_, __) =>
+      {
+        try { CadMapRaster.EndCartographyEditing(); }
+        catch { }
+      };
     }
 
     private void BuildLayerRow(
@@ -173,6 +184,15 @@ namespace NcTestRibbon.Shell
       {
         if (_suppress) return;
         onOpacity();
+      };
+      opacity.TextChanged += (_, __) =>
+      {
+        if (_suppress) return;
+        // Apply as soon as a valid 0–100 value is typed (Properties Transparency must update).
+        if (int.TryParse(opacity.Text.Trim(), out int v) && v >= 0 && v <= 100)
+        {
+          onOpacity();
+        }
       };
       opacity.KeyDown += (s, e) =>
       {
@@ -353,14 +373,22 @@ namespace NcTestRibbon.Shell
       try
       {
         int opacity = ReadOpacity(box, defaultOpacity);
-        box.Text = opacity.ToString();
+        string normalized = opacity.ToString();
+        if (!string.Equals(box.Text, normalized, StringComparison.Ordinal))
+        {
+          _suppress = true;
+          try { box.Text = normalized; }
+          finally { _suppress = false; }
+        }
+
         PersistOpacity(kind, opacity);
         if (CadMapRaster.HasDrawingImage(kind))
         {
           CadMapRaster.SetOpacity(kind, opacity);
-          SetStatus(CadMapRaster.DisplayName(kind) + ": Transparency "
-            + CadRasterAttach.OpacityToTransparencyValue(opacity)
-            + " (opacity " + opacity + "%)");
+          byte tVal = CadRasterAttach.OpacityToTransparencyValue(opacity);
+          SetStatus(CadMapRaster.DisplayName(kind)
+            + ": Transparency=" + tVal
+            + " (Properties; not ByLayer; layers unlocked while this window is open)");
         }
         else
         {

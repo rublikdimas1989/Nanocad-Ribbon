@@ -10,7 +10,8 @@ namespace NcTestRibbon.Cad
 
   /// <summary>
   /// Cartography rasters on locked layers (KP-style): Forest / Height / Screen_ESRI.
-  /// Uncheck → layer IsOff (lightbulb); never move/delete while locked.
+  /// Uncheck → layer IsOff (lightbulb). While «Картография» is open layers stay unlocked
+  /// so RasterImage.Transparency writes stick (Properties shows 0–90, not ByLayer).
   /// </summary>
   public static class CadMapRaster
   {
@@ -24,6 +25,49 @@ namespace NcTestRibbon.Cad
     public const string LayerForest = "NC_MAP_FOREST";
     public const string LayerHeight = "NC_MAP_HEIGHT";
     public const string LayerScreen = "NC_MAP_SCREEN";
+
+    /// <summary>True while CartographyWindow is open — keep NC_MAP_* unlocked for Transparency edits.</summary>
+    public static bool CartographyEditing { get; private set; }
+
+    public static void BeginCartographyEditing()
+    {
+      CartographyEditing = true;
+      SetAllMapLayersLocked(false);
+    }
+
+    public static void EndCartographyEditing()
+    {
+      CartographyEditing = false;
+      SetAllMapLayersLocked(true);
+    }
+
+    public static void SetAllMapLayersLocked(bool locked)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      string[] names = { LayerForest, LayerHeight, LayerScreen };
+      using (doc.LockDocument())
+      using (Transaction tr = doc.TransactionManager.StartTransaction())
+      {
+        LayerTable layers = (LayerTable)tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead);
+        foreach (string name in names)
+        {
+          if (!layers.Has(name))
+          {
+            continue;
+          }
+
+          LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[name], OpenMode.ForWrite);
+          layer.IsLocked = locked;
+        }
+
+        tr.Commit();
+      }
+    }
 
     public static string LayerName(Kind kind)
     {
@@ -120,7 +164,8 @@ namespace NcTestRibbon.Cad
         LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
         layer.IsOff = !visible;
         layer.IsFrozen = false;
-        layer.IsLocked = true;
+        // Stay unlocked while Cartography window is open (Transparency edits).
+        layer.IsLocked = !CartographyEditing;
         tr.Commit();
       }
 
@@ -130,8 +175,11 @@ namespace NcTestRibbon.Cad
 
     public static void SetOpacity(Kind kind, int opacityPercent)
     {
-      // Prefer Transparency while layer stays locked; unlock/relock only if API throws.
-      CadRasterAttach.SetOpacityOnLayer(LayerName(kind), opacityPercent);
+      // Always unlock → set entity Transparency (0–90) → leave unlocked if editing.
+      CadRasterAttach.SetOpacityOnLayer(
+        LayerName(kind),
+        opacityPercent,
+        relockAfter: !CartographyEditing);
     }
 
     public static bool IsLayerOn(Kind kind)
@@ -167,7 +215,8 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Attach raster onto locked map layer (replaces prior images on that layer).
+    /// Attach raster onto map layer (replaces prior images on that layer).
+    /// Locks only when Cartography window is closed.
     /// </summary>
     public static CadRasterAttach.Result AttachToLayer(string rasterPath, Kind kind, int opacityPercent)
     {
@@ -177,7 +226,7 @@ namespace NcTestRibbon.Cad
         rasterPath,
         writeWorldSidecar: true,
         layerName: layer,
-        lockLayer: true,
+        lockLayer: !CartographyEditing,
         opacityPercent: opacityPercent);
       SetVisible(kind, true);
       return result;
@@ -363,7 +412,7 @@ namespace NcTestRibbon.Cad
         if (layers.Has(layerName))
         {
           LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
-          layer.IsLocked = true;
+          layer.IsLocked = !CartographyEditing;
           layer.IsOff = false;
         }
 
