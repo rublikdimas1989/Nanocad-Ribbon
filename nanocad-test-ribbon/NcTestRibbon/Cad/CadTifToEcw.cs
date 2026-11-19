@@ -9,8 +9,8 @@ namespace NcTestRibbon.Cad
   using NcTestRibbon.Shell;
 
   /// <summary>
-  /// GeoTIFF → Maps\&lt;name&gt;.ecw (OEM license) or free Maps\&lt;name&gt;.tif (End Forest.tif style),
-  /// then attach with preserved GeoTransform.
+  /// GeoTIFF → Maps\&lt;name&gt;_geo.ecw (OEM) or Maps\&lt;name&gt;_geo.tif (free encode).
+  /// Never deletes/overwrites the source file.
   /// </summary>
   public static class CadTifToEcw
   {
@@ -31,7 +31,8 @@ namespace NcTestRibbon.Cad
         throw new FileNotFoundException("TIF не найден.", tifPath);
       }
 
-      string ext = Path.GetExtension(tifPath) ?? string.Empty;
+      string sourceFull = Path.GetFullPath(tifPath);
+      string ext = Path.GetExtension(sourceFull) ?? string.Empty;
       if (!ext.Equals(".tif", StringComparison.OrdinalIgnoreCase)
         && !ext.Equals(".tiff", StringComparison.OrdinalIgnoreCase))
       {
@@ -46,38 +47,37 @@ namespace NcTestRibbon.Cad
           + "из v1.2.48+ или nanocad-gdal-runtime zip.");
       }
 
+      EnsureMapsDir();
       EcwEncodeLicense.License lic = EcwEncodeLicense.TryResolve(out string licDiag);
-      string mapsEcw = PreferMapsOutputPath(tifPath, ".ecw");
-      EnsureParentDir(mapsEcw);
 
       if (lic.IsComplete)
       {
-        ConvertResult ecw = RunTranslate(exe, tifPath, mapsEcw, lic, licDiag);
+        string mapsEcw = PreferMapsOutputPath(sourceFull, ".ecw");
+        AssertSafeOutput(sourceFull, mapsEcw);
+        ConvertResult ecw = RunTranslate(exe, sourceFull, mapsEcw, lic, licDiag);
         if (ecw != null)
         {
           return ecw;
         }
       }
 
-      // Free encode (End Forest.tif style): GeoTIFF in Maps with embedded GT — no OEM key.
-      string mapsTif = PreferMapsOutputPath(tifPath, ".tif");
-      EnsureParentDir(mapsTif);
-      ConvertResult free = RunTranslate(exe, tifPath, mapsTif, license: null, licDiag);
+      // Free encode: Maps\<name>_geo.tif — never same path as source.
+      string mapsTif = PreferMapsOutputPath(sourceFull, ".tif");
+      AssertSafeOutput(sourceFull, mapsTif);
+      ConvertResult free = RunTranslate(exe, sourceFull, mapsTif, license: null, licDiag);
       if (free == null)
       {
         throw new InvalidOperationException(
-          "TIF→растр не удался.\n"
+          "TIF→растр не удался (source left intact: " + Path.GetFileName(sourceFull) + ").\n"
           + "Для ECW нужен OEM: " + EcwEncodeLicense.ExampleConfPath + "\n"
-          + "  ECW_ENCODE_COMPANY=...\n  ECW_ENCODE_KEY=...\n"
-          + "(или env / End LoadFile ecw_encode.conf)\n\n"
+          + "  ECW_ENCODE_COMPANY=...\n  ECW_ENCODE_KEY=...\n\n"
           + "License probe:\n" + Truncate(licDiag, 1200));
       }
 
       free.UsedFreeEncode = true;
       free.Note = RasterGeoTransform.PackageStamp()
         + " free encode → " + Path.GetFileName(free.OutputPath)
-        + " (End Forest.tif style; ECW OEM missing — put key in "
-        + Path.GetFileName(EcwEncodeLicense.ExampleConfPath) + ")";
+        + " (source kept: " + Path.GetFileName(sourceFull) + ")";
       return free;
     }
 
@@ -88,6 +88,9 @@ namespace NcTestRibbon.Cad
       EcwEncodeLicense.License license,
       string licDiag)
     {
+      AssertSafeOutput(src, dst);
+      EnsureParentDir(dst);
+
       var psi = new ProcessStartInfo
       {
         FileName = exe,
@@ -107,7 +110,6 @@ namespace NcTestRibbon.Cad
       }
       else
       {
-        // Avoid inheriting a partial/broken env pair into the child.
         psi.Environment.Remove("ECW_ENCODE_COMPANY");
         psi.Environment.Remove("ECW_ENCODE_KEY");
       }
@@ -126,11 +128,19 @@ namespace NcTestRibbon.Cad
         throw new TimeoutException("NcGdalGeo translate timed out for " + Path.GetFileName(src));
       }
 
+      // Source must still exist after translate.
+      if (!File.Exists(src))
+      {
+        throw new InvalidOperationException(
+          "BUG: source was deleted during translate: " + src
+          + "\nstdout=" + Truncate(stdout, 400));
+      }
+
       if (string.IsNullOrWhiteSpace(stdout))
       {
         if (proc.ExitCode == 3)
         {
-          return null; // license required — caller may free-fallback
+          return null;
         }
 
         throw new InvalidOperationException(
@@ -156,7 +166,14 @@ namespace NcTestRibbon.Cad
       string outPath = root.TryGetProperty("dst", out JsonElement d) ? d.GetString() : dst;
       if (string.IsNullOrWhiteSpace(outPath) || !File.Exists(outPath))
       {
-        throw new InvalidOperationException("Translate: output missing after CreateCopy.");
+        throw new InvalidOperationException(
+          "Translate: output missing after CreateCopy: " + (outPath ?? dst)
+          + " (source intact=" + File.Exists(src) + ")");
+      }
+
+      if (SamePath(src, outPath))
+      {
+        throw new InvalidOperationException("BUG: translate output equals source path: " + src);
       }
 
       double[] gt = null;
@@ -186,24 +203,42 @@ namespace NcTestRibbon.Cad
       };
     }
 
-    /// <summary>Tracing_cache\Maps\{name}.ecw|.tif</summary>
+    /// <summary>Tracing_cache\Maps\{name}_geo.ecw|.tif — never the source path.</summary>
     public static string PreferMapsOutputPath(string tifPath, string extension)
     {
       string baseName = Path.GetFileNameWithoutExtension(tifPath) ?? "raster";
+      if (baseName.EndsWith("_geo", StringComparison.OrdinalIgnoreCase))
+      {
+        // Avoid Forest_geo_geo.tif if re-run on prior output.
+        baseName = baseName.Substring(0, baseName.Length - 4);
+        if (string.IsNullOrWhiteSpace(baseName))
+        {
+          baseName = "raster";
+        }
+      }
+
       string ext = extension.StartsWith(".", StringComparison.Ordinal) ? extension : "." + extension;
-      try
+      string mapsDir = EnsureMapsDir();
+      string candidate = Path.Combine(mapsDir, baseName + "_geo" + ext);
+      // If somehow still collides with source, add a unique suffix.
+      if (SamePath(tifPath, candidate))
       {
-        TracingCache.EnsureCreated();
-        Directory.CreateDirectory(TracingCache.MapsDir);
-        return Path.Combine(TracingCache.MapsDir, baseName + ext);
+        candidate = Path.Combine(
+          mapsDir,
+          baseName + "_geo_" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ext);
       }
-      catch
-      {
-        return Path.Combine(Path.GetDirectoryName(tifPath) ?? ".", baseName + "_nc" + ext);
-      }
+
+      return candidate;
     }
 
     public static string PreferEcwOutputPath(string tifPath) => PreferMapsOutputPath(tifPath, ".ecw");
+
+    private static string EnsureMapsDir()
+    {
+      TracingCache.EnsureCreated();
+      Directory.CreateDirectory(TracingCache.MapsDir);
+      return TracingCache.MapsDir;
+    }
 
     private static void EnsureParentDir(string path)
     {
@@ -211,6 +246,35 @@ namespace NcTestRibbon.Cad
       if (!string.IsNullOrEmpty(dir))
       {
         Directory.CreateDirectory(dir);
+      }
+    }
+
+    private static void AssertSafeOutput(string source, string dest)
+    {
+      if (string.IsNullOrWhiteSpace(dest))
+      {
+        throw new InvalidOperationException("Empty output path.");
+      }
+
+      if (SamePath(source, dest))
+      {
+        throw new InvalidOperationException(
+          "Refusing to overwrite source raster: " + source);
+      }
+    }
+
+    private static bool SamePath(string a, string b)
+    {
+      try
+      {
+        return string.Equals(
+          Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+          Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+          StringComparison.OrdinalIgnoreCase);
+      }
+      catch
+      {
+        return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
       }
     }
 

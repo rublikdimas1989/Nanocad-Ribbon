@@ -123,16 +123,30 @@ namespace NcGdalGeo
         return 1;
       }
 
-      string dstDir = Path.GetDirectoryName(dstPath);
+      // Never delete/overwrite the source raster (Maps\Forest.tif → same path bug).
+      string srcFull = Path.GetFullPath(srcPath);
+      string dstFull = Path.GetFullPath(dstPath);
+      if (string.Equals(srcFull, dstFull, StringComparison.OrdinalIgnoreCase))
+      {
+        WriteErr("Refusing translate: destination equals source (" + srcFull + "). "
+          + "Use Maps\\<name>_geo.tif|.ecw");
+        return 4;
+      }
+
+      string dstDir = Path.GetDirectoryName(dstFull);
       if (!string.IsNullOrEmpty(dstDir))
       {
         Directory.CreateDirectory(dstDir);
       }
 
-      if (File.Exists(dstPath))
+      if (File.Exists(dstFull))
       {
-        File.Delete(dstPath);
+        // Only remove a prior *output* file, never the source.
+        File.Delete(dstFull);
       }
+
+      dstPath = dstFull;
+      srcPath = srcFull;
 
       string company = Environment.GetEnvironmentVariable("ECW_ENCODE_COMPANY");
       string key = Environment.GetEnvironmentVariable("ECW_ENCODE_KEY");

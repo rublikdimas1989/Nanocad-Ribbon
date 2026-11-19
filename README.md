@@ -4,11 +4,16 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.50.zip`](nanocad-test-ribbon-v1.2.50.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.50/nanocad-test-ribbon-v1.2.50.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.51.zip`](nanocad-test-ribbon-v1.2.51.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.51/nanocad-test-ribbon-v1.2.51.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.51 — never overwrite source TIF
+
+- Bug: free encode wrote `Maps\Forest.tif` when source was the same path → deleted input
+- Output always `Maps\<name>_geo.tif` / `_geo.ecw`; NcGdalGeo refuses src==dst; source left intact
 
 ## v1.2.50 — ECW encode license / free Maps encode
 
