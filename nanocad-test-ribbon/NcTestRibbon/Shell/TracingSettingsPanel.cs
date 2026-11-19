@@ -10,6 +10,7 @@ namespace NcTestRibbon.Shell
   using System.Windows.Controls;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
+  // AppPaths remembers Price / workbook locations in Tracing_cache\Settings\paths.json.
 
   /// <summary>
   /// Tab «Настройки трассировки»: local End-variant logic —
@@ -305,6 +306,11 @@ namespace NcTestRibbon.Shell
         if (_ratesPath != null)
         {
           _ratesPath.Text = ratesPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ratesPath) && System.IO.File.Exists(ratesPath))
+        {
+          AppPaths.Set(p => p.PriceWorkbook = ratesPath);
         }
 
         var request = new TracingRatesLoader.Request

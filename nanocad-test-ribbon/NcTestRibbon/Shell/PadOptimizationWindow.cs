@@ -1,16 +1,21 @@
 namespace NcTestRibbon.Shell
 {
   using System;
+  using System.Collections.Generic;
   using System.Collections.ObjectModel;
   using System.Globalization;
+  using System.IO;
   using System.Windows;
   using System.Windows.Controls;
   using System.Windows.Data;
   using System.Windows.Media;
+  using Microsoft.Win32;
+  using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
 
   /// <summary>
   /// UI shell of End-variant TopologyInputsWindow («Оптимизация … кустовых площадок»).
-  /// Built in code (no XAML pack URI). Logic is stubbed via StubUi.
+  /// Built in code (no XAML pack URI). Opens KP tables from xlsx; paths remembered in paths.json.
   /// </summary>
   public sealed class PadOptimizationWindow : Window
   {
@@ -22,6 +27,7 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _y;
     private readonly TextBox _background;
     private readonly TextBox _alpha;
+    private readonly TextBox _tablesFile;
     private readonly TextBox _log;
     private readonly TextBlock _status;
     private readonly ComboBox _mode;
@@ -38,8 +44,12 @@ namespace NcTestRibbon.Shell
       MinHeight = 600;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-      _pads.Add(new PadRow { Name = "КП-1", X = "0", Y = "0", Liquid = true, Oil = true, Gas = true, FirstLaunch = "1" });
-      _pads.Add(new PadRow { Name = "КП-2", X = "1000", Y = "500", Liquid = true, Oil = true, Gas = false, FirstLaunch = "1" });
+      AppPaths paths = AppPaths.Load();
+      TracingCache.EnsureCreated();
+
+      _pads.Add(new PadRow { Name = "КП-1", X = "0", Y = "0", WidthM = "150", LengthM = "250", Liquid = true, Oil = true, Gas = true, FirstLaunch = "1" });
+      _pads.Add(new PadRow { Name = "КП-2", X = "1000", Y = "500", WidthM = "150", LengthM = "250", Liquid = true, Oil = true, Gas = false, FirstLaunch = "1" });
+      // Placeholder rows replaced if last pads workbook loads below.
 
       var root = new DockPanel { Margin = new Thickness(8) };
       Content = root;
@@ -134,9 +144,15 @@ namespace NcTestRibbon.Shell
       _months = Field(first, "Месяцев:", "12", 60);
       Button(first, "Применить месяцы", () =>
         StubUi.Notify(this, "PadOptimization.ApplyMonths → " + _months.Text));
-      _fluidFile = Field(first, "Excel свойств:", string.Empty, 340);
-      Button(first, "Обзор…", () => StubUi.Notify(this, "PadOptimization.BrowseFluidExcel"));
+      _fluidFile = Field(first, "Excel свойств:", paths.FluidProperties ?? string.Empty, 340);
+      Button(first, "Обзор…", () => BrowseFluidExcel());
       Button(first, "Загрузить свойства", () => StubUi.Notify(this, "PadOptimization.LoadFluidProps"));
+
+      var tables = Row();
+      _tablesFile = Field(tables, "Таблицы КП (xlsx):", paths.PadsWorkbook ?? string.Empty, 420);
+      Button(tables, "Обзор…", () => BrowsePadsWorkbook(load: false));
+      Button(tables, "Открыть таблицы…", () => BrowsePadsWorkbook(load: true));
+      Button(tables, "Загрузить", () => LoadPadsWorkbook(_tablesFile.Text));
 
       var units = Group("Единицы профилей");
       Choice(units, "Жидкость", new[] { "м³/сут", "м³/ч", "тыс. м³/сут" }, "м³/сут");
@@ -170,9 +186,26 @@ namespace NcTestRibbon.Shell
       ModeChanged();
 
       var bg = Group("Космоснимок / растровая подложка");
-      _background = Field(bg, "ECW / GeoTIFF:", string.Empty, 380);
-      Button(bg, "Обзор…", () => StubUi.Notify(this, "PadOptimization.BrowseBackground"));
-      Button(bg, "Отключить", () => { _background.Text = string.Empty; });
+      _background = Field(bg, "ECW / GeoTIFF:", paths.Background ?? string.Empty, 380);
+      Button(bg, "Обзор…", () =>
+      {
+        var dialog = new OpenFileDialog
+        {
+          Filter = "Raster (*.ecw;*.tif;*.tiff)|*.ecw;*.tif;*.tiff|All|*.*",
+          CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+          _background.Text = dialog.FileName;
+          AppPaths.Set(p => p.Background = dialog.FileName);
+          Log("Подложка: " + dialog.FileName);
+        }
+      });
+      Button(bg, "Отключить", () =>
+      {
+        _background.Text = string.Empty;
+        AppPaths.Set(p => p.Background = string.Empty);
+      });
       _alpha = Field(bg, "Прозрачность 0…1:", "0.5", 55);
       _gray = new CheckBox
       {
@@ -187,7 +220,21 @@ namespace NcTestRibbon.Shell
       var coordinatePanel = new StackPanel { Orientation = Orientation.Horizontal };
       extras.Children.Add(coordinatePanel);
       _coordinateUnit = Choice(coordinatePanel, "Единицы X/Y", new[] { "метры", "километры" }, "метры");
-      Button(extras, "Открыть JSON…", () => StubUi.Notify(this, "PadOptimization.OpenJson"));
+      Button(extras, "Открыть JSON…", () =>
+      {
+        var dialog = new OpenFileDialog { Filter = "Profiles JSON (*.json)|*.json", CheckFileExists = true };
+        if (!string.IsNullOrWhiteSpace(paths.ProfilesJson) && File.Exists(paths.ProfilesJson))
+        {
+          dialog.InitialDirectory = Path.GetDirectoryName(paths.ProfilesJson);
+        }
+
+        if (dialog.ShowDialog(this) == true)
+        {
+          AppPaths.Set(p => p.ProfilesJson = dialog.FileName);
+          Log("JSON профилей (путь сохранён): " + dialog.FileName);
+          StubUi.Notify(this, "PadOptimization.OpenJson → " + dialog.FileName);
+        }
+      });
       Button(extras, "Сохранить как…", () => StubUi.Notify(this, "PadOptimization.SaveAs"));
       Button(extras, "Расчётные параметры", () => StubUi.Notify(this, "PadOptimization.CalcParams"));
 
@@ -227,6 +274,8 @@ namespace NcTestRibbon.Shell
             Name = dialog.PadName,
             X = dialog.PadX,
             Y = dialog.PadY,
+            WidthM = dialog.PadWidthM,
+            LengthM = dialog.PadLengthM,
             Liquid = true,
             Oil = true,
             Gas = true,
@@ -235,7 +284,7 @@ namespace NcTestRibbon.Shell
           Log("Добавлена КП: " + dialog.PadName);
         }
       });
-      Button(buttons, "Вставить КП из Excel", () => StubUi.Notify(this, "PadOptimization.PasteFromExcel"));
+      Button(buttons, "Вставить КП из Excel", () => BrowsePadsWorkbook(load: true));
       Button(buttons, "Редактировать / профили", () =>
       {
         if (_grid.SelectedItem is not PadRow row)
@@ -243,12 +292,14 @@ namespace NcTestRibbon.Shell
           throw new InvalidOperationException("Выберите КП в таблице.");
         }
 
-        var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y) { Owner = this };
+        var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y, row.WidthM, row.LengthM) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
           row.Name = dialog.PadName;
           row.X = dialog.PadX;
           row.Y = dialog.PadY;
+          row.WidthM = dialog.PadWidthM;
+          row.LengthM = dialog.PadLengthM;
           _grid.Items.Refresh();
           Log("Обновлена КП: " + row.Name);
         }
@@ -276,6 +327,8 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
       _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
       _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
+      _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
+      _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
@@ -284,19 +337,113 @@ namespace NcTestRibbon.Shell
       {
         if (_grid.SelectedItem is PadRow row)
         {
-          var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y) { Owner = this };
+          var dialog = new TopologyPadWindowShell(row.Name, row.X, row.Y, row.WidthM, row.LengthM) { Owner = this };
           if (dialog.ShowDialog() == true)
           {
             row.Name = dialog.PadName;
             row.X = dialog.PadX;
             row.Y = dialog.PadY;
+            row.WidthM = dialog.PadWidthM;
+            row.LengthM = dialog.PadLengthM;
             _grid.Items.Refresh();
           }
         }
       };
       root.Children.Add(_grid);
 
-      Log("Загружена оболочка «Оптимизация кустовых площадок» (без серверной логики).");
+      if (!string.IsNullOrWhiteSpace(paths.PadsWorkbook) && File.Exists(paths.PadsWorkbook))
+      {
+        try
+        {
+          LoadPadsWorkbook(paths.PadsWorkbook);
+        }
+        catch (Exception ex)
+        {
+          Log("Не удалось загрузить прошлые таблицы КП: " + ex.Message);
+        }
+      }
+      else
+      {
+        Log("Загружена оболочка «Оптимизация кустовых площадок». Откройте таблицы КП (xlsx).");
+      }
+    }
+
+    private void BrowseFluidExcel()
+    {
+      var dialog = new OpenFileDialog { Filter = "Excel (*.xlsx)|*.xlsx", CheckFileExists = true };
+      if (!string.IsNullOrWhiteSpace(_fluidFile.Text) && File.Exists(_fluidFile.Text))
+      {
+        dialog.InitialDirectory = Path.GetDirectoryName(_fluidFile.Text);
+      }
+
+      if (dialog.ShowDialog(this) == true)
+      {
+        _fluidFile.Text = dialog.FileName;
+        AppPaths.Set(p => p.FluidProperties = dialog.FileName);
+        Log("Файл свойств: " + dialog.FileName);
+      }
+    }
+
+    private void BrowsePadsWorkbook(bool load)
+    {
+      var dialog = new OpenFileDialog
+      {
+        Title = "Таблицы КП / Top_tree (xlsx)",
+        Filter = "Excel (*.xlsx)|*.xlsx",
+        CheckFileExists = true
+      };
+      string current = _tablesFile.Text;
+      if (!string.IsNullOrWhiteSpace(current) && File.Exists(current))
+      {
+        dialog.InitialDirectory = Path.GetDirectoryName(current);
+        dialog.FileName = Path.GetFileName(current);
+      }
+
+      if (dialog.ShowDialog(this) != true)
+      {
+        return;
+      }
+
+      _tablesFile.Text = dialog.FileName;
+      AppPaths.Set(p => p.PadsWorkbook = dialog.FileName);
+      if (load)
+      {
+        LoadPadsWorkbook(dialog.FileName);
+      }
+      else
+      {
+        Log("Путь таблиц КП сохранён: " + dialog.FileName);
+      }
+    }
+
+    private void LoadPadsWorkbook(string path)
+    {
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        throw new InvalidOperationException("Укажите файл таблиц КП (xlsx).");
+      }
+
+      List<PadWorkbookLoader.PadRecord> records = PadWorkbookLoader.LoadPads(path);
+      _pads.Clear();
+      foreach (PadWorkbookLoader.PadRecord pad in records)
+      {
+        _pads.Add(new PadRow
+        {
+          Name = pad.Name,
+          X = pad.X.ToString("G17", CultureInfo.CurrentCulture),
+          Y = pad.Y.ToString("G17", CultureInfo.CurrentCulture),
+          WidthM = pad.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
+          LengthM = pad.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
+          Oil = pad.ActiveOil,
+          Liquid = pad.ActiveLiquid,
+          Gas = pad.ActiveGas,
+          FirstLaunch = "1"
+        });
+      }
+
+      _tablesFile.Text = path;
+      AppPaths.Set(p => p.PadsWorkbook = path);
+      Log("Загружено КП из Excel: " + records.Count + " (" + Path.GetFileName(path) + ")");
     }
 
     private void Log(string text)
@@ -331,6 +478,8 @@ namespace NcTestRibbon.Shell
       public string Name { get; set; } = string.Empty;
       public string X { get; set; } = "0";
       public string Y { get; set; } = "0";
+      public string WidthM { get; set; } = "150";
+      public string LengthM { get; set; } = "250";
       public bool Liquid { get; set; } = true;
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;
@@ -347,6 +496,8 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _name;
     private readonly TextBox _x;
     private readonly TextBox _y;
+    private readonly TextBox _width;
+    private readonly TextBox _length;
     private readonly TextBox _horizon;
     private readonly TextBox _pressure;
     private readonly CheckBox _sour;
@@ -356,8 +507,15 @@ namespace NcTestRibbon.Shell
     public string PadName => (_name.Text ?? string.Empty).Trim();
     public string PadX => (_x.Text ?? string.Empty).Trim();
     public string PadY => (_y.Text ?? string.Empty).Trim();
+    public string PadWidthM => (_width.Text ?? string.Empty).Trim();
+    public string PadLengthM => (_length.Text ?? string.Empty).Trim();
 
-    public TopologyPadWindowShell(string name, string x = "0", string y = "0")
+    public TopologyPadWindowShell(
+      string name,
+      string x = "0",
+      string y = "0",
+      string widthM = "150",
+      string lengthM = "250")
     {
       Title = name + " — месячные профили и загрузка БУОС";
       Width = 1220;
@@ -436,6 +594,12 @@ namespace NcTestRibbon.Shell
       general.Children.Add(Label("Y"));
       _y = Box(y);
       general.Children.Add(_y);
+      general.Children.Add(Label("Ширина кустовой площадки, м"));
+      _width = Box(string.IsNullOrWhiteSpace(widthM) ? "150" : widthM);
+      general.Children.Add(_width);
+      general.Children.Add(Label("Длина кустовой площадки, м"));
+      _length = Box(string.IsNullOrWhiteSpace(lengthM) ? "250" : lengthM);
+      general.Children.Add(_length);
       var paste = new Button
       {
         Content = "Вставить X/Y из буфера",
@@ -447,7 +611,7 @@ namespace NcTestRibbon.Shell
       general.Children.Add(paste);
       general.Children.Add(new TextBlock
       {
-        Text = "Профили сред редактируются на вкладке «Месяцы и загрузка БУОС».",
+        Text = "Профили сред редактируются на вкладке «Месяцы и загрузка БУОС». Размер КП — прямоугольник (ширина × длина).",
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 8, 0, 0)
       });

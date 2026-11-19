@@ -35,13 +35,27 @@ namespace NcTestRibbon.Shell
 
     public static string TracingConf => Path.Combine(SettingsDir, "tracing.conf");
     public static string TrenchRoadConf => Path.Combine(SettingsDir, "trench_road.conf");
+    public static string PathsJson => Path.Combine(SettingsDir, "paths.json");
 
     /// <summary>
-    /// Resolve rates workbook under Settings: prefer existing Price.xlsx, else Price.xlsm.
+    /// Resolve rates workbook: remembered paths.json priceWorkbook, else Price.xlsx, else Price.xlsm.
     /// Returns preferred xlsx path when neither exists (for UI / error messages).
     /// </summary>
     public static string ResolveRatesFilePath()
     {
+      try
+      {
+        var remembered = Configuration.AppPaths.Load().PriceWorkbook;
+        if (IsUsableRatesFile(remembered))
+        {
+          return remembered;
+        }
+      }
+      catch
+      {
+        // Fall through to default Settings files.
+      }
+
       if (IsUsableRatesFile(PriceXlsx))
       {
         return PriceXlsx;
