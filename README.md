@@ -4,11 +4,17 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.51.zip`](nanocad-test-ribbon-v1.2.51.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.51/nanocad-test-ribbon-v1.2.51.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.52.zip`](nanocad-test-ribbon-v1.2.52.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.52/nanocad-test-ribbon-v1.2.52.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.52 — Forest / Height End colorize
+
+- `NcTestForest` / `NcTestHeight` ribbon buttons: End-style colorize (ForestGreen #228B22 if f>0.5; viridis 7-band) via NcGdalGeo `colorize`
+- Writes RGB `Maps\<name>_geo.tif` (source never overwritten) then attaches like other rasters
+- Forest.tif 0/1 binary no longer inserts as black
 
 ## v1.2.51 — never overwrite source TIF
 

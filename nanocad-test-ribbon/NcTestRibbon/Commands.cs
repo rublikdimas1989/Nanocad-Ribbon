@@ -271,14 +271,14 @@ namespace NcTestRibbon
     [CommandMethod("NcTestEcw")]
     public void NcTestEcw()
     {
-      AttachGeoreferencedRaster("NcTestEcw", tifToEcw: false);
+      AttachGeoreferencedRaster("NcTestEcw", RasterAttachMode.Direct);
     }
 
     /// <summary>Alias for NcTestEcw (any georeferenced raster: ECW/TIFF/JPG/…).</summary>
     [CommandMethod("NcTestRaster")]
     public void NcTestRaster()
     {
-      AttachGeoreferencedRaster("NcTestRaster", tifToEcw: false);
+      AttachGeoreferencedRaster("NcTestRaster", RasterAttachMode.Direct);
     }
 
     /// <summary>
@@ -287,10 +287,32 @@ namespace NcTestRibbon
     [CommandMethod("NcTestTif")]
     public void NcTestTif()
     {
-      AttachGeoreferencedRaster("NcTestTif", tifToEcw: true);
+      AttachGeoreferencedRaster("NcTestTif", RasterAttachMode.TifToEcw);
     }
 
-    private void AttachGeoreferencedRaster(string label, bool tifToEcw)
+    /// <summary>End Forest colorize (0/1 → ForestGreen) → Maps\*_geo.tif → attach.</summary>
+    [CommandMethod("NcTestForest")]
+    public void NcTestForest()
+    {
+      AttachGeoreferencedRaster("NcTestForest", RasterAttachMode.ColorizeForest);
+    }
+
+    /// <summary>End Height colorize (viridis 7-band) → Maps\*_geo.tif → attach.</summary>
+    [CommandMethod("NcTestHeight")]
+    public void NcTestHeight()
+    {
+      AttachGeoreferencedRaster("NcTestHeight", RasterAttachMode.ColorizeHeight);
+    }
+
+    private enum RasterAttachMode
+    {
+      Direct,
+      TifToEcw,
+      ColorizeForest,
+      ColorizeHeight
+    }
+
+    private void AttachGeoreferencedRaster(string label, RasterAttachMode mode)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
@@ -317,7 +339,17 @@ namespace NcTestRibbon
 
         using (OpenFileDialog dlg = new OpenFileDialog())
         {
-          if (tifToEcw)
+          if (mode == RasterAttachMode.ColorizeForest)
+          {
+            dlg.Title = "Forest.tif → colorize (End ForestGreen) → Maps\\*_geo.tif";
+            dlg.Filter = "GeoTIFF Forest (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else if (mode == RasterAttachMode.ColorizeHeight)
+          {
+            dlg.Title = "Height.tif → colorize (End viridis) → Maps\\*_geo.tif";
+            dlg.Filter = "GeoTIFF Height (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else if (mode == RasterAttachMode.TifToEcw)
           {
             dlg.Title = "GeoTIFF → ECW (геопривязка сохраняется)";
             dlg.Filter = "GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
@@ -359,7 +391,7 @@ namespace NcTestRibbon
 
           string rasterPath = pickedPath;
           string convertNote = string.Empty;
-          if (tifToEcw)
+          if (mode == RasterAttachMode.TifToEcw)
           {
             ed?.WriteMessage("\n" + label + ": TIF→Maps (ECW if OEM license, else free GeoTIFF)…");
             CadTifToEcw.ConvertResult converted = CadTifToEcw.Convert(pickedPath);
@@ -367,6 +399,18 @@ namespace NcTestRibbon
               ? converted.OutputPath
               : converted.EcwPath;
             convertNote = converted.Note;
+            ed?.WriteMessage("\n" + label + ": " + convertNote);
+            AppPaths.Set(p => p.Background = rasterPath);
+          }
+          else if (mode == RasterAttachMode.ColorizeForest || mode == RasterAttachMode.ColorizeHeight)
+          {
+            var cmode = mode == RasterAttachMode.ColorizeForest
+              ? CadRasterColorize.Mode.Forest
+              : CadRasterColorize.Mode.Height;
+            ed?.WriteMessage("\n" + label + ": colorize " + cmode + " → Maps\\*_geo.tif…");
+            CadRasterColorize.Result colored = CadRasterColorize.Colorize(pickedPath, cmode);
+            rasterPath = colored.OutputPath;
+            convertNote = colored.Note;
             ed?.WriteMessage("\n" + label + ": " + convertNote);
             AppPaths.Set(p => p.Background = rasterPath);
           }
