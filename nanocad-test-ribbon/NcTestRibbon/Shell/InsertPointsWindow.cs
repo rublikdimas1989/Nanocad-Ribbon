@@ -312,10 +312,19 @@ namespace NcTestRibbon.Shell
     private void RunWithCadFocus(Action cadWork)
     {
       bool wasEnabled = Enabled;
+      Form host = FindForm();
       try
       {
         Enabled = false;
-        Hide();
+        if (host != null && !host.IsDisposed)
+        {
+          host.Hide();
+        }
+        else
+        {
+          Hide();
+        }
+
         try { Application.DoEvents(); } catch { }
         cadWork?.Invoke();
       }
@@ -328,10 +337,20 @@ namespace NcTestRibbon.Shell
       {
         if (!IsDisposed)
         {
-          Show();
           Enabled = wasEnabled;
-          Activate();
-          BringToFront();
+          if (host != null && !host.IsDisposed)
+          {
+            host.Show();
+            host.Activate();
+            host.BringToFront();
+          }
+          else
+          {
+            Show();
+            Focus();
+            BringToFront();
+          }
+
           BindGrid(Selected());
         }
       }

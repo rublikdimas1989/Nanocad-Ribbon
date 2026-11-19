@@ -528,15 +528,24 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// Yield modeless Form to CAD (jig / zoom / ROTATE). Hide is OK for Show() — does not end the window.
+    /// Yield host Form to CAD (jig / zoom / ROTATE). Hide host — does not dispose the window.
     /// </summary>
     private void RunWithCadFocus(Action cadWork)
     {
       bool wasEnabled = Enabled;
+      Form host = FindForm();
       try
       {
         Enabled = false;
-        Hide();
+        if (host != null && !host.IsDisposed)
+        {
+          host.Hide();
+        }
+        else
+        {
+          Hide();
+        }
+
         try
         {
           Application.DoEvents();
@@ -566,10 +575,20 @@ namespace NcTestRibbon.Shell
         {
           if (!IsDisposed)
           {
-            Show();
             Enabled = wasEnabled;
-            Activate();
-            BringToFront();
+            if (host != null && !host.IsDisposed)
+            {
+              host.Show();
+              host.Activate();
+              host.BringToFront();
+            }
+            else
+            {
+              Show();
+              Focus();
+              BringToFront();
+            }
+
             BindPadsGrid(SelectedPad());
           }
         }
