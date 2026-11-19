@@ -56,6 +56,13 @@
       "tooltip": "Вставить ECW/растр с End-геопривязкой (world coords + масштаб), не plain IMAGEATTACH.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestTif",
+      "displayName": "TIF→ECW",
+      "tooltip": "GeoTIFF → ECW (сохранить GeoTransform) → вставить как ECW (как Screen_ESRI.ecw).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
     }
   ],
   "buttons": [
@@ -97,6 +104,11 @@
     {
       "text": "ECW/растр",
       "command": "NcTestEcw",
+      "style": "large"
+    },
+    {
+      "text": "TIF→ECW",
+      "command": "NcTestTif",
       "style": "large"
     }
   ]

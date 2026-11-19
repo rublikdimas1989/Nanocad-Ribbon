@@ -271,17 +271,26 @@ namespace NcTestRibbon
     [CommandMethod("NcTestEcw")]
     public void NcTestEcw()
     {
-      AttachGeoreferencedRaster("NcTestEcw");
+      AttachGeoreferencedRaster("NcTestEcw", tifToEcw: false);
     }
 
     /// <summary>Alias for NcTestEcw (any georeferenced raster: ECW/TIFF/JPG/…).</summary>
     [CommandMethod("NcTestRaster")]
     public void NcTestRaster()
     {
-      AttachGeoreferencedRaster("NcTestRaster");
+      AttachGeoreferencedRaster("NcTestRaster", tifToEcw: false);
     }
 
-    private void AttachGeoreferencedRaster(string label)
+    /// <summary>
+    /// GeoTIFF → ECW (NcGdalGeo translate / CreateCopy, preserve GeoTransform) then attach like ECW.
+    /// </summary>
+    [CommandMethod("NcTestTif")]
+    public void NcTestTif()
+    {
+      AttachGeoreferencedRaster("NcTestTif", tifToEcw: true);
+    }
+
+    private void AttachGeoreferencedRaster(string label, bool tifToEcw)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
@@ -308,10 +317,19 @@ namespace NcTestRibbon
 
         using (OpenFileDialog dlg = new OpenFileDialog())
         {
-          dlg.Title = "Растр с геопривязкой (ECW / TIFF / …)";
-          dlg.Filter =
-            "Растры (*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp)|*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|"
-            + "ECW (*.ecw)|*.ecw|GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          if (tifToEcw)
+          {
+            dlg.Title = "GeoTIFF → ECW (геопривязка сохраняется)";
+            dlg.Filter = "GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else
+          {
+            dlg.Title = "Растр с геопривязкой (ECW / TIFF / …)";
+            dlg.Filter =
+              "Растры (*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp)|*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|"
+              + "ECW (*.ecw)|*.ecw|GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+
           dlg.FilterIndex = 1;
           dlg.CheckFileExists = true;
           dlg.Multiselect = false;
@@ -335,15 +353,28 @@ namespace NcTestRibbon
             return;
           }
 
-          string rasterPath = dlg.FileName;
-          AppPaths.Set(p => p.Background = rasterPath);
+          string pickedPath = dlg.FileName;
+          AppPaths.Set(p => p.Background = pickedPath);
           ed?.WriteMessage("\n" + label + ": " + RasterGeoTransform.PackageStamp());
+
+          string rasterPath = pickedPath;
+          string convertNote = string.Empty;
+          if (tifToEcw)
+          {
+            ed?.WriteMessage("\n" + label + ": TIF→ECW…");
+            CadTifToEcw.ConvertResult converted = CadTifToEcw.Convert(pickedPath);
+            rasterPath = converted.EcwPath;
+            convertNote = converted.Note;
+            ed?.WriteMessage("\n" + label + ": " + convertNote);
+            AppPaths.Set(p => p.Background = rasterPath);
+          }
 
           CadRasterAttach.Result result = CadRasterAttach.Attach(rasterPath, writeWorldSidecar: true);
           CadRasterAttach.ZoomToImage(result.ImageId);
 
           string msg =
             label + " — вставлено\n\n"
+            + (string.IsNullOrEmpty(convertNote) ? string.Empty : convertNote + "\n\n")
             + Path.GetFileName(result.Path) + "\n"
             + "Геопривязка: " + result.GeoSource + "\n"
             + "UL (мир): X=" + result.OriginX.ToString("R")

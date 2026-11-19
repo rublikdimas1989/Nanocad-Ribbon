@@ -329,7 +329,7 @@ function Copy-RibbonDependencies {
     }
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestTif')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -459,63 +459,66 @@ Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 # EPPlus + transitive NuGet deps must sit next to the plugin in LoadFile.
 Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
 
-# Bundled GDAL x64 + ECW plugin (End-style embedded GeoTransform for NcTestEcw).
-# Must land at %LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal\x64\... (plugin probes this path).
+# GDAL runtime (natives + NcGdalGeo): optional in slim plugin zips.
+# Prefer package copy when present; else reuse existing LoadFile from v1.2.48 / gdal-runtime zip.
 $gdalSrc = Join-Path $src 'gdal'
-if (-not (Test-Path $gdalSrc)) {
+if (-not (Test-Path (Join-Path $gdalSrc 'x64\gdal_wrap.dll'))) {
     $gdalSrc = Join-Path $pkgRoot 'installer\gdal'
 }
 $gdalDest = Join-Path $syncFolder 'gdal'
-if (Test-Path $gdalSrc) {
+$wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
+$ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
+$ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
+$csharp = Join-Path $syncFolder 'gdal_csharp.dll'
+
+if (Test-Path (Join-Path $gdalSrc 'x64\gdal_wrap.dll')) {
     Write-Host ("GDAL source: {0}" -f $gdalSrc)
     if (Test-Path $gdalDest) {
         Remove-Item $gdalDest -Recurse -Force
     }
     New-Item -ItemType Directory -Path $gdalDest -Force | Out-Null
-    # Copy contents so LoadFile\NANOCAD\gdal\x64 exists (not gdal\gdal\x64).
     Copy-Item -Path (Join-Path $gdalSrc '*') -Destination $gdalDest -Recurse -Force
-    $wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
-    $ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
-    $ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
-    $csharp = Join-Path $syncFolder 'gdal_csharp.dll'
-    Write-Host ("  wrap:   {0}  exists={1}" -f $wrap, (Test-Path $wrap))
-    Write-Host ("  ECW:    {0}  exists={1}" -f $ecw, (Test-Path $ecw))
-    Write-Host ("  NCSEcw: {0}  exists={1}" -f $ncs, (Test-Path $ncs))
-    Write-Host ("  csharp: {0}  exists={1}" -f $csharp, (Test-Path $csharp))
-    if ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs) -and (Test-Path $csharp)) {
-        Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
-    }
-    else {
-        Write-Host 'ERROR: GDAL install incomplete (need wrap + ECW plugins + gdal_csharp.dll).' -ForegroundColor Yellow
-        throw 'Bundled GDAL ECW files missing after INSTALL copy. Re-unpack v1.2.48+ zip (includes installer\gdal).'
-    }
+    Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
+}
+elseif ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs)) {
+    Write-Host ("Reusing existing LoadFile GDAL: {0}" -f $gdalDest)
 }
 else {
-    Write-Host 'ERROR: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
-    throw 'installer\gdal not found. Unpack the full versioned zip (not a partial source tree).'
+    Write-Host 'ERROR: GDAL runtime missing in package AND LoadFile.' -ForegroundColor Yellow
+    Write-Host 'Install once: nanocad-gdal-runtime-3.12.1.zip (or keep LoadFile\gdal from v1.2.48).'
+    Write-Host '  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1'
+    throw 'GDAL runtime not found. Slim plugin zip reuses LoadFile\gdal from 1.2.48 / gdal-runtime asset.'
 }
 
-# Out-of-process NcGdalGeo (matched GDAL 3.12.1) — avoids in-process gdal_wrap 0x8007007F.
+Write-Host ("  wrap:   {0}  exists={1}" -f $wrap, (Test-Path $wrap))
+Write-Host ("  ECW:    {0}  exists={1}" -f $ecw, (Test-Path $ecw))
+Write-Host ("  NCSEcw: {0}  exists={1}" -f $ncs, (Test-Path $ncs))
+Write-Host ("  csharp: {0}  exists={1}" -f $csharp, (Test-Path $csharp))
+if (-not ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs))) {
+    throw 'GDAL incomplete (need wrap + ECW plugins).'
+}
+
 $toolSrc = Join-Path $src 'tools\NcGdalGeo'
 if (-not (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe'))) {
     $toolSrc = Join-Path $pkgRoot 'installer\tools\NcGdalGeo'
 }
 $toolDest = Join-Path $syncFolder 'tools\NcGdalGeo'
+$toolExe = Join-Path $toolDest 'NcGdalGeo.exe'
 if (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe')) {
     if (Test-Path $toolDest) {
         Remove-Item $toolDest -Recurse -Force
     }
     New-Item -ItemType Directory -Path $toolDest -Force | Out-Null
     Copy-Item -Path (Join-Path $toolSrc '*') -Destination $toolDest -Recurse -Force
-    $toolExe = Join-Path $toolDest 'NcGdalGeo.exe'
-    Write-Host ("NcGdalGeo: {0} exists={1}" -f $toolExe, (Test-Path $toolExe))
-    if (-not (Test-Path $toolExe)) {
-        throw 'NcGdalGeo.exe missing after INSTALL copy.'
-    }
+    Write-Host ("NcGdalGeo copied: {0}" -f $toolExe)
+}
+elseif (Test-Path $toolExe) {
+    Write-Host ("Reusing existing NcGdalGeo: {0}" -f $toolExe)
 }
 else {
-    Write-Host 'ERROR: installer\tools\NcGdalGeo missing — required for ECW GeoTransform out-of-process.' -ForegroundColor Yellow
-    throw 'installer\tools\NcGdalGeo not found. Unpack the full v1.2.48+ zip.'
+    Write-Host 'ERROR: NcGdalGeo missing in package AND LoadFile.' -ForegroundColor Yellow
+    Write-Host 'Install nanocad-gdal-runtime-3.12.1.zip (includes tools\NcGdalGeo) once.'
+    throw 'NcGdalGeo.exe not found. Slim plugin zip reuses LoadFile tools from 1.2.48 / gdal-runtime.'
 }
 
 $profiles = @(Get-NanoCadProfiles)

@@ -4,9 +4,17 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.48.zip`](nanocad-test-ribbon-v1.2.48.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.48/nanocad-test-ribbon-v1.2.48.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.49.zip`](nanocad-test-ribbon-v1.2.49.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.49/nanocad-test-ribbon-v1.2.49.zip
+- **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
+  https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.49 — slim releases + TIF→ECW
+
+- Releases ship **slim plugin** zip (no ~132MB GDAL natives); INSTALL reuses `LoadFile\gdal` / optional `nanocad-gdal-runtime-3.12.1`
+- `NcTestTif` / ribbon «TIF→ECW»: GeoTIFF → ECW via NcGdalGeo `translate` (preserve GeoTransform) → attach like ECW
+- Pack helper: `installer/Pack-Release.sh`
 
 ## v1.2.48 — out-of-process NcGdalGeo (TCON-62)
 
