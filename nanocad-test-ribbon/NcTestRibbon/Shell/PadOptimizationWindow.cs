@@ -10,6 +10,7 @@ namespace NcTestRibbon.Shell
   using System.Windows.Data;
   using System.Windows.Input;
   using System.Windows.Media;
+  using System.Windows.Threading;
   using Microsoft.Win32;
   using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
@@ -42,6 +43,7 @@ namespace NcTestRibbon.Shell
       MinHeight = 480;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
       // Closing the window must NOT erase KP entities — they stay on the drawing.
+      HookDispatcherExceptions();
 
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
@@ -374,8 +376,7 @@ namespace NcTestRibbon.Shell
         CadPadOverlay.UpdatePad(ToGeom(row));
       }
 
-      Hide();
-      try
+      RunWithCadFocus(() =>
       {
         if (!CadPadOverlay.TryManualRotate(row.Name, out double x, out double y, out double rot, out bool poseUpdated))
         {
@@ -401,13 +402,7 @@ namespace NcTestRibbon.Shell
         {
           Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
         }
-      }
-      finally
-      {
-        Show();
-        Activate();
-        Focus();
-      }
+      });
     }
 
     private void PlaceSelectedPad()
@@ -418,8 +413,7 @@ namespace NcTestRibbon.Shell
       }
 
       var geom = ToGeom(row);
-      Hide();
-      try
+      RunWithCadFocus(() =>
       {
         if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
         {
@@ -447,12 +441,139 @@ namespace NcTestRibbon.Shell
         UpdateActionButtons();
         Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
+      });
+    }
+
+    /// <summary>
+    /// Yield the modal WPF dialog to CAD (jig / zoom / ROTATE) without Hide()/Show().
+    /// Hide+Show on a ShowDialog window owned by nCad/Qt re-enters PresentationFramework
+    /// through hostQtUi and can crash with CLR 0xE0434352 (WPF frames on the stack).
+    /// </summary>
+    private void RunWithCadFocus(Action cadWork)
+    {
+      Visibility previous = Visibility;
+      bool wasEnabled = IsEnabled;
+      try
+      {
+        IsEnabled = false;
+        Visibility = Visibility.Collapsed;
+        try
+        {
+          Dispatcher.Invoke(DispatcherPriority.Render, new Action(() => { }));
+        }
+        catch
+        {
+        }
+
+        cadWork?.Invoke();
+      }
+      catch (Exception ex)
+      {
+        string msg = ex.GetType().FullName + ": " + ex.Message;
+        WriteCrashLog("CAD interaction", ex);
+        Log(msg);
+        try
+        {
+          MessageBox.Show(this, msg, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch
+        {
+        }
       }
       finally
       {
-        Show();
-        Activate();
-        Focus();
+        try
+        {
+          Visibility = previous == Visibility.Collapsed ? Visibility.Visible : previous;
+          IsEnabled = wasEnabled;
+          if (Visibility == Visibility.Visible)
+          {
+            Activate();
+          }
+        }
+        catch (Exception ex)
+        {
+          WriteCrashLog("UI restore", ex);
+          try
+          {
+            Log("UI restore: " + ex.Message);
+          }
+          catch
+          {
+          }
+        }
+      }
+    }
+
+    private void HookDispatcherExceptions()
+    {
+      try
+      {
+        Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
+        Dispatcher.UnhandledException += OnDispatcherUnhandledException;
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        if (Application.Current != null)
+        {
+          Application.Current.DispatcherUnhandledException -= OnAppDispatcherUnhandledException;
+          Application.Current.DispatcherUnhandledException += OnAppDispatcherUnhandledException;
+        }
+      }
+      catch
+      {
+      }
+    }
+
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+      try
+      {
+        WriteCrashLog("Dispatcher", e.Exception);
+        Log("WPF: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+        e.Handled = true;
+      }
+      catch
+      {
+        e.Handled = true;
+      }
+    }
+
+    private static void OnAppDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+      try
+      {
+        WriteCrashLog("AppDispatcher", e.Exception);
+        e.Handled = true;
+      }
+      catch
+      {
+        e.Handled = true;
+      }
+    }
+
+    private static void WriteCrashLog(string where, Exception ex)
+    {
+      try
+      {
+        TracingCache.EnsureCreated();
+        string path = Path.Combine(TracingCache.SettingsDir, "nc_test_ribbon_crash.log");
+        string line = DateTime.Now.ToString("s", CultureInfo.InvariantCulture)
+          + " [" + where + "] "
+          + (ex?.GetType().FullName ?? "?") + ": " + (ex?.Message ?? "")
+          + Environment.NewLine
+          + (ex?.StackTrace ?? "")
+          + Environment.NewLine
+          + "----"
+          + Environment.NewLine;
+        File.AppendAllText(path, line);
+      }
+      catch
+      {
       }
     }
 

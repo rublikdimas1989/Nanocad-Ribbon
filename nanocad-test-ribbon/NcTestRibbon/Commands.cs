@@ -2,6 +2,7 @@ namespace NcTestRibbon
 {
   using System;
   using System.Diagnostics;
+  using System.IO;
   using System.Net.Http;
   using System.Threading.Tasks;
   using System.Windows.Forms;
@@ -217,6 +218,7 @@ namespace NcTestRibbon
     {
       if (WpfApp.Current != null || _wpfAppCreated)
       {
+        HookWpfUnhandled(ed);
         return;
       }
 
@@ -227,11 +229,50 @@ namespace NcTestRibbon
           ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown
         };
         _wpfAppCreated = true;
+        HookWpfUnhandled(ed);
         ed?.WriteMessage("\nWPF Application created (OnExplicitShutdown).");
       }
       catch (System.Exception ex)
       {
         ed?.WriteMessage("\nWPF Application init: " + ex.Message);
+      }
+    }
+
+    private static bool _wpfUnhandledHooked;
+
+    private static void HookWpfUnhandled(Editor ed)
+    {
+      if (_wpfUnhandledHooked || WpfApp.Current == null)
+      {
+        return;
+      }
+
+      try
+      {
+        WpfApp.Current.DispatcherUnhandledException += (_, e) =>
+        {
+          try
+          {
+            string dir = NcTestRibbon.Shell.TracingCache.SettingsDir;
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+              Path.Combine(dir, "nc_test_ribbon_crash.log"),
+              DateTime.Now.ToString("s") + " [AppDispatcher] "
+              + e.Exception.GetType().FullName + ": " + e.Exception.Message
+              + Environment.NewLine + e.Exception.StackTrace + Environment.NewLine + "----\n");
+            ed?.WriteMessage("\nWPF unhandled: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+          }
+          catch
+          {
+          }
+
+          e.Handled = true;
+        };
+        _wpfUnhandledHooked = true;
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nWPF unhandled hook: " + ex.Message);
       }
     }
 

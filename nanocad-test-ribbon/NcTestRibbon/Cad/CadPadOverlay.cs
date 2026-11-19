@@ -100,10 +100,11 @@ namespace NcTestRibbon.Cad
 
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
-      Editor ed = doc.Editor;
+      Editor ed = doc.Editor
+        ?? throw new InvalidOperationException("Нет редактора активного чертежа.");
 
-      // Same zoom-to-KP as «Повернуть вручную» before the move jig.
-      ZoomToPadOrGeom(ed, doc, pad);
+      // Same zoom-to-KP as «Повернуть вручную» before the move jig (never throws).
+      SafeZoomToPadOrGeom(ed, doc, pad);
 
       var jig = new PadPlaceJig(pad, new Point3d(pad.X, pad.Y, 0));
       PromptResult result = ed.Drag(jig);
@@ -174,7 +175,7 @@ namespace NcTestRibbon.Cad
       {
       }
 
-      ZoomToPad(ed, doc, ids);
+      SafeZoomToPad(ed, doc, ids);
 
       ed.WriteMessage(
         "\nПоворот КП «" + padName + "»: база = центр прямоугольника ("
@@ -423,31 +424,102 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Zoom to drawn KP entities when present; otherwise fit to pad geom (place before first draw).
+    /// Best-effort zoom before place/move. Must never throw into the unmanaged host.
     /// </summary>
-    private static void ZoomToPadOrGeom(Editor ed, Document doc, PadGeom pad)
+    private static void SafeZoomToPadOrGeom(Editor ed, Document doc, PadGeom pad)
     {
-      if (pad == null || string.IsNullOrWhiteSpace(pad.Name))
+      try
       {
-        ZoomToGeom(ed, doc, pad);
-        return;
-      }
+        if (ed == null || doc == null || pad == null)
+        {
+          return;
+        }
 
-      ObjectId[] ids = FindPadIdsReadOnly(doc, pad.Name);
-      if (ids.Length > 0)
+        ObjectId[] ids = Array.Empty<ObjectId>();
+        if (!string.IsNullOrWhiteSpace(pad.Name))
+        {
+          ids = FindPadIdsReadOnly(doc, pad.Name);
+        }
+
+        if (ids.Length > 0)
+        {
+          SafeZoomToPad(ed, doc, ids);
+          return;
+        }
+
+        SafeZoomToGeom(ed, pad);
+      }
+      catch (Exception)
       {
-        ZoomToPad(ed, doc, ids);
-        return;
+        // Swallow — zoom must not crash nCad.exe.
       }
-
-      ZoomToGeom(ed, doc, pad);
+      catch
+      {
+      }
     }
 
+    private static void SafeZoomToPad(Editor ed, Document doc, ObjectId[] ids)
+    {
+      try
+      {
+        if (ed == null || doc == null || ids == null || ids.Length == 0)
+        {
+          return;
+        }
+
+        if (!TryGetEntityExtents(doc, ids, out double minX, out double minY, out double maxX, out double maxY))
+        {
+          return;
+        }
+
+        ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
+    private static void SafeZoomToGeom(Editor ed, PadGeom pad)
+    {
+      try
+      {
+        if (ed == null || pad == null)
+        {
+          return;
+        }
+
+        if (!TryGetGeomExtents(pad, out double minX, out double minY, out double maxX, out double maxY))
+        {
+          return;
+        }
+
+        ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
+    /// <summary>
+    /// Read pad ObjectIds without nested write locks (avoids lock/view races before jig).
+    /// </summary>
     private static ObjectId[] FindPadIdsReadOnly(Document doc, string padName)
     {
       try
       {
-        using (doc.LockDocument())
+        if (doc?.Database == null || string.IsNullOrWhiteSpace(padName))
+        {
+          return Array.Empty<ObjectId>();
+        }
+
+        // Prefer transaction without LockDocument — zoom is read-only and may run
+        // while the UI already holds a document context.
         using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
         {
           BlockTable bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
@@ -455,8 +527,12 @@ namespace NcTestRibbon.Cad
             bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
           ObjectId[] ids = FindNamedPadIds(tr, model, padName);
           tr.Commit();
-          return ids;
+          return ids ?? Array.Empty<ObjectId>();
         }
+      }
+      catch (Exception)
+      {
+        return Array.Empty<ObjectId>();
       }
       catch
       {
@@ -464,25 +540,22 @@ namespace NcTestRibbon.Cad
       }
     }
 
-    /// <summary>
-    /// Fit the current view around the KP entities (rectangle + label) with margin.
-    /// </summary>
-    private static void ZoomToPad(Editor ed, Document doc, ObjectId[] ids)
+    private static bool TryGetEntityExtents(
+      Document doc,
+      ObjectId[] ids,
+      out double minX,
+      out double minY,
+      out double maxX,
+      out double maxY)
     {
-      if (ed == null || doc == null || ids == null || ids.Length == 0)
-      {
-        return;
-      }
+      minX = double.PositiveInfinity;
+      minY = double.PositiveInfinity;
+      maxX = double.NegativeInfinity;
+      maxY = double.NegativeInfinity;
+      bool any = false;
 
       try
       {
-        double minX = double.PositiveInfinity;
-        double minY = double.PositiveInfinity;
-        double maxX = double.NegativeInfinity;
-        double maxY = double.NegativeInfinity;
-        bool any = false;
-
-        using (doc.LockDocument())
         using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
         {
           foreach (ObjectId id in ids)
@@ -506,86 +579,136 @@ namespace NcTestRibbon.Cad
 
           tr.Commit();
         }
-
-        if (!any || !double.IsFinite(minX) || !double.IsFinite(maxX))
-        {
-          return;
-        }
-
-        ApplyViewExtents(ed, doc, minX, minY, maxX, maxY);
+      }
+      catch (Exception)
+      {
+        return false;
       }
       catch
       {
-        // Zoom is best-effort — place/rotate must still work.
+        return false;
       }
+
+      return any
+        && double.IsFinite(minX) && double.IsFinite(minY)
+        && double.IsFinite(maxX) && double.IsFinite(maxY)
+        && maxX >= minX && maxY >= minY;
     }
 
-    private static void ZoomToGeom(Editor ed, Document doc, PadGeom pad)
+    private static bool TryGetGeomExtents(
+      PadGeom pad,
+      out double minX,
+      out double minY,
+      out double maxX,
+      out double maxY)
     {
-      if (ed == null || doc == null || pad == null)
+      minX = minY = maxX = maxY = 0;
+      if (pad == null)
       {
-        return;
+        return false;
       }
 
-      try
+      if (!double.IsFinite(pad.X) || !double.IsFinite(pad.Y)
+          || !double.IsFinite(pad.LengthM) || !double.IsFinite(pad.WidthM)
+          || !double.IsFinite(pad.RotationDeg))
       {
-        double halfX = Math.Max(pad.LengthM, 1) / 2.0;
-        double halfY = Math.Max(pad.WidthM, 1) / 2.0;
-        Point2d[] local =
-        {
-          new Point2d(-halfX, -halfY),
-          new Point2d(+halfX, -halfY),
-          new Point2d(+halfX, +halfY),
-          new Point2d(-halfX, +halfY)
-        };
-
-        double minX = double.PositiveInfinity;
-        double minY = double.PositiveInfinity;
-        double maxX = double.NegativeInfinity;
-        double maxY = double.NegativeInfinity;
-        foreach (Point2d p in local)
-        {
-          Point2d w = Rotate(pad.X, pad.Y, p.X, p.Y, pad.RotationDeg);
-          minX = Math.Min(minX, w.X);
-          minY = Math.Min(minY, w.Y);
-          maxX = Math.Max(maxX, w.X);
-          maxY = Math.Max(maxY, w.Y);
-        }
-
-        // Include label above the pad (same offset as AddLabel).
-        double height = Math.Max(pad.WidthM, 1) / 2.0;
-        Point2d label = Rotate(pad.X, pad.Y, 0, halfY + height * 1.15, pad.RotationDeg);
-        minX = Math.Min(minX, label.X - height);
-        minY = Math.Min(minY, label.Y - height);
-        maxX = Math.Max(maxX, label.X + height);
-        maxY = Math.Max(maxY, label.Y + height);
-
-        ApplyViewExtents(ed, doc, minX, minY, maxX, maxY);
+        return false;
       }
-      catch
+
+      double halfX = Math.Max(pad.LengthM, 1) / 2.0;
+      double halfY = Math.Max(pad.WidthM, 1) / 2.0;
+      Point2d[] local =
       {
+        new Point2d(-halfX, -halfY),
+        new Point2d(+halfX, -halfY),
+        new Point2d(+halfX, +halfY),
+        new Point2d(-halfX, +halfY)
+      };
+
+      minX = double.PositiveInfinity;
+      minY = double.PositiveInfinity;
+      maxX = double.NegativeInfinity;
+      maxY = double.NegativeInfinity;
+      foreach (Point2d p in local)
+      {
+        Point2d w = Rotate(pad.X, pad.Y, p.X, p.Y, pad.RotationDeg);
+        minX = Math.Min(minX, w.X);
+        minY = Math.Min(minY, w.Y);
+        maxX = Math.Max(maxX, w.X);
+        maxY = Math.Max(maxY, w.Y);
       }
+
+      double labelH = Math.Max(pad.WidthM, 1) / 2.0;
+      Point2d label = Rotate(pad.X, pad.Y, 0, halfY + labelH * 1.15, pad.RotationDeg);
+      minX = Math.Min(minX, label.X - labelH);
+      minY = Math.Min(minY, label.Y - labelH);
+      maxX = Math.Max(maxX, label.X + labelH);
+      maxY = Math.Max(maxY, label.Y + labelH);
+
+      return double.IsFinite(minX) && double.IsFinite(maxX) && maxX >= minX && maxY >= minY;
     }
 
-    private static void ApplyViewExtents(
+    /// <summary>
+    /// Set current view to extents. Avoids disposing ViewTableRecord after SetCurrentView
+    /// (Teigha/HostMgd can AV / raise CLR 0xE0434352 on Dispose of that wrapper).
+    /// </summary>
+    private static void ApplyViewExtentsSafe(
       Editor ed,
-      Document doc,
       double minX,
       double minY,
       double maxX,
       double maxY)
     {
-      double width = Math.Max(maxX - minX, 1.0);
-      double height = Math.Max(maxY - minY, 1.0);
-      // ~35% margin so the pad is not edge-clipped while placing/rotating.
-      width *= 1.7;
-      height *= 1.7;
+      if (ed == null)
+      {
+        return;
+      }
+
+      if (!double.IsFinite(minX) || !double.IsFinite(minY)
+          || !double.IsFinite(maxX) || !double.IsFinite(maxY)
+          || maxX < minX || maxY < minY)
+      {
+        return;
+      }
+
+      double width = Math.Max(maxX - minX, 1.0) * 1.7;
+      double height = Math.Max(maxY - minY, 1.0) * 1.7;
       double cx = (minX + maxX) / 2.0;
       double cy = (minY + maxY) / 2.0;
-
-      using (ViewTableRecord view = ed.GetCurrentView())
+      if (!double.IsFinite(width) || !double.IsFinite(height)
+          || !double.IsFinite(cx) || !double.IsFinite(cy)
+          || width <= 0 || height <= 0)
       {
-        double aspect = view.Width / Math.Max(view.Height, 1e-9);
+        return;
+      }
+
+      ViewTableRecord view = null;
+      try
+      {
+        view = ed.GetCurrentView();
+        if (view == null)
+        {
+          return;
+        }
+
+        double viewH = view.Height;
+        double viewW = view.Width;
+        if (!double.IsFinite(viewH) || viewH <= 1e-9)
+        {
+          viewH = 1.0;
+        }
+
+        if (!double.IsFinite(viewW) || viewW <= 1e-9)
+        {
+          viewW = 1.0;
+        }
+
+        double aspect = viewW / viewH;
+        if (!double.IsFinite(aspect) || aspect <= 0)
+        {
+          aspect = 1.0;
+        }
+
         if (width / height > aspect)
         {
           height = width / aspect;
@@ -595,13 +718,29 @@ namespace NcTestRibbon.Cad
           width = height * aspect;
         }
 
+        if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0)
+        {
+          return;
+        }
+
         view.CenterPoint = new Point2d(cx, cy);
         view.Width = width;
         view.Height = height;
         ed.SetCurrentView(view);
       }
-
-      TryUpdateScreen(doc);
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+      finally
+      {
+        // Do NOT Dispose ViewTableRecord after SetCurrentView on HostMgd/Teigha —
+        // Dispose of the temporary view wrapper has been observed to crash nCad
+        // (CLR 0xE0434352 / KernelBase). Leave for GC.
+        view = null;
+      }
     }
 
     private static bool TryExpandExtents(
@@ -611,30 +750,34 @@ namespace NcTestRibbon.Cad
       ref double maxX,
       ref double maxY)
     {
-      try
-      {
-        Extents3d ext = ent.GeometricExtents;
-        minX = Math.Min(minX, ext.MinPoint.X);
-        minY = Math.Min(minY, ext.MinPoint.Y);
-        maxX = Math.Max(maxX, ext.MaxPoint.X);
-        maxY = Math.Max(maxY, ext.MaxPoint.Y);
-        return true;
-      }
-      catch
-      {
-      }
-
+      // Prefer polyline/text verts — GeometricExtents can throw native SEH on bad entities.
       if (ent is DbPolyline pl)
       {
         bool any = false;
-        for (int i = 0; i < pl.NumberOfVertices; i++)
+        try
         {
-          Point2d p = pl.GetPoint2dAt(i);
-          minX = Math.Min(minX, p.X);
-          minY = Math.Min(minY, p.Y);
-          maxX = Math.Max(maxX, p.X);
-          maxY = Math.Max(maxY, p.Y);
-          any = true;
+          for (int i = 0; i < pl.NumberOfVertices; i++)
+          {
+            Point2d p = pl.GetPoint2dAt(i);
+            if (!double.IsFinite(p.X) || !double.IsFinite(p.Y))
+            {
+              continue;
+            }
+
+            minX = Math.Min(minX, p.X);
+            minY = Math.Min(minY, p.Y);
+            maxX = Math.Max(maxX, p.X);
+            maxY = Math.Max(maxY, p.Y);
+            any = true;
+          }
+        }
+        catch (Exception)
+        {
+          return any;
+        }
+        catch
+        {
+          return any;
         }
 
         return any;
@@ -642,16 +785,53 @@ namespace NcTestRibbon.Cad
 
       if (ent is DBText text)
       {
-        Point3d p = text.Position;
-        double h = Math.Max(text.Height, 1.0);
-        minX = Math.Min(minX, p.X - h);
-        minY = Math.Min(minY, p.Y - h);
-        maxX = Math.Max(maxX, p.X + h);
-        maxY = Math.Max(maxY, p.Y + h);
-        return true;
+        try
+        {
+          Point3d p = text.Position;
+          double h = Math.Max(text.Height, 1.0);
+          if (!double.IsFinite(p.X) || !double.IsFinite(p.Y) || !double.IsFinite(h))
+          {
+            return false;
+          }
+
+          minX = Math.Min(minX, p.X - h);
+          minY = Math.Min(minY, p.Y - h);
+          maxX = Math.Max(maxX, p.X + h);
+          maxY = Math.Max(maxY, p.Y + h);
+          return true;
+        }
+        catch (Exception)
+        {
+          return false;
+        }
+        catch
+        {
+          return false;
+        }
       }
 
-      return false;
+      try
+      {
+        Extents3d ext = ent.GeometricExtents;
+        if (!double.IsFinite(ext.MinPoint.X) || !double.IsFinite(ext.MaxPoint.X))
+        {
+          return false;
+        }
+
+        minX = Math.Min(minX, ext.MinPoint.X);
+        minY = Math.Min(minY, ext.MinPoint.Y);
+        maxX = Math.Max(maxX, ext.MaxPoint.X);
+        maxY = Math.Max(maxY, ext.MaxPoint.Y);
+        return true;
+      }
+      catch (Exception)
+      {
+        return false;
+      }
+      catch
+      {
+        return false;
+      }
     }
 
     /// <summary>
