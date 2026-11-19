@@ -460,25 +460,39 @@ Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
 
 # Bundled GDAL x64 + ECW plugin (End-style embedded GeoTransform for NcTestEcw).
+# Must land at %LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal\x64\... (plugin probes this path).
 $gdalSrc = Join-Path $src 'gdal'
+if (-not (Test-Path $gdalSrc)) {
+    $gdalSrc = Join-Path $pkgRoot 'installer\gdal'
+}
 $gdalDest = Join-Path $syncFolder 'gdal'
 if (Test-Path $gdalSrc) {
+    Write-Host ("GDAL source: {0}" -f $gdalSrc)
     if (Test-Path $gdalDest) {
         Remove-Item $gdalDest -Recurse -Force
     }
-    Copy-Item $gdalSrc $gdalDest -Recurse -Force
+    New-Item -ItemType Directory -Path $gdalDest -Force | Out-Null
+    # Copy contents so LoadFile\NANOCAD\gdal\x64 exists (not gdal\gdal\x64).
+    Copy-Item -Path (Join-Path $gdalSrc '*') -Destination $gdalDest -Recurse -Force
     $wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
     $ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
     $ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
-    if ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs)) {
+    $csharp = Join-Path $syncFolder 'gdal_csharp.dll'
+    Write-Host ("  wrap:   {0}  exists={1}" -f $wrap, (Test-Path $wrap))
+    Write-Host ("  ECW:    {0}  exists={1}" -f $ecw, (Test-Path $ecw))
+    Write-Host ("  NCSEcw: {0}  exists={1}" -f $ncs, (Test-Path $ncs))
+    Write-Host ("  csharp: {0}  exists={1}" -f $csharp, (Test-Path $csharp))
+    if ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs) -and (Test-Path $csharp)) {
         Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
     }
     else {
-        Write-Host 'WARNING: installer\gdal incomplete (need x64\gdal_wrap.dll + ECW plugins).' -ForegroundColor Yellow
+        Write-Host 'ERROR: GDAL install incomplete (need wrap + ECW plugins + gdal_csharp.dll).' -ForegroundColor Yellow
+        throw 'Bundled GDAL ECW files missing after INSTALL copy. Re-unpack v1.2.46+ zip (includes installer\gdal).'
     }
 }
 else {
-    Write-Host 'WARNING: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
+    Write-Host 'ERROR: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
+    throw 'installer\gdal not found. Unpack the full versioned zip (not a partial source tree).'
 }
 
 $profiles = @(Get-NanoCadProfiles)

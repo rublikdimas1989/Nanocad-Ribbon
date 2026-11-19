@@ -72,12 +72,19 @@ namespace NcTestRibbon.Cad
         return fromGdal;
       }
 
+      string loadFileHint = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ASDC", "LoadFile", "NANOCAD", "gdal", "x64", "gdal_wrap.dll");
       throw new InvalidOperationException(
         "Нет геопривязки для «" + Path.GetFileName(rasterPath) + "».\n"
-        + "Нужен world/TAF (.eww/.wld/.tfw/…) либо bundled GDAL ECW "
-        + "(installer\\gdal\\x64 + plugins; как End: Gdal.Open → GetGeoTransform).\n"
-        + "Переустановите v1.2.45+ через INSTALL.bat (копирует gdal рядом с плагином).\n"
-        + "IMAGEATTACH без world-файла ставит масштаб 1 (пиксель = единица чертежа).");
+        + "Ожидается embedded GDAL GeoTransform (как End) или world/TAF рядом с файлом.\n\n"
+        + "GDAL status:\n" + (string.IsNullOrWhiteSpace(managedNote) ? "(нет)" : managedNote) + "\n\n"
+        + "Проверьте, что INSTALL.bat скопировал:\n"
+        + "  " + loadFileHint + "\n"
+        + "  …\\gdal\\x64\\plugins\\gdal_ECW_JP2ECW.dll\n"
+        + "  …\\gdal\\x64\\plugins\\NCSEcw.dll\n"
+        + "и рядом с плагином: gdal_csharp.dll.\n"
+        + "Затем NETLOAD / перезапуск nanoCAD.");
     }
 
     /// <summary>Write ESRI world sidecar; returns full path written.</summary>
@@ -173,84 +180,214 @@ namespace NcTestRibbon.Cad
     {
       geo = null;
       note = string.Empty;
+      var status = new StringBuilder();
       try
       {
-        string baseDir = ResolveGdalBaseDirectory();
-        if (!GdalRuntimeBootstrap.TryInitialize(baseDir, out string diagnostics, out string error))
+        string arch = Environment.Is64BitProcess ? "x64" : "x86";
+        List<string> candidates = EnumerateGdalBaseCandidates();
+        status.AppendLine("arch=" + arch);
+        status.AppendLine("candidates:");
+        foreach (string c in candidates)
         {
-          note = "GDAL init failed: " + (error ?? diagnostics);
-          return false;
+          string wrap = Path.Combine(c, "gdal", arch, "gdal_wrap.dll");
+          status.AppendLine("  " + c + (File.Exists(wrap) ? " [wrap OK]" : " [no wrap]"));
         }
 
-        using OSGeo.GDAL.Dataset dataset = OSGeo.GDAL.Gdal.Open(rasterPath, OSGeo.GDAL.Access.GA_ReadOnly);
-        if (dataset == null || dataset.RasterXSize <= 0 || dataset.RasterYSize <= 0)
+        string chosen = null;
+        foreach (string baseDir in candidates)
         {
-          return false;
-        }
-
-        double[] t = new double[6];
-        dataset.GetGeoTransform(t);
-        foreach (double value in t)
-        {
-          if (!double.IsFinite(value))
+          if (File.Exists(Path.Combine(baseDir, "gdal", arch, "gdal_wrap.dll")))
           {
-            return false;
+            chosen = baseDir;
+            break;
           }
         }
 
-        bool identity = t[0] == 0 && t[1] == 1 && t[2] == 0 && t[3] == 0 && t[4] == 0 && t[5] == 1;
-        double det = t[1] * t[5] - t[2] * t[4];
-        if (identity || !double.IsFinite(det) || Math.Abs(det) < 1e-30)
+        if (chosen == null)
         {
+          note = status.ToString().TrimEnd()
+            + "\nGDAL init: gdal_wrap.dll not found under any candidate\\gdal\\" + arch;
           return false;
         }
 
-        geo = new RasterGeoTransform
+        status.AppendLine("using base: " + chosen);
+        if (!GdalRuntimeBootstrap.TryInitialize(chosen, out string diagnostics, out string error))
         {
-          OriginX = t[0],
-          PixelSizeX = t[1],
-          RotateX = t[2],
-          OriginY = t[3],
-          RotateY = t[4],
-          PixelSizeY = t[5],
-          WidthPx = dataset.RasterXSize,
-          HeightPx = dataset.RasterYSize,
-          Source = "OSGeo.GDAL"
-        };
-        note = "GDAL GetGeoTransform (embedded)";
-        return true;
+          note = status.ToString().TrimEnd()
+            + "\nGDAL init failed: " + (error ?? "(null)")
+            + "\n--- diagnostics ---\n" + (diagnostics ?? string.Empty);
+          return false;
+        }
+
+        status.AppendLine("init OK");
+        try
+        {
+          OSGeo.GDAL.Driver ecw = OSGeo.GDAL.Gdal.GetDriverByName("ECW");
+          status.AppendLine("ECW driver: " + (ecw != null ? ecw.ShortName : "MISSING"));
+        }
+        catch (Exception dex)
+        {
+          status.AppendLine("ECW driver check: " + dex.Message);
+        }
+
+        OSGeo.GDAL.Dataset dataset = null;
+        try
+        {
+          dataset = OSGeo.GDAL.Gdal.Open(rasterPath, OSGeo.GDAL.Access.GA_ReadOnly);
+        }
+        catch (Exception openEx)
+        {
+          note = status.ToString().TrimEnd()
+            + "\nGdal.Open threw: " + openEx.GetType().Name + ": " + openEx.Message
+            + "\nLastError: " + SafeGdalLastError();
+          return false;
+        }
+
+        if (dataset == null)
+        {
+          note = status.ToString().TrimEnd()
+            + "\nGdal.Open returned null. LastError: " + SafeGdalLastError();
+          return false;
+        }
+
+        using (dataset)
+        {
+          if (dataset.RasterXSize <= 0 || dataset.RasterYSize <= 0)
+          {
+            note = status.ToString().TrimEnd() + "\nGdal.Open: empty raster size.";
+            return false;
+          }
+
+          double[] t = new double[6];
+          dataset.GetGeoTransform(t);
+          status.AppendLine(
+            "GT=[" + string.Join(", ", Array.ConvertAll(t, v => v.ToString("R", CultureInfo.InvariantCulture))) + "]");
+          status.AppendLine("size=" + dataset.RasterXSize + "x" + dataset.RasterYSize);
+
+          foreach (double value in t)
+          {
+            if (!double.IsFinite(value))
+            {
+              note = status.ToString().TrimEnd() + "\nGeoTransform has non-finite values.";
+              return false;
+            }
+          }
+
+          bool identity = t[0] == 0 && t[1] == 1 && t[2] == 0 && t[3] == 0 && t[4] == 0 && t[5] == 1;
+          double det = t[1] * t[5] - t[2] * t[4];
+          if (identity || !double.IsFinite(det) || Math.Abs(det) < 1e-30)
+          {
+            note = status.ToString().TrimEnd()
+              + "\nGeoTransform identity/degenerate — ECW opened but no usable embedded affine.";
+            return false;
+          }
+
+          geo = new RasterGeoTransform
+          {
+            OriginX = t[0],
+            PixelSizeX = t[1],
+            RotateX = t[2],
+            OriginY = t[3],
+            RotateY = t[4],
+            PixelSizeY = t[5],
+            WidthPx = dataset.RasterXSize,
+            HeightPx = dataset.RasterYSize,
+            Source = "OSGeo.GDAL"
+          };
+          note = "GDAL GetGeoTransform (embedded) @ " + chosen;
+          return true;
+        }
       }
       catch (Exception ex)
       {
-        note = "GDAL: " + ex.GetType().Name + ": " + ex.Message;
+        note = status.ToString().TrimEnd()
+          + "\nGDAL: " + ex.GetType().Name + ": " + ex.Message
+          + "\nLastError: " + SafeGdalLastError();
         return false;
       }
     }
 
-    private static string ResolveGdalBaseDirectory()
+    private static string SafeGdalLastError()
     {
+      try
+      {
+        return OSGeo.GDAL.Gdal.GetLastErrorMsg() ?? string.Empty;
+      }
+      catch
+      {
+        return "(unavailable)";
+      }
+    }
+
+    /// <summary>
+    /// Prefer LoadFile\NANOCAD (where INSTALL copies gdal\), then plugin assembly dir.
+    /// </summary>
+    private static List<string> EnumerateGdalBaseCandidates()
+    {
+      var list = new List<string>();
+      void Add(string path)
+      {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+          return;
+        }
+
+        try
+        {
+          string full = Path.GetFullPath(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+          if (!list.Exists(x => string.Equals(x, full, StringComparison.OrdinalIgnoreCase)))
+          {
+            list.Add(full);
+          }
+        }
+        catch
+        {
+        }
+      }
+
+      try
+      {
+        Add(Path.Combine(
+          Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+          "ASDC", "LoadFile", "NANOCAD"));
+      }
+      catch
+      {
+      }
+
       try
       {
         string asm = typeof(RasterGeoTransform).Assembly.Location;
         if (!string.IsNullOrEmpty(asm))
         {
-          string dir = Path.GetDirectoryName(asm);
-          if (!string.IsNullOrEmpty(dir) && Directory.Exists(Path.Combine(dir, "gdal")))
-          {
-            return dir;
-          }
-
-          if (!string.IsNullOrEmpty(dir))
-          {
-            return dir;
-          }
+          Add(Path.GetDirectoryName(asm));
         }
       }
       catch
       {
       }
 
-      return AppContext.BaseDirectory;
+      try
+      {
+        Add(AppContext.BaseDirectory);
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        string env = Environment.GetEnvironmentVariable("NC_TEST_GDAL_HOME");
+        if (!string.IsNullOrWhiteSpace(env))
+        {
+          Add(env);
+        }
+      }
+      catch
+      {
+      }
+
+      return list;
     }
 
     private static bool TryReadGdalInfo(string rasterPath, out RasterGeoTransform geo, out string note)

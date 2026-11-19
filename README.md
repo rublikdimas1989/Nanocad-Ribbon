@@ -4,9 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.45.zip`](nanocad-test-ribbon-v1.2.45.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.45/nanocad-test-ribbon-v1.2.45.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.46.zip`](nanocad-test-ribbon-v1.2.46.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.46/nanocad-test-ribbon-v1.2.46.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.46 — GDAL path + Open diagnostics (TCON-62)
+
+- Probe `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal` first; INSTALL hard-fails if wrap/ECW/csharp missing
+- NcTestEcw error shows GDAL status (candidates, ECW driver, Gdal.Open / LastError)
 
 ## v1.2.45 — embedded ECW GeoTransform via GDAL (TCON-62)
 

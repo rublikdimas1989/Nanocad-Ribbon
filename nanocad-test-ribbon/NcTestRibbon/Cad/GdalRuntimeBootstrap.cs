@@ -580,45 +580,79 @@ namespace NcTestRibbon.Cad
             string baseDir,
             string architecture)
         {
-            string[] preferred =
-            {
-                Path.Combine(baseDir, "gdal", architecture),
-                Path.Combine(
-                    baseDir,
-                    "runtimes",
-                    "win-" + architecture,
-                    "native"),
-                baseDir
-            };
-
-            foreach (string dir in preferred)
-            {
-                if (Directory.Exists(dir) &&
-                    File.Exists(
-                        Path.Combine(dir, "gdal_wrap.dll")))
-                {
-                    return dir;
-                }
-            }
+            var searchRoots = new List<string>();
+            if (!string.IsNullOrWhiteSpace(baseDir))
+                searchRoots.Add(baseDir);
 
             try
             {
-                string wrap =
-                    Directory
-                        .EnumerateFiles(
-                            baseDir,
-                            "gdal_wrap.dll",
-                            SearchOption.AllDirectories)
-                        .FirstOrDefault();
-
-                return wrap == null
-                    ? null
-                    : Path.GetDirectoryName(wrap);
+                string loadFile = Path.Combine(
+                    Environment.GetFolderPath(
+                        Environment.SpecialFolder.LocalApplicationData),
+                    "ASDC",
+                    "LoadFile",
+                    "NANOCAD");
+                if (!searchRoots.Any(
+                        r => string.Equals(
+                            r,
+                            loadFile,
+                            StringComparison.OrdinalIgnoreCase)))
+                {
+                    searchRoots.Add(loadFile);
+                }
             }
             catch
             {
-                return null;
             }
+
+            foreach (string root in searchRoots)
+            {
+                string[] preferred =
+                {
+                    Path.Combine(root, "gdal", architecture),
+                    Path.Combine(
+                        root,
+                        "runtimes",
+                        "win-" + architecture,
+                        "native"),
+                    root
+                };
+
+                foreach (string dir in preferred)
+                {
+                    if (Directory.Exists(dir) &&
+                        File.Exists(
+                            Path.Combine(dir, "gdal_wrap.dll")))
+                    {
+                        return dir;
+                    }
+                }
+            }
+
+            foreach (string root in searchRoots)
+            {
+                if (!Directory.Exists(root))
+                    continue;
+
+                try
+                {
+                    string wrap =
+                        Directory
+                            .EnumerateFiles(
+                                root,
+                                "gdal_wrap.dll",
+                                SearchOption.AllDirectories)
+                            .FirstOrDefault();
+
+                    if (wrap != null)
+                        return Path.GetDirectoryName(wrap);
+                }
+                catch
+                {
+                }
+            }
+
+            return null;
         }
 
         private static string FindPluginDirectory(

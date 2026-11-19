@@ -8,10 +8,10 @@
     <AssemblyName>NC_TestRibbon</AssemblyName>
     <RootNamespace>NcTestRibbon</RootNamespace>
     <!-- Product / File version. AssemblyVersion stays 1.0.0.0 for any remaining Page shells. -->
-    <Version>1.2.45</Version>
+    <Version>1.2.46</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.2.45.0</FileVersion>
-    <InformationalVersion>1.2.45+EcwEmbeddedGdal</InformationalVersion>
+    <FileVersion>1.2.46.0</FileVersion>
+    <InformationalVersion>1.2.46+EcwGdalPath</InformationalVersion>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <EnableDefaultPageItems>true</EnableDefaultPageItems>
