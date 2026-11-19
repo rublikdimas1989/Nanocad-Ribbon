@@ -329,7 +329,7 @@ function Copy-RibbonDependencies {
     }
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink')
+$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -458,6 +458,28 @@ Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 
 # EPPlus + transitive NuGet deps must sit next to the plugin in LoadFile.
 Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
+
+# Bundled GDAL x64 + ECW plugin (End-style embedded GeoTransform for NcTestEcw).
+$gdalSrc = Join-Path $src 'gdal'
+$gdalDest = Join-Path $syncFolder 'gdal'
+if (Test-Path $gdalSrc) {
+    if (Test-Path $gdalDest) {
+        Remove-Item $gdalDest -Recurse -Force
+    }
+    Copy-Item $gdalSrc $gdalDest -Recurse -Force
+    $wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
+    $ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
+    $ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
+    if ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs)) {
+        Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
+    }
+    else {
+        Write-Host 'WARNING: installer\gdal incomplete (need x64\gdal_wrap.dll + ECW plugins).' -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host 'WARNING: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
+}
 
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {

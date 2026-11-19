@@ -9,7 +9,8 @@ namespace NcTestRibbon.Cad
 
   /// <summary>
   /// End-style raster georeference (GDAL GeoTransform): upper-left corner + affine.
-  /// Sources: world/TAF sidecar, or gdalinfo -json when available.
+  /// Sources: world/TAF sidecar, bundled OSGeo.GDAL Open+GetGeoTransform (ECW plugin),
+  /// or gdalinfo -json when available.
   /// </summary>
   public sealed class RasterGeoTransform
   {
@@ -58,6 +59,13 @@ namespace NcTestRibbon.Cad
         return fromWorld;
       }
 
+      // End path: OSGeo.GDAL Open + GetGeoTransform (embedded ECW GT via ECW plugin).
+      if (TryReadManagedGdal(rasterPath, out RasterGeoTransform fromManaged, out string managedNote))
+      {
+        note = managedNote;
+        return fromManaged;
+      }
+
       if (TryReadGdalInfo(rasterPath, out RasterGeoTransform fromGdal, out string gdalNote))
       {
         note = gdalNote;
@@ -66,8 +74,9 @@ namespace NcTestRibbon.Cad
 
       throw new InvalidOperationException(
         "Нет геопривязки для «" + Path.GetFileName(rasterPath) + "».\n"
-        + "Нужен world/TAF рядом с файлом (.eww/.wld/.tfw/.jgw/.pgw/.sdw/.taf) "
-        + "или gdalinfo в PATH (как в End: GDAL GeoTransform).\n"
+        + "Нужен world/TAF (.eww/.wld/.tfw/…) либо bundled GDAL ECW "
+        + "(installer\\gdal\\x64 + plugins; как End: Gdal.Open → GetGeoTransform).\n"
+        + "Переустановите v1.2.45+ через INSTALL.bat (копирует gdal рядом с плагином).\n"
         + "IMAGEATTACH без world-файла ставит масштаб 1 (пиксель = единица чертежа).");
     }
 
@@ -158,6 +167,90 @@ namespace NcTestRibbon.Cad
       }
 
       return false;
+    }
+
+    private static bool TryReadManagedGdal(string rasterPath, out RasterGeoTransform geo, out string note)
+    {
+      geo = null;
+      note = string.Empty;
+      try
+      {
+        string baseDir = ResolveGdalBaseDirectory();
+        if (!GdalRuntimeBootstrap.TryInitialize(baseDir, out string diagnostics, out string error))
+        {
+          note = "GDAL init failed: " + (error ?? diagnostics);
+          return false;
+        }
+
+        using OSGeo.GDAL.Dataset dataset = OSGeo.GDAL.Gdal.Open(rasterPath, OSGeo.GDAL.Access.GA_ReadOnly);
+        if (dataset == null || dataset.RasterXSize <= 0 || dataset.RasterYSize <= 0)
+        {
+          return false;
+        }
+
+        double[] t = new double[6];
+        dataset.GetGeoTransform(t);
+        foreach (double value in t)
+        {
+          if (!double.IsFinite(value))
+          {
+            return false;
+          }
+        }
+
+        bool identity = t[0] == 0 && t[1] == 1 && t[2] == 0 && t[3] == 0 && t[4] == 0 && t[5] == 1;
+        double det = t[1] * t[5] - t[2] * t[4];
+        if (identity || !double.IsFinite(det) || Math.Abs(det) < 1e-30)
+        {
+          return false;
+        }
+
+        geo = new RasterGeoTransform
+        {
+          OriginX = t[0],
+          PixelSizeX = t[1],
+          RotateX = t[2],
+          OriginY = t[3],
+          RotateY = t[4],
+          PixelSizeY = t[5],
+          WidthPx = dataset.RasterXSize,
+          HeightPx = dataset.RasterYSize,
+          Source = "OSGeo.GDAL"
+        };
+        note = "GDAL GetGeoTransform (embedded)";
+        return true;
+      }
+      catch (Exception ex)
+      {
+        note = "GDAL: " + ex.GetType().Name + ": " + ex.Message;
+        return false;
+      }
+    }
+
+    private static string ResolveGdalBaseDirectory()
+    {
+      try
+      {
+        string asm = typeof(RasterGeoTransform).Assembly.Location;
+        if (!string.IsNullOrEmpty(asm))
+        {
+          string dir = Path.GetDirectoryName(asm);
+          if (!string.IsNullOrEmpty(dir) && Directory.Exists(Path.Combine(dir, "gdal")))
+          {
+            return dir;
+          }
+
+          if (!string.IsNullOrEmpty(dir))
+          {
+            return dir;
+          }
+        }
+      }
+      catch
+      {
+      }
+
+      return AppContext.BaseDirectory;
     }
 
     private static bool TryReadGdalInfo(string rasterPath, out RasterGeoTransform geo, out string note)
@@ -266,6 +359,13 @@ namespace NcTestRibbon.Cad
     {
       if (geo.WidthPx > 0 && geo.HeightPx > 0)
       {
+        return;
+      }
+
+      if (TryReadManagedGdal(rasterPath, out RasterGeoTransform managed, out _) && managed.WidthPx > 0)
+      {
+        geo.WidthPx = managed.WidthPx;
+        geo.HeightPx = managed.HeightPx;
         return;
       }
 

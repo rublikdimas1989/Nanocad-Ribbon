@@ -4,9 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.44.zip`](nanocad-test-ribbon-v1.2.44.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.44/nanocad-test-ribbon-v1.2.44.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.45.zip`](nanocad-test-ribbon-v1.2.45.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.45/nanocad-test-ribbon-v1.2.45.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.45 — embedded ECW GeoTransform via GDAL (TCON-62)
+
+- End-style: `GdalRuntimeBootstrap` + `Gdal.Open` → `GetGeoTransform` (ECW plugin `gdal_ECW_JP2ECW` / `NCSEcw`)
+- Bundled `installer/gdal/x64` (+ plugins) copied to LoadFile by INSTALL; no PATH gdalinfo required
 
 ## v1.2.44 — PathTextDisplay FlowDirection (TCON-61)
 

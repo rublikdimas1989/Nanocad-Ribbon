@@ -118,6 +118,22 @@ Write-Host '  NcTestEcw'
 Write-Host '  NcTestRaster'
 Write-Host 'If unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL path above.'
 
+Write-Host ''
+Write-Host '=== Bundled GDAL ECW (NcTestEcw embedded georef) ==='
+$gdalWrap = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\gdal_wrap.dll'
+$gdalEcw = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\gdal_ECW_JP2ECW.dll'
+$gdalNcs = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\NCSEcw.dll'
+$gdalCsharp = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal_csharp.dll'
+foreach ($p in @($gdalWrap, $gdalEcw, $gdalNcs, $gdalCsharp)) {
+    if (Test-Path $p) {
+        Write-Host ("  OK  {0}" -f $p)
+    }
+    else {
+        Write-Host ("  MISSING  {0}" -f $p)
+        $fail = $true
+    }
+}
+
 if ($fail) {
     Write-Host ''
     Write-Host 'VERIFY FAILED: rebuild and reinstall.' -ForegroundColor Yellow
