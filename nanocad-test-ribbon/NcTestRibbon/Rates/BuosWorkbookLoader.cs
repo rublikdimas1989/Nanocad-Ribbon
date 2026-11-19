@@ -5,12 +5,12 @@ namespace NcTestRibbon.Rates
   using System.Globalization;
   using System.IO;
   using System.Linq;
-  using System.Text;
   using OfficeOpenXml;
 
   /// <summary>
   /// End TopologyBuosType catalog (variants) — sheet «БУОС» / «Варианты БУОС».
-  /// Identity = unique «Имя». No site coordinates.
+  /// Identity = unique «Имя». No site coordinates, UseInTopology, or cost columns
+  /// (cost comes from Price.xlsx «Элементы топологии»).
   /// </summary>
   public static class BuosWorkbookLoader
   {
@@ -19,7 +19,6 @@ namespace NcTestRibbon.Rates
     public sealed class BuosVariant
     {
       public string Name { get; set; } = "БУОС";
-      public bool UseInTopology { get; set; } = true;
       /// <summary>Жидкость (нефть + вода), м³/сут.</summary>
       public double CombinedCapacity { get; set; } = 4000;
       /// <summary>ПНГ, ст. м³/сут.</summary>
@@ -28,9 +27,6 @@ namespace NcTestRibbon.Rates
       public double LengthM { get; set; } = 700;
       /// <summary>Ширина площадки одной установки, м.</summary>
       public double WidthM { get; set; } = 700;
-      public bool UseExcelPrice { get; set; } = true;
-      /// <summary>Стоимость одной установки, руб. (если цена Excel выключена).</summary>
-      public double CostRub { get; set; }
     }
 
     public sealed class WorkbookData
@@ -80,13 +76,10 @@ namespace NcTestRibbon.Rates
       string[] headers =
       {
         "Имя",
-        "Использовать в подборе",
         "Производительность жидкость м3/сут",
         "Производительность ПНГ ст.м3/сут",
         "Длина площадки м",
-        "Ширина площадки м",
-        "Цена из Excel",
-        "Стоимость руб"
+        "Ширина площадки м"
       };
       for (int c = 0; c < headers.Length; c++)
       {
@@ -95,9 +88,9 @@ namespace NcTestRibbon.Rates
 
       object[][] rows =
       {
-        new object[] { "БУОС-4000", "Да", 4000, 1500000, 700, 700, "Да", 0 },
-        new object[] { "БУОС-2500", "Да", 2500, 900000, 550, 550, "Да", 0 },
-        new object[] { "БУОС-резерв", "Нет", 6000, 2000000, 800, 750, "Нет", 85000000 }
+        new object[] { "БУОС-4000", 4000, 1500000, 700, 700 },
+        new object[] { "БУОС-2500", 2500, 900000, 550, 550 },
+        new object[] { "БУОС-резерв", 6000, 2000000, 800, 750 }
       };
       for (int i = 0; i < rows.Length; i++)
       {
@@ -115,7 +108,6 @@ namespace NcTestRibbon.Rates
     {
       Dictionary<string, int> headers = MapHeaders(sheet);
       int nameCol = Require(headers, "имя", "name", "тип", "тип буос");
-      int useCol = Find(headers, "использовать в подборе", "useintopology", "в подборе");
       int combinedCol = Find(headers,
         "производительность жидкость м3/сут",
         "производительность: жидкость",
@@ -130,8 +122,6 @@ namespace NcTestRibbon.Rates
         "пнг");
       int lengthCol = Find(headers, "длина площадки м", "длина площадки", "length", "длина");
       int widthCol = Find(headers, "ширина площадки м", "ширина площадки", "width", "ширина");
-      int excelPriceCol = Find(headers, "цена из excel", "брать стоимость", "useexcelprice");
-      int costCol = Find(headers, "стоимость руб", "стоимость", "costrub");
 
       var list = new List<BuosVariant>();
       var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -156,13 +146,10 @@ namespace NcTestRibbon.Rates
         list.Add(new BuosVariant
         {
           Name = trimmed,
-          UseInTopology = useCol > 0 ? ParseBool(CellText(sheet, r, useCol), true) : true,
           CombinedCapacity = combinedCol > 0 ? ParseDouble(sheet, r, combinedCol, 4000) : 4000,
           GasCapacity = gasCol > 0 ? ParseDouble(sheet, r, gasCol, 1_500_000) : 1_500_000,
           LengthM = lengthCol > 0 ? ParseDouble(sheet, r, lengthCol, 700) : 700,
-          WidthM = widthCol > 0 ? ParseDouble(sheet, r, widthCol, 700) : 700,
-          UseExcelPrice = excelPriceCol > 0 ? ParseBool(CellText(sheet, r, excelPriceCol), true) : true,
-          CostRub = costCol > 0 ? ParseDouble(sheet, r, costCol, 0) : 0
+          WidthM = widthCol > 0 ? ParseDouble(sheet, r, widthCol, 700) : 700
         });
       }
 
@@ -254,7 +241,6 @@ namespace NcTestRibbon.Rates
         }
       }
 
-      // Fuzzy: header contains key fragment.
       foreach (KeyValuePair<string, int> pair in headers)
       {
         foreach (string key in keys)
@@ -299,31 +285,6 @@ namespace NcTestRibbon.Rates
       }
 
       return fallback;
-    }
-
-    private static bool ParseBool(string text, bool defaultValue)
-    {
-      if (string.IsNullOrWhiteSpace(text))
-      {
-        return defaultValue;
-      }
-
-      string t = text.Trim();
-      if (t == "1" || t.Equals("true", StringComparison.OrdinalIgnoreCase)
-        || t.Equals("да", StringComparison.OrdinalIgnoreCase)
-        || t.Equals("yes", StringComparison.OrdinalIgnoreCase))
-      {
-        return true;
-      }
-
-      if (t == "0" || t.Equals("false", StringComparison.OrdinalIgnoreCase)
-        || t.Equals("нет", StringComparison.OrdinalIgnoreCase)
-        || t.Equals("no", StringComparison.OrdinalIgnoreCase))
-      {
-        return false;
-      }
-
-      return defaultValue;
     }
   }
 }

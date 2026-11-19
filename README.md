@@ -4,10 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.32.zip`](nanocad-test-ribbon-v1.2.32.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.32/nanocad-test-ribbon-v1.2.32.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.33.zip`](nanocad-test-ribbon-v1.2.33.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/nanocad-test-ribbon-v1.2.33.zip
 - **Sample inserts:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
 - **Sample BUOS:** [`Topology_Buos.xlsx`](Topology_Buos.xlsx)
+
+## v1.2.33 — BUOS cost from Price.xlsx (TCON-51)
+
+- Dropped UseInTopology / UseExcelPrice / CostRub from BUOS xlsx+UI
+- Cost = Price.xlsx «Элементы топологии» A→B by name; missing → red «введите в Price стоимость»
 
 ## v1.2.32 — Варианты БУОС (catalog)
 

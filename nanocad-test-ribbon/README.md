@@ -3,12 +3,12 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.32**): `nanocad-test-ribbon-v1.2.32.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.32.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.32/nanocad-test-ribbon-v1.2.32.zip  
+Актуальный zip с GitHub (версия **1.2.33**): `nanocad-test-ribbon-v1.2.33.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.33.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/nanocad-test-ribbon-v1.2.33.zip  
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.32/Topology_Inserts.xlsx)  
-Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.32/Topology_Buos.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/Topology_Buos.xlsx)  
 
 
 
@@ -30,7 +30,7 @@ Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanoc
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.32**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.33**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -131,11 +131,12 @@ NcTestBlink
 - `LabelFontHeightM` — подписи КП и врезок
 - `InsertCircleDiameterM` — диаметр круга врезки
 
-### Варианты БУОС (v1.2.32)
+### Варианты БУОС (v1.2.33 / TCON-51)
 
-`NcTestBuos` — каталог типов (End `TopologyBuosType` / BuosCatalogPanel), **без** координат площадок:
+`NcTestBuos` — каталог типов (End `TopologyBuosType` / BuosCatalogPanel), **без** координат и «в подборе»:
 
-- Лист Excel **«БУОС»**: Имя, Использовать в подборе, производительность жидкость/ПНГ, длина/ширина площадки, цена Excel, стоимость руб
+- Лист Excel **«БУОС»**: Имя, производительность жидкость/ПНГ, длина/ширина площадки
+- Стоимость — из `Price.xlsx` лист **«Элементы топологии»** (A=имя, B=цена); нет цены → красный текст «введите в Price стоимость»
 - Display-only; уникальное Имя; path в `paths.json` → `buosWorkbook`
 - Sample: `Topology_Buos.xlsx`
 

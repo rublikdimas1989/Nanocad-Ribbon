@@ -1,6 +1,7 @@
 namespace NcTestRibbon.Shell
 {
   using System;
+  using System.Collections.Generic;
   using System.ComponentModel;
   using System.Drawing;
   using System.Globalization;
@@ -11,6 +12,7 @@ namespace NcTestRibbon.Shell
 
   /// <summary>
   /// End BuosCatalogPanel / TopologyBuosType catalogue — display-only Excel grid (no site X/Y).
+  /// Cost from Price.xlsx sheet «Элементы топологии» by BUOS name.
   /// </summary>
   public sealed class BuosVariantsWindow : Form
   {
@@ -19,11 +21,13 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _log;
     private readonly Label _status;
     private readonly DataGridView _grid;
+    private Dictionary<string, double> _prices = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+    private string _priceFile = string.Empty;
 
     public BuosVariantsWindow()
     {
       Text = "Варианты БУОС";
-      Width = 1100;
+      Width = 1000;
       Height = 520;
       MinimumSize = new Size(720, 360);
       StartPosition = FormStartPosition.CenterParent;
@@ -57,10 +61,10 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Каталог типов БУОС (End TopologyBuosType): производительность и габарит одной установки. "
-          + "Координаты площадок здесь не задаются. Правки — в Excel; имена уникальны.",
+        Text = "Каталог типов БУОС: производительность и габарит. Координаты и «в подборе» здесь не задаются. "
+          + "Стоимость — из Price.xlsx, лист «Элементы топологии» (имя в A, цена в B).",
         AutoSize = true,
-        MaximumSize = new Size(1040, 0),
+        MaximumSize = new Size(960, 0),
         Margin = new Padding(3, 0, 3, 8)
       });
 
@@ -86,6 +90,23 @@ namespace NcTestRibbon.Shell
         }
       };
       fileRow.Controls.Add(browse);
+      var refreshPrices = new Button { Text = "Обновить цены", AutoSize = true, Margin = new Padding(3) };
+      refreshPrices.Click += (_, __) =>
+      {
+        try
+        {
+          ReloadPrices();
+          ApplyPricesToRows();
+          BindGrid();
+          LogPriceStatus();
+        }
+        catch (Exception ex)
+        {
+          MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          Log(ex.Message);
+        }
+      };
+      fileRow.Controls.Add(refreshPrices);
 
       _grid = new DataGridView
       {
@@ -101,13 +122,12 @@ namespace NcTestRibbon.Shell
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
       };
       _grid.Columns.Add(TextCol("Имя типа БУОС", nameof(BuosRow.Name), 140));
-      _grid.Columns.Add(CheckCol("В подборе", nameof(BuosRow.UseInTopology), 70));
       _grid.Columns.Add(TextCol("Жидкость\nм³/сут", nameof(BuosRow.CombinedText), 100));
       _grid.Columns.Add(TextCol("ПНГ\nст. м³/сут", nameof(BuosRow.GasText), 110));
       _grid.Columns.Add(TextCol("Длина\nм", nameof(BuosRow.LengthText), 70));
       _grid.Columns.Add(TextCol("Ширина\nм", nameof(BuosRow.WidthText), 70));
-      _grid.Columns.Add(CheckCol("Цена Excel", nameof(BuosRow.UseExcelPrice), 80));
-      _grid.Columns.Add(TextCol("Стоимость\nруб.", nameof(BuosRow.CostText), 100));
+      _grid.Columns.Add(TextCol("Стоимость\nруб.", nameof(BuosRow.CostText), 160));
+      _grid.CellFormatting += OnCellFormatting;
       root.Controls.Add(_grid, 0, 1);
 
       _log = new TextBox
@@ -128,6 +148,7 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(_status, 0, 3);
 
+      ReloadPrices();
       BindGrid();
       if (!string.IsNullOrWhiteSpace(paths.BuosWorkbook) && File.Exists(paths.BuosWorkbook))
       {
@@ -137,6 +158,7 @@ namespace NcTestRibbon.Shell
       else
       {
         Log("Откройте xlsx с листом «БУОС» / «Варианты БУОС» через «Обзор…».");
+        LogPriceStatus();
       }
     }
 
@@ -163,20 +185,20 @@ namespace NcTestRibbon.Shell
     private void LoadWorkbook(string path, bool remember)
     {
       BuosWorkbookLoader.WorkbookData book = BuosWorkbookLoader.LoadWorkbook(path);
+      ReloadPrices();
       _rows.Clear();
       foreach (BuosWorkbookLoader.BuosVariant v in book.Variants)
       {
-        _rows.Add(new BuosRow
+        var row = new BuosRow
         {
           Name = v.Name,
-          UseInTopology = v.UseInTopology,
           CombinedText = v.CombinedCapacity.ToString("0.###", CultureInfo.CurrentCulture),
           GasText = v.GasCapacity.ToString("0.###", CultureInfo.CurrentCulture),
           LengthText = v.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
-          WidthText = v.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
-          UseExcelPrice = v.UseExcelPrice,
-          CostText = v.CostRub.ToString("0.###", CultureInfo.CurrentCulture)
-        });
+          WidthText = v.WidthM.ToString("0.###", CultureInfo.CurrentCulture)
+        };
+        ApplyPrice(row);
+        _rows.Add(row);
       }
 
       _file.Text = path;
@@ -186,7 +208,83 @@ namespace NcTestRibbon.Shell
       }
 
       Log("Загружено типов БУОС: " + book.Variants.Count + " (" + Path.GetFileName(path) + ")");
+      LogPriceStatus();
       BindGrid();
+    }
+
+    private void ReloadPrices()
+    {
+      _priceFile = TracingCache.ResolveRatesFilePath();
+      _prices = TopologyElementPrices.Load(_priceFile);
+    }
+
+    private void ApplyPricesToRows()
+    {
+      foreach (BuosRow row in _rows)
+      {
+        ApplyPrice(row);
+      }
+    }
+
+    private void ApplyPrice(BuosRow row)
+    {
+      if (TopologyElementPrices.TryGet(_prices, row.Name, out double price))
+      {
+        row.CostMissing = false;
+        row.CostText = price.ToString("0.###", CultureInfo.CurrentCulture);
+      }
+      else
+      {
+        row.CostMissing = true;
+        row.CostText = TopologyElementPrices.MissingHint;
+      }
+    }
+
+    private void LogPriceStatus()
+    {
+      string fileLabel = string.IsNullOrWhiteSpace(_priceFile) ? "(нет)" : _priceFile;
+      if (!File.Exists(_priceFile))
+      {
+        Log("Price не найден: " + fileLabel + ". Положите Price.xlsx в Tracing_cache\\Settings\\.");
+        return;
+      }
+
+      int missing = 0;
+      foreach (BuosRow row in _rows)
+      {
+        if (row.CostMissing)
+        {
+          missing++;
+        }
+      }
+
+      Log("Цены: " + Path.GetFileName(_priceFile) + ", лист «" + TopologyElementPrices.SheetName
+        + "», записей: " + _prices.Count
+        + (missing > 0 ? "; без цены: " + missing + " (красные)" : "; все цены найдены") + ".");
+    }
+
+    private void OnCellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+    {
+      if (e.RowIndex < 0 || e.RowIndex >= _rows.Count)
+      {
+        return;
+      }
+
+      BuosRow row = _rows[e.RowIndex];
+      if (!row.CostMissing)
+      {
+        return;
+      }
+
+      DataGridViewRow dgRow = _grid.Rows[e.RowIndex];
+      dgRow.DefaultCellStyle.ForeColor = Color.Firebrick;
+      if (_grid.Columns[e.ColumnIndex].DataPropertyName == nameof(BuosRow.CostText))
+      {
+        e.CellStyle.ForeColor = Color.Firebrick;
+        e.CellStyle.BackColor = Color.FromArgb(255, 230, 230);
+        e.CellStyle.SelectionForeColor = Color.Firebrick;
+        e.CellStyle.SelectionBackColor = Color.FromArgb(255, 210, 210);
+      }
     }
 
     private void BindGrid()
@@ -194,6 +292,7 @@ namespace NcTestRibbon.Shell
       _grid.DataSource = null;
       _grid.DataSource = _rows;
       _status.Text = "Сетка БУОС: rows=" + _rows.Count;
+      _grid.Refresh();
     }
 
     private void Log(string text)
@@ -216,28 +315,15 @@ namespace NcTestRibbon.Shell
       };
     }
 
-    private static DataGridViewCheckBoxColumn CheckCol(string header, string prop, int fill)
-    {
-      return new DataGridViewCheckBoxColumn
-      {
-        HeaderText = header,
-        DataPropertyName = prop,
-        Name = prop,
-        ReadOnly = true,
-        FillWeight = fill
-      };
-    }
-
     public sealed class BuosRow
     {
       public string Name { get; set; } = string.Empty;
-      public bool UseInTopology { get; set; }
       public string CombinedText { get; set; } = string.Empty;
       public string GasText { get; set; } = string.Empty;
       public string LengthText { get; set; } = string.Empty;
       public string WidthText { get; set; } = string.Empty;
-      public bool UseExcelPrice { get; set; }
-      public string CostText { get; set; } = string.Empty;
+      public string CostText { get; set; } = TopologyElementPrices.MissingHint;
+      public bool CostMissing { get; set; } = true;
     }
   }
 }
