@@ -122,7 +122,7 @@ namespace NcTestRibbon.Cad
         image.ShowImage = true;
         image.Orientation = new CoordinateSystem3d(origin, uAxis, vAxis);
         image.Layer = layer;
-        try { image.Fade = fade; }
+        try { image.Fade = (byte)fade; }
         catch { /* older host without Fade */ }
 
         BlockTableRecord model = (BlockTableRecord)tr.GetObject(

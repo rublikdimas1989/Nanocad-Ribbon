@@ -4,11 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.53.zip`](nanocad-test-ribbon-v1.2.53.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.53/nanocad-test-ribbon-v1.2.53.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.54.zip`](nanocad-test-ribbon-v1.2.54.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.54/nanocad-test-ribbon-v1.2.54.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.54 — Fade byte cast (CS0266)
+
+- `RasterImage.Fade` is `byte` — explicit cast in `CadMapRaster` / `CadRasterAttach`
 
 ## v1.2.53 — Cartography panel (End-style)
 

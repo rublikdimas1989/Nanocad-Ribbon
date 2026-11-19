@@ -147,7 +147,7 @@ namespace NcTestRibbon.Cad
             continue;
           }
 
-          try { image.Fade = fade; }
+          try { image.Fade = (byte)fade; }
           catch { /* older host */ }
           image.ShowImage = true;
         }
