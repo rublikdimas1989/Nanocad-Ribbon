@@ -180,21 +180,23 @@ namespace NcTestRibbon.Shell
         Anchor = AnchorStyles.Left,
         TextAlign = HorizontalAlignment.Center
       };
-      opacity.LostFocus += (_, __) =>
+      // CS1628: cannot capture out-parameter in lambda — use local copy.
+      TextBox opacityBox = opacity;
+      opacityBox.LostFocus += (_, __) =>
       {
         if (_suppress) return;
         onOpacity();
       };
-      opacity.TextChanged += (_, __) =>
+      opacityBox.TextChanged += (_, __) =>
       {
         if (_suppress) return;
         // Apply as soon as a valid 0–100 value is typed (Properties Transparency must update).
-        if (int.TryParse(opacity.Text.Trim(), out int v) && v >= 0 && v <= 100)
+        if (int.TryParse(opacityBox.Text.Trim(), out int v) && v >= 0 && v <= 100)
         {
           onOpacity();
         }
       };
-      opacity.KeyDown += (s, e) =>
+      opacityBox.KeyDown += (s, e) =>
       {
         if (e.KeyCode == Keys.Enter)
         {
@@ -202,7 +204,7 @@ namespace NcTestRibbon.Shell
           onOpacity();
         }
       };
-      grid.Controls.Add(opacity, 2, 0);
+      grid.Controls.Add(opacityBox, 2, 0);
 
       var pct = new Label
       {
