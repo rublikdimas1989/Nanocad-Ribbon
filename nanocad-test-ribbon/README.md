@@ -3,17 +3,19 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.13**): `nanocad-test-ribbon-v1.2.13.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.13.zip  
+Актуальный zip с GitHub (версия **1.2.14**): `nanocad-test-ribbon-v1.2.14.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.14.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.14/nanocad-test-ribbon-v1.2.14.zip  
+
 
 **`NcSdkDir` уже зашит** в `Directory.Build.props` и `.csproj` (UTF-8 BOM), тот же путь, что в RibbonExecDoc.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.13**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.14**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
-4. nanoCAD: `NcTestBlink` / `NcTestSettings` / `NcTestPadOpt` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
+4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
 
 | Команда | Что делает |
 |---------|------------|
@@ -22,7 +24,7 @@ https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-te
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
 | `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
-| `NcTestPadOpt` | **WPF code shell** «Оптимизация кустовых площадок» |
+| `NcTestPadOpt` | **Только просмотр** КП из Excel (`paths.json`); правки — в книге |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
 | `NcTestBlinkOff` | принудительно выключить мигание |
 | `NcTestDemo` | маленький WinForms smoke |
@@ -81,7 +83,15 @@ NcTestPadOpt
 NcTestBlink
 ```
 
-### Мигание сегмента (v1.2.13)
+### Кустовые площадки (v1.2.14, display-only)
+
+`NcTestPadOpt` / лента **Кустовые площадки**:
+
+- Excel свойств — только **Обзор…** (сразу сохраняет путь и «загружает»)
+- Таблицы КП — только **Обзор…** (сразу читает лист «КП» в сетку)
+- Убраны: единицы профилей, месяцы, БУОС, подложка, JSON/параметры, нижний ряд кнопок
+
+### Мигание сегмента (v1.2.13+)
 
 Как в End (`MainWindow.ManualProgress` / fragment blink, таймер 200 мс), но в чертеже nanoCAD:
 

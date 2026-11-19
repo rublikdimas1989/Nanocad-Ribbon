@@ -32,7 +32,7 @@
     {
       "intername": "NcTestPadOpt",
       "displayName": "Кустовые площадки",
-      "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
+      "tooltip": "Кустовые площадки: просмотр КП из Excel (xlsx). Правки — в книге; пути в paths.json.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },

@@ -99,8 +99,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Opens pad-optimization shell (TopologyInputsWindow / TopologyPadWindow UI).
-    /// Code-built WPF — no XAML pack URI.
+    /// Display-only KP table from Excel (paths.json). Edit in workbook.
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
