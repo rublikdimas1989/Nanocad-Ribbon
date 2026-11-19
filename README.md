@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.37.zip`](nanocad-test-ribbon-v1.2.37.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/nanocad-test-ribbon-v1.2.37.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.38.zip`](nanocad-test-ribbon-v1.2.38.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.38/nanocad-test-ribbon-v1.2.38.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.38 — portable paths.json
+
+- Store paths as relative under Tracing_cache or `%LOCALAPPDATA%\…` (no username); expand on load; migrate absolute LocalAppData on save/load
 
 ## v1.2.37 — close prompt for yellow coords
 
