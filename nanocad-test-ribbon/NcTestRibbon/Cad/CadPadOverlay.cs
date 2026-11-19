@@ -170,6 +170,8 @@ namespace NcTestRibbon.Cad
       {
       }
 
+      ZoomToPad(ed, doc, ids);
+
       ed.WriteMessage(
         "\nПоворот КП «" + padName + "»: база = центр прямоугольника ("
         + center.X.ToString("0.###") + "; " + center.Y.ToString("0.###") + ").");
@@ -410,6 +412,138 @@ namespace NcTestRibbon.Cad
         Point2d p0 = pl.GetPoint2dAt(0);
         Point2d p2 = pl.GetPoint2dAt(2);
         center = new Point3d((p0.X + p2.X) / 2.0, (p0.Y + p2.Y) / 2.0, 0);
+        return true;
+      }
+
+      return false;
+    }
+
+    /// <summary>
+    /// Fit the current view around the KP entities (rectangle + label) with margin.
+    /// </summary>
+    private static void ZoomToPad(Editor ed, Document doc, ObjectId[] ids)
+    {
+      if (ed == null || doc == null || ids == null || ids.Length == 0)
+      {
+        return;
+      }
+
+      try
+      {
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+        bool any = false;
+
+        using (doc.LockDocument())
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          foreach (ObjectId id in ids)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+            if (ent == null)
+            {
+              continue;
+            }
+
+            if (TryExpandExtents(ent, ref minX, ref minY, ref maxX, ref maxY))
+            {
+              any = true;
+            }
+          }
+
+          tr.Commit();
+        }
+
+        if (!any || !double.IsFinite(minX) || !double.IsFinite(maxX))
+        {
+          return;
+        }
+
+        double width = Math.Max(maxX - minX, 1.0);
+        double height = Math.Max(maxY - minY, 1.0);
+        // ~35% margin so the pad is not edge-clipped while rotating.
+        width *= 1.7;
+        height *= 1.7;
+        double cx = (minX + maxX) / 2.0;
+        double cy = (minY + maxY) / 2.0;
+
+        using (ViewTableRecord view = ed.GetCurrentView())
+        {
+          double aspect = view.Width / Math.Max(view.Height, 1e-9);
+          if (width / height > aspect)
+          {
+            height = width / aspect;
+          }
+          else
+          {
+            width = height * aspect;
+          }
+
+          view.CenterPoint = new Point2d(cx, cy);
+          view.Width = width;
+          view.Height = height;
+          ed.SetCurrentView(view);
+        }
+
+        TryUpdateScreen(doc);
+      }
+      catch
+      {
+        // Zoom is best-effort — rotate must still work.
+      }
+    }
+
+    private static bool TryExpandExtents(
+      Entity ent,
+      ref double minX,
+      ref double minY,
+      ref double maxX,
+      ref double maxY)
+    {
+      try
+      {
+        Extents3d ext = ent.GeometricExtents;
+        minX = Math.Min(minX, ext.MinPoint.X);
+        minY = Math.Min(minY, ext.MinPoint.Y);
+        maxX = Math.Max(maxX, ext.MaxPoint.X);
+        maxY = Math.Max(maxY, ext.MaxPoint.Y);
+        return true;
+      }
+      catch
+      {
+      }
+
+      if (ent is DbPolyline pl)
+      {
+        bool any = false;
+        for (int i = 0; i < pl.NumberOfVertices; i++)
+        {
+          Point2d p = pl.GetPoint2dAt(i);
+          minX = Math.Min(minX, p.X);
+          minY = Math.Min(minY, p.Y);
+          maxX = Math.Max(maxX, p.X);
+          maxY = Math.Max(maxY, p.Y);
+          any = true;
+        }
+
+        return any;
+      }
+
+      if (ent is DBText text)
+      {
+        Point3d p = text.Position;
+        double h = Math.Max(text.Height, 1.0);
+        minX = Math.Min(minX, p.X - h);
+        minY = Math.Min(minY, p.Y - h);
+        maxX = Math.Max(maxX, p.X + h);
+        maxY = Math.Max(maxY, p.Y + h);
         return true;
       }
 
