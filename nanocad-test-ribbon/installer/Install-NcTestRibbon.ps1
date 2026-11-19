@@ -249,6 +249,86 @@ function Resolve-TestRibbonFiles {
     return $null
 }
 
+function Get-RibbonDependencyDlls {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath
+    )
+
+    $skip = @{
+        'NC_TestRibbon.dll' = $true
+        'hostmgd.dll'       = $true
+        'hostdbmgd.dll'     = $true
+        'NcBootstrap.dll'   = $true
+    }
+
+    $byName = @{}
+
+    $depsDir = Join-Path $src 'deps'
+    if (Test-Path $depsDir) {
+        Get-ChildItem -Path $depsDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $ribbonDir = Split-Path -Parent $RibbonDllPath
+    if (Test-Path $ribbonDir) {
+        Get-ChildItem -Path $ribbonDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $payloadDeps = Join-Path $src 'payload'
+    if (Test-Path $payloadDeps) {
+        Get-ChildItem -Path $payloadDeps -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object {
+                if (-not $byName.ContainsKey($_.Name)) {
+                    $byName[$_.Name] = $_.FullName
+                }
+            }
+    }
+
+    return @(
+        $byName.GetEnumerator() |
+            Sort-Object Name |
+            ForEach-Object {
+                [PSCustomObject]@{ Name = $_.Key; Path = $_.Value }
+            }
+    )
+}
+
+function Copy-RibbonDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath,
+        [Parameter(Mandatory = $true)][string]$DestFolder
+    )
+
+    $deps = @(Get-RibbonDependencyDlls -RibbonDllPath $RibbonDllPath)
+    if ($deps.Count -eq 0) {
+        Write-Host 'WARNING: no plugin dependency DLLs found (installer\deps or build output).' -ForegroundColor Yellow
+        Write-Host 'EPPlus.dll must sit next to NC_TestRibbon.dll for Price.xlsx rates.'
+        return
+    }
+
+    $copied = 0
+    foreach ($dep in $deps) {
+        $destPath = Join-Path $DestFolder $dep.Name
+        if (Test-Path $destPath) {
+            Remove-Item $destPath -Force
+        }
+        Copy-Item $dep.Path $destPath -Force
+        $copied++
+    }
+
+    Write-Host ("Copied {0} dependency DLL(s) to: {1}" -f $copied, $DestFolder)
+    $epplus = Join-Path $DestFolder 'EPPlus.dll'
+    if (Test-Path $epplus) {
+        Write-DllInfo -Label 'Installed EPPlus' -Path $epplus
+    }
+    else {
+        Write-Host 'WARNING: EPPlus.dll was not installed. Rates tab will fail to load.' -ForegroundColor Yellow
+    }
+}
+
 $requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
@@ -375,6 +455,9 @@ Copy-Item $ribbon.Json $ribbonJsonDest -Force
 Assert-DllHasCommands -DllPath $ribbonDllDest -Commands $requiredCommands
 Write-Host "Copied NC_TestRibbon to: $syncFolder"
 Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
+
+# EPPlus + transitive NuGet deps must sit next to the plugin in LoadFile.
+Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
 
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {
