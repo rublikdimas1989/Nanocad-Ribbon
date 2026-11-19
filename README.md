@@ -4,9 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.47.zip`](nanocad-test-ribbon-v1.2.47.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.47/nanocad-test-ribbon-v1.2.47.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.48.zip`](nanocad-test-ribbon-v1.2.48.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.48/nanocad-test-ribbon-v1.2.48.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.48 — out-of-process NcGdalGeo (TCON-62)
+
+- Fix `DllNotFoundException` / `0x8007007F` on `gdal_wrap` (SWIG vs process `gdal.dll` mismatch inside nanoCAD)
+- Matched NuGet set **GDAL / GDAL.Native / GDAL.Plugins 3.12.1** (same wrap+gdal+ECW versions, End-style)
+- Bundled `installer/tools/NcGdalGeo` (net48 x64) → INSTALL to LoadFile `tools\NcGdalGeo`; Resolve prefers it before in-process OSGeo
 
 ## v1.2.47 — GDAL preload + version stamp (TCON-62)
 

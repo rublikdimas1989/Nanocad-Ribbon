@@ -61,7 +61,15 @@ namespace NcTestRibbon.Cad
         return fromWorld;
       }
 
-      // End path: OSGeo.GDAL Open + GetGeoTransform (embedded ECW GT via ECW plugin).
+      // Prefer out-of-process helper: nanoCAD often already loaded a foreign gdal.dll
+      // → in-process gdal_wrap 0x8007007F (PROC_NOT_FOUND / SWIG mismatch).
+      if (TryReadNcGdalGeo(rasterPath, out RasterGeoTransform fromTool, out string toolNote))
+      {
+        note = toolNote;
+        return fromTool;
+      }
+
+      // End-style in-process OSGeo.GDAL (may fail inside nanoCAD with mismatched gdal.dll).
       if (TryReadManagedGdal(rasterPath, out RasterGeoTransform fromManaged, out string managedNote))
       {
         note = managedNote;
@@ -77,17 +85,22 @@ namespace NcTestRibbon.Cad
       string loadFileHint = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ASDC", "LoadFile", "NANOCAD", "gdal", "x64", "gdal_wrap.dll");
+      string toolHint = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "ASDC", "LoadFile", "NANOCAD", "tools", "NcGdalGeo", "NcGdalGeo.exe");
       throw new InvalidOperationException(
         PackageStamp() + "\n"
         + "Нет геопривязки для «" + Path.GetFileName(rasterPath) + "».\n"
         + "Ожидается embedded GDAL GeoTransform (как End) или world/TAF рядом с файлом.\n\n"
-        + "GDAL status:\n" + (string.IsNullOrWhiteSpace(managedNote) ? "(нет)" : managedNote) + "\n\n"
+        + "NcGdalGeo (out-of-process):\n" + (string.IsNullOrWhiteSpace(toolNote) ? "(нет)" : toolNote) + "\n\n"
+        + "In-process GDAL status:\n" + (string.IsNullOrWhiteSpace(managedNote) ? "(нет)" : managedNote) + "\n\n"
         + "Bootstrap diagnostics:\n" + Truncate(GdalRuntimeBootstrap.Diagnostics, 2500) + "\n\n"
-        + "Проверьте INSTALL → %LOCALAPPDATA%\\ASDC\\LoadFile\\NANOCAD\\gdal\\x64\\…\n"
+        + "Проверьте INSTALL → %LOCALAPPDATA%\\ASDC\\LoadFile\\NANOCAD\\…\n"
+        + "  tool: " + toolHint + " exists=" + File.Exists(toolHint) + "\n"
         + "  wrap: " + loadFileHint + " exists=" + File.Exists(loadFileHint) + "\n"
         + "  ECW:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "gdal_ECW_JP2ECW.dll")) + "\n"
         + "  NCS:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "NCSEcw.dll")) + "\n"
-        + "Если stamp ≠ v1.2.47 — старый DLL: NEW folder + INSTALL + NETLOAD.");
+        + "Если stamp ≠ v1.2.48 — старый DLL: NEW folder + INSTALL + NETLOAD.");
     }
 
     public static string PackageStamp()
@@ -455,6 +468,171 @@ namespace NcTestRibbon.Cad
       return list;
     }
 
+    /// <summary>
+    /// Out-of-process GeoTransform via bundled NcGdalGeo.exe (matched GDAL 3.12.1 wrap+gdal+ECW).
+    /// Avoids nanoCAD process DllNotFoundException 0x8007007F on gdal_wrap.
+    /// </summary>
+    private static bool TryReadNcGdalGeo(string rasterPath, out RasterGeoTransform geo, out string note)
+    {
+      geo = null;
+      note = string.Empty;
+      string exe = FindNcGdalGeo();
+      if (exe == null)
+      {
+        note = "NcGdalGeo.exe not found (expected tools\\NcGdalGeo next to plugin / LoadFile).";
+        return false;
+      }
+
+      try
+      {
+        var psi = new ProcessStartInfo
+        {
+          FileName = exe,
+          Arguments = "\"" + rasterPath + "\"",
+          UseShellExecute = false,
+          RedirectStandardOutput = true,
+          RedirectStandardError = true,
+          CreateNoWindow = true,
+          StandardOutputEncoding = Encoding.UTF8,
+          WorkingDirectory = Path.GetDirectoryName(exe) ?? string.Empty
+        };
+        using Process proc = Process.Start(psi);
+        if (proc == null)
+        {
+          note = "NcGdalGeo: Process.Start returned null (" + exe + ")";
+          return false;
+        }
+
+        string stdout = proc.StandardOutput.ReadToEnd();
+        string stderr = proc.StandardError.ReadToEnd();
+        if (!proc.WaitForExit(120000))
+        {
+          try { proc.Kill(); } catch { /* ignore */ }
+          note = "NcGdalGeo timed out: " + exe;
+          return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(stdout))
+        {
+          note = "NcGdalGeo empty stdout exit=" + proc.ExitCode + " stderr=" + Truncate(stderr, 400);
+          return false;
+        }
+
+        using JsonDocument doc = JsonDocument.Parse(stdout.Trim());
+        JsonElement root = doc.RootElement;
+        if (root.TryGetProperty("ok", out JsonElement okEl) && okEl.ValueKind == JsonValueKind.False)
+        {
+          string err = root.TryGetProperty("error", out JsonElement e) ? e.GetString() : stdout;
+          note = "NcGdalGeo failed: " + Truncate(err ?? stdout, 800);
+          return false;
+        }
+
+        if (!root.TryGetProperty("geoTransform", out JsonElement gt) || gt.GetArrayLength() < 6)
+        {
+          note = "NcGdalGeo: no geoTransform in " + Truncate(stdout, 400);
+          return false;
+        }
+
+        double[] t = new double[6];
+        for (int i = 0; i < 6; i++)
+        {
+          t[i] = gt[i].GetDouble();
+        }
+
+        bool identity = t[0] == 0 && t[1] == 1 && t[2] == 0 && t[3] == 0 && t[4] == 0 && t[5] == 1;
+        double det = t[1] * t[5] - t[2] * t[4];
+        if (identity || !double.IsFinite(det) || Math.Abs(det) < 1e-30)
+        {
+          note = "NcGdalGeo: identity/degenerate GeoTransform";
+          return false;
+        }
+
+        int w = 0, h = 0;
+        if (root.TryGetProperty("width", out JsonElement wEl))
+        {
+          w = wEl.GetInt32();
+        }
+
+        if (root.TryGetProperty("height", out JsonElement hEl))
+        {
+          h = hEl.GetInt32();
+        }
+
+        string driver = root.TryGetProperty("driver", out JsonElement dEl) ? (dEl.GetString() ?? "") : "";
+        geo = new RasterGeoTransform
+        {
+          OriginX = t[0],
+          PixelSizeX = t[1],
+          RotateX = t[2],
+          OriginY = t[3],
+          RotateY = t[4],
+          PixelSizeY = t[5],
+          WidthPx = w,
+          HeightPx = h,
+          Source = "NcGdalGeo/" + driver
+        };
+        note = PackageStamp() + " NcGdalGeo GetGeoTransform driver=" + driver + " @ " + exe;
+        return true;
+      }
+      catch (Exception ex)
+      {
+        note = "NcGdalGeo: " + ex.GetType().Name + ": " + ex.Message;
+        return false;
+      }
+    }
+
+    private static string FindNcGdalGeo()
+    {
+      var candidates = new List<string>();
+      void Add(string path)
+      {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+          return;
+        }
+
+        try
+        {
+          string full = Path.GetFullPath(path);
+          if (File.Exists(full) && !candidates.Exists(x => string.Equals(x, full, StringComparison.OrdinalIgnoreCase)))
+          {
+            candidates.Add(full);
+          }
+        }
+        catch
+        {
+        }
+      }
+
+      foreach (string baseDir in EnumerateGdalBaseCandidates())
+      {
+        Add(Path.Combine(baseDir, "tools", "NcGdalGeo", "NcGdalGeo.exe"));
+        Add(Path.Combine(baseDir, "NcGdalGeo.exe"));
+      }
+
+      try
+      {
+        string asm = typeof(RasterGeoTransform).Assembly.Location;
+        if (!string.IsNullOrEmpty(asm))
+        {
+          string dir = Path.GetDirectoryName(asm);
+          Add(Path.Combine(dir, "tools", "NcGdalGeo", "NcGdalGeo.exe"));
+          // Dev layout: …\NcTestRibbon\bin\… → …\installer\tools\NcGdalGeo
+          string walk = dir;
+          for (int i = 0; i < 6 && !string.IsNullOrEmpty(walk); i++)
+          {
+            Add(Path.Combine(walk, "installer", "tools", "NcGdalGeo", "NcGdalGeo.exe"));
+            walk = Directory.GetParent(walk)?.FullName;
+          }
+        }
+      }
+      catch
+      {
+      }
+
+      return candidates.Count > 0 ? candidates[0] : null;
+    }
+
     private static bool TryReadGdalInfo(string rasterPath, out RasterGeoTransform geo, out string note)
     {
       geo = null;
@@ -561,6 +739,13 @@ namespace NcTestRibbon.Cad
     {
       if (geo.WidthPx > 0 && geo.HeightPx > 0)
       {
+        return;
+      }
+
+      if (TryReadNcGdalGeo(rasterPath, out RasterGeoTransform tool, out _) && tool.WidthPx > 0)
+      {
+        geo.WidthPx = tool.WidthPx;
+        geo.HeightPx = tool.HeightPx;
         return;
       }
 

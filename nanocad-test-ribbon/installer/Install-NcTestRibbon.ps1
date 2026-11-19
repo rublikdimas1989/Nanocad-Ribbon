@@ -487,12 +487,35 @@ if (Test-Path $gdalSrc) {
     }
     else {
         Write-Host 'ERROR: GDAL install incomplete (need wrap + ECW plugins + gdal_csharp.dll).' -ForegroundColor Yellow
-        throw 'Bundled GDAL ECW files missing after INSTALL copy. Re-unpack v1.2.46+ zip (includes installer\gdal).'
+        throw 'Bundled GDAL ECW files missing after INSTALL copy. Re-unpack v1.2.48+ zip (includes installer\gdal).'
     }
 }
 else {
     Write-Host 'ERROR: installer\gdal missing — NcTestEcw embedded georef needs GDAL ECW.' -ForegroundColor Yellow
     throw 'installer\gdal not found. Unpack the full versioned zip (not a partial source tree).'
+}
+
+# Out-of-process NcGdalGeo (matched GDAL 3.12.1) — avoids in-process gdal_wrap 0x8007007F.
+$toolSrc = Join-Path $src 'tools\NcGdalGeo'
+if (-not (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe'))) {
+    $toolSrc = Join-Path $pkgRoot 'installer\tools\NcGdalGeo'
+}
+$toolDest = Join-Path $syncFolder 'tools\NcGdalGeo'
+if (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe')) {
+    if (Test-Path $toolDest) {
+        Remove-Item $toolDest -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $toolDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $toolSrc '*') -Destination $toolDest -Recurse -Force
+    $toolExe = Join-Path $toolDest 'NcGdalGeo.exe'
+    Write-Host ("NcGdalGeo: {0} exists={1}" -f $toolExe, (Test-Path $toolExe))
+    if (-not (Test-Path $toolExe)) {
+        throw 'NcGdalGeo.exe missing after INSTALL copy.'
+    }
+}
+else {
+    Write-Host 'ERROR: installer\tools\NcGdalGeo missing — required for ECW GeoTransform out-of-process.' -ForegroundColor Yellow
+    throw 'installer\tools\NcGdalGeo not found. Unpack the full v1.2.48+ zip.'
 }
 
 $profiles = @(Get-NanoCadProfiles)

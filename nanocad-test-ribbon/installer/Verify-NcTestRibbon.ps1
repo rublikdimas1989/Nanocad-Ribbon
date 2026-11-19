@@ -124,7 +124,8 @@ $gdalWrap = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\gdal_wra
 $gdalEcw = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\gdal_ECW_JP2ECW.dll'
 $gdalNcs = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal\x64\plugins\NCSEcw.dll'
 $gdalCsharp = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\gdal_csharp.dll'
-foreach ($p in @($gdalWrap, $gdalEcw, $gdalNcs, $gdalCsharp)) {
+$ncGdalGeo = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\tools\NcGdalGeo\NcGdalGeo.exe'
+foreach ($p in @($gdalWrap, $gdalEcw, $gdalNcs, $gdalCsharp, $ncGdalGeo)) {
     if (Test-Path $p) {
         Write-Host ("  OK  {0}" -f $p)
     }
