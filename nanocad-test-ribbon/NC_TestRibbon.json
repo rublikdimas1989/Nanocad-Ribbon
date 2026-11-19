@@ -25,14 +25,42 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx, conf).",
+      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx|xlsm, conf).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
     {
       "intername": "NcTestPadOpt",
       "displayName": "Кустовые площадки",
-      "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
+      "tooltip": "Кустовые площадки: просмотр КП из Excel (xlsx). Правки — в книге; пути в paths.json.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestInserts",
+      "displayName": "Точки врезки",
+      "tooltip": "Точки врезки / сброса (End Topology): Excel лист «Врезки», положение на чертеже.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestBuos",
+      "displayName": "Варианты БУОС",
+      "tooltip": "Каталог типов БУОС (производительность, габарит). Без координат площадок.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestInterface",
+      "displayName": "Оформление",
+      "tooltip": "Размер шрифта подписей и диаметр круга врезки → Tracing_cache\\Settings\\interface.conf",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestBlink",
+      "displayName": "Мигание",
+      "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     }
@@ -61,6 +89,26 @@
     {
       "text": "Кустовые площадки",
       "command": "NcTestPadOpt",
+      "style": "large"
+    },
+    {
+      "text": "Точки врезки",
+      "command": "NcTestInserts",
+      "style": "large"
+    },
+    {
+      "text": "Варианты БУОС",
+      "command": "NcTestBuos",
+      "style": "large"
+    },
+    {
+      "text": "Оформление",
+      "command": "NcTestInterface",
+      "style": "large"
+    },
+    {
+      "text": "Мигание",
+      "command": "NcTestBlink",
       "style": "large"
     }
   ]
