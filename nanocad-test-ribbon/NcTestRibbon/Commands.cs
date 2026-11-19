@@ -100,12 +100,63 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Display-only KP table from Excel (paths.json). Edit in workbook.
+    /// Display-only KP table from Excel (paths.json). WinForms DataGridView (v1.2.27+).
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
     {
-      OpenWpfWindow(ed: null, "NcTestPadOpt", () => new PadOptimizationWindow());
+      OpenPadOptForm();
+    }
+
+    /// <summary>
+    /// Modal WinForms pad window — DataGridView shows rows reliably (WPF DataGrid stayed empty).
+    /// </summary>
+    private void OpenPadOptForm()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestPadOpt";
+      try
+      {
+        EnsureVisualStyles(ed);
+        // Detail profiles dialog is still WPF.
+        EnsureWpfApplication(ed);
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        ed?.WriteMessage("\n" + label + ": opening WinForms pad grid (ShowDialog)."
+          + " HWND=" + hwnd.ToInt64());
+
+        using (PadOptimizationWindow form = new PadOptimizationWindow())
+        {
+          DialogResult result;
+          if (hwnd != IntPtr.Zero)
+          {
+            result = form.ShowDialog(new WindowWrapper(hwnd));
+          }
+          else
+          {
+            result = form.ShowDialog();
+          }
+
+          ed?.WriteMessage("\n" + label + ": closed, DialogResult=" + result);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     /// <summary>

@@ -3,93 +3,113 @@ namespace NcTestRibbon.Shell
   using System;
   using System.Collections.Generic;
   using System.ComponentModel;
+  using System.Drawing;
   using System.Globalization;
   using System.IO;
   using System.Linq;
-  using System.Windows;
-  using System.Windows.Controls;
-  using System.Windows.Data;
-  using System.Windows.Input;
-  using System.Windows.Media;
-  using System.Windows.Threading;
-  using Microsoft.Win32;
+  using System.Windows.Forms;
+  using System.Windows.Interop;
   using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
+  using WpfApp = System.Windows.Application;
+  using WpfShutdownMode = System.Windows.ShutdownMode;
 
   /// <summary>
-  /// KP table from Excel: profiles, CAD overlay (locked layer), place/rotate, save X/Y.
+  /// KP table from Excel (WinForms DataGridView): profiles, CAD overlay, place/rotate, save X/Y.
+  /// Replaces WPF DataGrid which stayed empty (headers only) after load while _pads had rows.
   /// </summary>
-  public sealed class PadOptimizationWindow : Window
+  public sealed class PadOptimizationWindow : Form
   {
-    private readonly System.Collections.ObjectModel.ObservableCollection<PadRow> _pads
-      = new System.Collections.ObjectModel.ObservableCollection<PadRow>();
+    private readonly BindingList<PadRow> _pads = new BindingList<PadRow>();
     private readonly TextBox _fluidFile;
     private readonly TextBox _tablesFile;
     private readonly TextBox _log;
-    private readonly TextBlock _status;
-    private readonly DataGrid _grid;
+    private readonly Label _status;
+    private readonly DataGridView _grid;
     private readonly CheckBox _showOnDrawing;
     private readonly Button _placeButton;
     private readonly Button _rotateButton;
     private readonly Button _saveButton;
     private PadWorkbookLoader.WorkbookData _book;
+    private bool _suppressShowToggle;
 
     public PadOptimizationWindow()
     {
-      Title = "Кустовые площадки";
+      Text = "Кустовые площадки";
       Width = 1140;
       Height = 700;
-      MinWidth = 720;
-      MinHeight = 480;
-      WindowStartupLocation = WindowStartupLocation.CenterOwner;
-      // Closing the window must NOT erase KP entities — they stay on the drawing.
-      HookDispatcherExceptions();
+      MinimumSize = new Size(720, 480);
+      StartPosition = FormStartPosition.CenterParent;
+      FormBorderStyle = FormBorderStyle.Sizable;
+      ShowInTaskbar = true;
+      // Closing must NOT erase KP entities — they stay on the drawing.
 
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
 
-      var root = new DockPanel { Margin = new Thickness(8) };
-      Content = root;
-
-      var top = new StackPanel();
-      DockPanel.SetDock(top, Dock.Top);
-      root.Children.Add(top);
-
-      WrapPanel Row()
+      var root = new TableLayoutPanel
       {
-        var row = new WrapPanel { Margin = new Thickness(0, 3, 0, 3) };
-        top.Children.Add(row);
+        Dock = DockStyle.Fill,
+        ColumnCount = 1,
+        RowCount = 4,
+        Padding = new Padding(8)
+      };
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+      root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+      root.RowStyles.Add(new RowStyle(SizeType.Absolute, 100f));
+      root.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
+      Controls.Add(root);
+
+      var top = new FlowLayoutPanel
+      {
+        Dock = DockStyle.Fill,
+        AutoSize = true,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
+        Padding = new Padding(0, 0, 0, 4)
+      };
+      root.Controls.Add(top, 0, 0);
+
+      FlowLayoutPanel Row()
+      {
+        var row = new FlowLayoutPanel
+        {
+          AutoSize = true,
+          WrapContents = true,
+          Margin = new Padding(0, 2, 0, 2)
+        };
+        top.Controls.Add(row);
         return row;
       }
 
-      TextBox Field(Panel parent, string label, string value, double width, bool readOnly = true)
+      TextBox Field(Control parent, string label, string value, int width)
       {
-        parent.Children.Add(new TextBlock
+        parent.Controls.Add(new Label
         {
           Text = label,
-          VerticalAlignment = VerticalAlignment.Center,
-          Margin = new Thickness(5)
+          AutoSize = true,
+          Margin = new Padding(5, 8, 0, 0)
         });
         var box = new TextBox
         {
-          Text = value,
+          Text = value ?? string.Empty,
           Width = width,
-          Padding = new Thickness(4),
-          Margin = new Thickness(3),
-          IsReadOnly = readOnly
+          Margin = new Padding(3),
+          ReadOnly = true
         };
-        parent.Children.Add(box);
+        parent.Controls.Add(box);
         return box;
       }
 
-      void Button(Panel parent, string label, Action action, out Button created)
+      Button MakeButton(Control parent, string label, Action action, out Button created)
       {
         var button = new Button
         {
-          Content = label,
-          Padding = new Thickness(9, 5, 9, 5),
-          Margin = new Thickness(3)
+          Text = label,
+          AutoSize = true,
+          Margin = new Padding(3),
+          Padding = new Padding(6, 3, 6, 3)
         };
         button.Click += (_, __) =>
         {
@@ -100,124 +120,134 @@ namespace NcTestRibbon.Shell
           catch (Exception ex)
           {
             MessageBox.Show(this, ex.Message, "Проверьте исходные данные",
-              MessageBoxButton.OK, MessageBoxImage.Warning);
+              MessageBoxButtons.OK, MessageBoxIcon.Warning);
             Log(ex.Message);
           }
         };
-        parent.Children.Add(button);
+        parent.Controls.Add(button);
         created = button;
+        return button;
       }
 
       var fluidRow = Row();
       _fluidFile = Field(fluidRow, "Excel свойств:", paths.FluidProperties ?? string.Empty, 420);
-      Button(fluidRow, "Обзор…", () => BrowseFluidExcel(), out _);
+      MakeButton(fluidRow, "Обзор…", () => BrowseFluidExcel(), out _);
 
       var tables = Row();
       _tablesFile = Field(tables, "Таблицы КП (xlsx):", paths.PadsWorkbook ?? string.Empty, 420);
-      Button(tables, "Обзор…", () => BrowsePadsWorkbook(), out _);
+      MakeButton(tables, "Обзор…", () => BrowsePadsWorkbook(), out _);
 
       var cadRow = Row();
       _showOnDrawing = new CheckBox
       {
-        Content = "Показывать на чертеже",
-        VerticalAlignment = VerticalAlignment.Center,
-        Margin = new Thickness(5, 3, 12, 3)
+        Text = "Показывать на чертеже",
+        AutoSize = true,
+        Margin = new Padding(5, 6, 12, 3)
       };
-      _showOnDrawing.Checked += (_, __) =>
+      _showOnDrawing.CheckedChanged += (_, __) =>
       {
+        if (_suppressShowToggle)
+        {
+          return;
+        }
+
         try
         {
-          RefreshDrawingOverlay(force: true);
+          if (_showOnDrawing.Checked)
+          {
+            RefreshDrawingOverlay(force: true);
+          }
+          else
+          {
+            CadPadOverlay.Clear();
+            Log("КП на чертеже скрыты (слой " + CadPadOverlay.LayerName + ").");
+          }
         }
         catch (Exception ex)
         {
-          MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+          MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
           Log("Показ на чертеже: " + ex.Message);
-          _showOnDrawing.IsChecked = false;
+          _suppressShowToggle = true;
+          try
+          {
+            _showOnDrawing.Checked = false;
+          }
+          finally
+          {
+            _suppressShowToggle = false;
+          }
         }
       };
-      _showOnDrawing.Unchecked += (_, __) =>
-      {
-        try
-        {
-          CadPadOverlay.Clear();
-          Log("КП на чертеже скрыты (слой " + CadPadOverlay.LayerName + ").");
-        }
-        catch (Exception ex)
-        {
-          Log("Не удалось очистить чертёж: " + ex.Message);
-        }
-      };
-      cadRow.Children.Add(_showOnDrawing);
+      cadRow.Controls.Add(_showOnDrawing);
 
-      Button(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
-      _placeButton.IsEnabled = false;
+      MakeButton(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
+      _placeButton.Enabled = false;
 
-      Button(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
-      _rotateButton.IsEnabled = false;
+      MakeButton(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
+      _rotateButton.Enabled = false;
 
-      Button(cadRow, "Сохранить положения", () => SaveCoordinates(), out _saveButton);
-      _saveButton.IsEnabled = false;
+      MakeButton(cadRow, "Сохранить положения", () => SaveCoordinates(), out _saveButton);
+      _saveButton.Enabled = false;
 
-      top.Children.Add(new TextBlock
+      top.Controls.Add(new Label
       {
         Text = "Таблица только для просмотра (все поля из Excel). Положение/угол — только «Задать положение вручную» / «Повернуть вручную» на чертеже.",
-        Margin = new Thickness(5, 2, 5, 6),
-        Foreground = Brushes.DarkSlateGray,
-        TextWrapping = TextWrapping.Wrap
+        AutoSize = true,
+        MaximumSize = new Size(1080, 0),
+        ForeColor = Color.DimGray,
+        Margin = new Padding(5, 4, 5, 6)
       });
 
-      _status = new TextBlock
+      _grid = new DataGridView
       {
-        Text = "Откройте таблицы КП (xlsx).",
-        Margin = new Thickness(4),
-        Foreground = Brushes.DarkSlateGray
+        Dock = DockStyle.Fill,
+        AllowUserToAddRows = false,
+        AllowUserToDeleteRows = false,
+        AllowUserToResizeRows = false,
+        ReadOnly = true,
+        MultiSelect = false,
+        SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+        AutoGenerateColumns = false,
+        RowHeadersVisible = false,
+        BackgroundColor = SystemColors.Window,
+        BorderStyle = BorderStyle.FixedSingle,
+        AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
       };
-      DockPanel.SetDock(_status, Dock.Bottom);
-      root.Children.Add(_status);
+      _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name), 70));
+      _grid.Columns.Add(TextCol("X", nameof(PadRow.X), 90));
+      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y), 90));
+      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText), 70));
+      _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM), 80));
+      _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM), 80));
+      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), 110));
+      _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid), 80));
+      _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil), 70));
+      _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas), 60));
+      _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch), 110));
+      _grid.CellDoubleClick += Grid_CellDoubleClick;
+      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
+      _grid.CellFormatting += Grid_CellFormatting;
+      root.Controls.Add(_grid, 0, 1);
 
       _log = new TextBox
       {
-        Height = 90,
-        IsReadOnly = true,
-        AcceptsReturn = true,
-        TextWrapping = TextWrapping.Wrap,
-        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        Dock = DockStyle.Fill,
+        Multiline = true,
+        ReadOnly = true,
+        ScrollBars = ScrollBars.Vertical,
+        WordWrap = true
       };
-      DockPanel.SetDock(_log, Dock.Bottom);
-      root.Children.Add(_log);
+      root.Controls.Add(_log, 0, 2);
 
-      _grid = new DataGrid
+      _status = new Label
       {
-        AutoGenerateColumns = false,
-        IsReadOnly = true,
-        CanUserAddRows = false,
-        CanUserDeleteRows = false,
-        CanUserSortColumns = true,
-        SelectionMode = DataGridSelectionMode.Single,
-        SelectionUnit = DataGridSelectionUnit.FullRow,
-        // Virtualization + Visibility.Collapsed restore can leave headers-only with 0 rows.
-        EnableRowVirtualization = false,
-        EnableColumnVirtualization = false
+        Dock = DockStyle.Fill,
+        Text = "Откройте таблицы КП (xlsx).",
+        TextAlign = ContentAlignment.MiddleLeft,
+        ForeColor = Color.DimGray
       };
-      VirtualizingPanel.SetIsVirtualizing(_grid, false);
-      VirtualizingPanel.SetVirtualizationMode(_grid, VirtualizationMode.Standard);
-      _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
-      _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
-      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
-      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
-      _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
-      _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
-      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium)));
-      _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
-      _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
-      _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
-      _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
-      _grid.MouseDoubleClick += Grid_MouseDoubleClick;
-      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
-      _grid.BeginningEdit += (_, e) => e.Cancel = true;
-      _grid.LoadingRow += Grid_LoadingRow;
-      root.Children.Add(_grid);
+      root.Controls.Add(_status, 0, 3);
+
       BindPadsGrid();
 
       if (!string.IsNullOrWhiteSpace(paths.FluidProperties) && File.Exists(paths.FluidProperties))
@@ -242,31 +272,49 @@ namespace NcTestRibbon.Shell
       }
 
       UpdateActionButtons();
+      Shown += (_, __) => BindPadsGrid();
     }
 
-    private void Grid_LoadingRow(object sender, DataGridRowEventArgs e)
+    private void Grid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
     {
-      if (e.Row.Item is PadRow row && row.CoordsDirty)
+      if (e.RowIndex < 0 || e.RowIndex >= _pads.Count)
       {
-        e.Row.Background = Brushes.Yellow;
+        return;
       }
-      else
-      {
-        e.Row.ClearValue(Control.BackgroundProperty);
-      }
+
+      PadRow row = _pads[e.RowIndex];
+      DataGridViewRow viewRow = _grid.Rows[e.RowIndex];
+      viewRow.DefaultCellStyle.BackColor = row.CoordsDirty ? Color.Yellow : _grid.DefaultCellStyle.BackColor;
     }
 
     private void UpdateActionButtons()
     {
-      bool hasRow = _grid.SelectedItem is PadRow { Record: not null };
-      _placeButton.IsEnabled = hasRow;
-      _rotateButton.IsEnabled = hasRow;
-      _saveButton.IsEnabled = _pads.Any(p => p.CoordsDirty);
+      PadRow row = SelectedPad();
+      bool hasRow = row?.Record != null;
+      _placeButton.Enabled = hasRow;
+      _rotateButton.Enabled = hasRow;
+      _saveButton.Enabled = _pads.Any(p => p.CoordsDirty);
     }
 
-    private void Grid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    private PadRow SelectedPad()
     {
-      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      if (_grid.CurrentRow == null || _grid.CurrentRow.Index < 0 || _grid.CurrentRow.Index >= _pads.Count)
+      {
+        return null;
+      }
+
+      return _pads[_grid.CurrentRow.Index];
+    }
+
+    private void Grid_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+    {
+      if (e.RowIndex < 0)
+      {
+        return;
+      }
+
+      PadRow row = SelectedPad();
+      if (row?.Record == null)
       {
         return;
       }
@@ -277,7 +325,7 @@ namespace NcTestRibbon.Shell
       }
       catch (Exception ex)
       {
-        MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
       }
     }
 
@@ -288,25 +336,43 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("Сначала откройте таблицы КП (xlsx).");
       }
 
+      EnsureWpfApp();
       PadWorkbookLoader.PadRecord live = _book.Pads.FirstOrDefault(p =>
         string.Equals(p.Name, pad.Name, StringComparison.OrdinalIgnoreCase)) ?? pad;
       PadLoadPreview.Result load = PadLoadPreview.Build(live, _book);
-      var detail = new TopologyPadDetailWindow(live, _book, load) { Owner = this };
+      var detail = new TopologyPadDetailWindow(live, _book, load);
+      new WindowInteropHelper(detail) { Owner = Handle };
       detail.ShowDialog();
       Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
     }
 
+    private static void EnsureWpfApp()
+    {
+      if (WpfApp.Current != null)
+      {
+        return;
+      }
+
+      try
+      {
+        new WpfApp { ShutdownMode = WpfShutdownMode.OnExplicitShutdown };
+      }
+      catch
+      {
+      }
+    }
+
     private void ManualRotateSelected()
     {
-      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      PadRow row = SelectedPad();
+      if (row?.Record == null)
       {
         throw new InvalidOperationException("Выберите КП в таблице.");
       }
 
-      // Ensure the pad exists on the drawing before ROTATE.
-      if (_showOnDrawing.IsChecked != true)
+      if (!_showOnDrawing.Checked)
       {
-        _showOnDrawing.IsChecked = true;
+        _showOnDrawing.Checked = true;
       }
       else
       {
@@ -344,7 +410,8 @@ namespace NcTestRibbon.Shell
 
     private void PlaceSelectedPad()
     {
-      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      PadRow row = SelectedPad();
+      if (row?.Record == null)
       {
         throw new InvalidOperationException("Выберите КП в таблице.");
       }
@@ -364,10 +431,9 @@ namespace NcTestRibbon.Shell
         row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
         row.CoordsDirty = true;
 
-        // Always materialize the placed pad on the drawing.
-        if (_showOnDrawing.IsChecked != true)
+        if (!_showOnDrawing.Checked)
         {
-          _showOnDrawing.IsChecked = true;
+          _showOnDrawing.Checked = true;
         }
         else
         {
@@ -382,22 +448,20 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// Yield the modal WPF dialog to CAD (jig / zoom / ROTATE) without Hide()/Show().
-    /// Hide+Show on a ShowDialog window owned by nCad/Qt re-enters PresentationFramework
-    /// through hostQtUi and can crash with CLR 0xE0434352 (WPF frames on the stack).
+    /// Yield modal Form to CAD (jig / zoom / ROTATE) without Hide() —
+    /// Hide() ends Form.ShowDialog. Opacity=0 keeps the dialog open.
     /// </summary>
     private void RunWithCadFocus(Action cadWork)
     {
-      Visibility previous = Visibility;
-      bool wasEnabled = IsEnabled;
-      CancelGridEdit();
+      double previousOpacity = Opacity;
+      bool wasEnabled = Enabled;
       try
       {
-        IsEnabled = false;
-        Visibility = Visibility.Collapsed;
+        Enabled = false;
+        Opacity = 0;
         try
         {
-          Dispatcher.Invoke(DispatcherPriority.Render, new Action(() => { }));
+          Application.DoEvents();
         }
         catch
         {
@@ -412,7 +476,7 @@ namespace NcTestRibbon.Shell
         Log(msg);
         try
         {
-          MessageBox.Show(this, msg, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+          MessageBox.Show(this, msg, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         catch
         {
@@ -422,15 +486,13 @@ namespace NcTestRibbon.Shell
       {
         try
         {
-          Visibility = previous == Visibility.Collapsed ? Visibility.Visible : previous;
-          IsEnabled = wasEnabled;
-          if (Visibility == Visibility.Visible)
+          if (!IsDisposed)
           {
+            Opacity = previousOpacity <= 0 ? 1 : previousOpacity;
+            Enabled = wasEnabled;
             Activate();
+            BindPadsGrid();
           }
-
-          // Always reassign ItemsSource after Collapsed→Visible (never Items.Refresh).
-          BindPadsGrid();
         }
         catch (Exception ex)
         {
@@ -447,85 +509,44 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// End any pending DataGrid / IEditableCollectionView edit before rebind.
-    /// </summary>
-    private void CancelGridEdit()
-    {
-      try
-      {
-        _grid.CancelEdit(DataGridEditingUnit.Cell);
-      }
-      catch
-      {
-      }
-
-      try
-      {
-        _grid.CancelEdit(DataGridEditingUnit.Row);
-      }
-      catch
-      {
-      }
-
-      try
-      {
-        if (_grid.Items is IEditableCollectionView editable)
-        {
-          if (editable.IsAddingNew)
-          {
-            editable.CancelNew();
-          }
-
-          if (editable.IsEditingItem)
-          {
-            editable.CancelEdit();
-          }
-        }
-      }
-      catch
-      {
-      }
-    }
-
-    /// <summary>
-    /// Force DataGrid rows by assigning a fresh ObservableCollection copy of _pads.
-    /// Avoids Items.Refresh (EditItem / empty-grid) and stale ItemsSource after load or Collapsed.
-    /// PadRow references are shared so place/rotate mutations stay on the same objects.
+    /// Rebind DataGridView to BindingList and log counts into status/log.
     /// </summary>
     private void BindPadsGrid(PadRow preferSelect = null)
     {
       try
       {
-        CancelGridEdit();
-        string keepName = preferSelect?.Name ?? (_grid.SelectedItem as PadRow)?.Name;
+        string keepName = preferSelect?.Name ?? SelectedPad()?.Name;
 
-        var view = new System.Collections.ObjectModel.ObservableCollection<PadRow>(_pads);
-        _grid.ItemsSource = null;
-        _grid.ItemsSource = view;
+        // Reset DataSource so WinForms rebuilds all rows from _pads.
+        _grid.DataSource = null;
+        _grid.DataSource = _pads;
+
+        int gridRows = _grid.Rows.Count;
+        int pads = _pads.Count;
+        string bindMsg = "Сетка: pads=" + pads + ", grid.Rows=" + gridRows
+          + ", DataSource=" + (_grid.DataSource != null ? _grid.DataSource.GetType().Name : "null");
+        _status.Text = bindMsg;
+        Log(bindMsg);
 
         if (!string.IsNullOrEmpty(keepName))
         {
-          PadRow match = view.FirstOrDefault(p =>
-            string.Equals(p.Name, keepName, StringComparison.OrdinalIgnoreCase));
-          if (match != null)
+          for (int i = 0; i < _pads.Count; i++)
           {
-            _grid.SelectedItem = match;
-            try
+            if (string.Equals(_pads[i].Name, keepName, StringComparison.OrdinalIgnoreCase))
             {
-              _grid.ScrollIntoView(match);
-            }
-            catch
-            {
+              _grid.ClearSelection();
+              _grid.Rows[i].Selected = true;
+              _grid.CurrentCell = _grid.Rows[i].Cells[0];
+              try
+              {
+                _grid.FirstDisplayedScrollingRowIndex = i;
+              }
+              catch
+              {
+              }
+              break;
             }
           }
-        }
-
-        try
-        {
-          _grid.UpdateLayout();
-        }
-        catch
-        {
         }
       }
       catch (Exception ex)
@@ -538,57 +559,6 @@ namespace NcTestRibbon.Shell
         catch
         {
         }
-      }
-    }
-
-    private void HookDispatcherExceptions()
-    {
-      try
-      {
-        Dispatcher.UnhandledException -= OnDispatcherUnhandledException;
-        Dispatcher.UnhandledException += OnDispatcherUnhandledException;
-      }
-      catch
-      {
-      }
-
-      try
-      {
-        if (Application.Current != null)
-        {
-          Application.Current.DispatcherUnhandledException -= OnAppDispatcherUnhandledException;
-          Application.Current.DispatcherUnhandledException += OnAppDispatcherUnhandledException;
-        }
-      }
-      catch
-      {
-      }
-    }
-
-    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
-    {
-      try
-      {
-        WriteCrashLog("Dispatcher", e.Exception);
-        Log("WPF: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
-        e.Handled = true;
-      }
-      catch
-      {
-        e.Handled = true;
-      }
-    }
-
-    private static void OnAppDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
-    {
-      try
-      {
-        WriteCrashLog("AppDispatcher", e.Exception);
-        e.Handled = true;
-      }
-      catch
-      {
-        e.Handled = true;
       }
     }
 
@@ -629,13 +599,13 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("Нет изменённых координат.");
       }
 
-      MessageBoxResult confirm = MessageBox.Show(
+      DialogResult confirm = MessageBox.Show(
         this,
         "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
         "Сохранить положения",
-        MessageBoxButton.YesNo,
-        MessageBoxImage.Question);
-      if (confirm != MessageBoxResult.Yes)
+        MessageBoxButtons.YesNo,
+        MessageBoxIcon.Question);
+      if (confirm != DialogResult.Yes)
       {
         return;
       }
@@ -653,7 +623,7 @@ namespace NcTestRibbon.Shell
 
     private void RefreshDrawingOverlay(bool force = false)
     {
-      if (!force && _showOnDrawing.IsChecked != true)
+      if (!force && !_showOnDrawing.Checked)
       {
         return;
       }
@@ -695,7 +665,7 @@ namespace NcTestRibbon.Shell
 
     private void BrowseFluidExcel()
     {
-      var dialog = new OpenFileDialog
+      using var dialog = new OpenFileDialog
       {
         Title = "Excel свойств флюида",
         Filter = "Excel (*.xlsx;*.xlsm)|*.xlsx;*.xlsm|All|*.*",
@@ -707,7 +677,7 @@ namespace NcTestRibbon.Shell
         dialog.FileName = Path.GetFileName(_fluidFile.Text);
       }
 
-      if (dialog.ShowDialog(this) == true)
+      if (dialog.ShowDialog(this) == DialogResult.OK)
       {
         LoadFluidProperties(dialog.FileName, remember: true);
       }
@@ -731,7 +701,7 @@ namespace NcTestRibbon.Shell
 
     private void BrowsePadsWorkbook()
     {
-      var dialog = new OpenFileDialog
+      using var dialog = new OpenFileDialog
       {
         Title = "Таблицы КП / Top_tree (xlsx)",
         Filter = "Excel (*.xlsx)|*.xlsx",
@@ -744,7 +714,7 @@ namespace NcTestRibbon.Shell
         dialog.FileName = Path.GetFileName(current);
       }
 
-      if (dialog.ShowDialog(this) != true)
+      if (dialog.ShowDialog(this) != DialogResult.OK)
       {
         return;
       }
@@ -789,7 +759,6 @@ namespace NcTestRibbon.Shell
         AppPaths.Set(p => p.PadsWorkbook = path);
       }
 
-      // Overlay sourMedium from sibling / remembered Top_tree JSON when Excel has no column.
       int fromJson = 0;
       if (!book.SourMediumFromSheet)
       {
@@ -820,11 +789,9 @@ namespace NcTestRibbon.Shell
         + "; " + caps
         + (fromJson > 0 ? "; sourMedium из JSON: " + fromJson : string.Empty)
         + " (" + Path.GetFileName(path) + ")");
-      // Always rebind ItemsSource after load — ObservableCollection Clear/Add during ctor
-      // or after Collapsed can leave the DataGrid with headers only (0 rows) while _pads is full.
       BindPadsGrid();
       UpdateActionButtons();
-      if (_showOnDrawing.IsChecked == true)
+      if (_showOnDrawing.Checked)
       {
         RefreshDrawingOverlay(force: true);
       }
@@ -833,33 +800,34 @@ namespace NcTestRibbon.Shell
     private void Log(string text)
     {
       _log.AppendText(text + Environment.NewLine);
-      _log.ScrollToEnd();
+      _log.SelectionStart = _log.TextLength;
+      _log.ScrollToCaret();
       _status.Text = text;
     }
 
-    private static DataGridTextColumn TextCol(string header, string path, bool readOnly = true)
+    private static DataGridViewTextBoxColumn TextCol(string header, string prop, int fillWeight)
     {
-      return new DataGridTextColumn
+      return new DataGridViewTextBoxColumn
       {
-        Header = header,
-        Binding = new Binding(path)
-        {
-          Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay,
-          UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
-        },
-        IsReadOnly = readOnly,
-        Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+        HeaderText = header,
+        DataPropertyName = prop,
+        Name = prop,
+        ReadOnly = true,
+        FillWeight = fillWeight
       };
     }
 
-    private static DataGridCheckBoxColumn CheckCol(string header, string path, bool readOnly = true)
+    private static DataGridViewCheckBoxColumn CheckCol(string header, string prop, int fillWeight)
     {
-      return new DataGridCheckBoxColumn
+      return new DataGridViewCheckBoxColumn
       {
-        Header = header,
-        Binding = new Binding(path),
-        IsReadOnly = readOnly,
-        Width = header.Length > 10 ? 120 : 85
+        HeaderText = header,
+        DataPropertyName = prop,
+        Name = prop,
+        ReadOnly = true,
+        FillWeight = fillWeight,
+        TrueValue = true,
+        FalseValue = false
       };
     }
 
@@ -879,6 +847,7 @@ namespace NcTestRibbon.Shell
       public bool Gas { get; set; } = true;
       public string FirstLaunch { get; set; } = "1";
       public bool CoordsDirty { get; set; }
+      [Browsable(false)]
       public PadWorkbookLoader.PadRecord Record { get; set; }
     }
   }

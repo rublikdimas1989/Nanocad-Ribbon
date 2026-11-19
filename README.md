@@ -4,8 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.26.zip`](nanocad-test-ribbon-v1.2.26.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.26/nanocad-test-ribbon-v1.2.26.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.27.zip`](nanocad-test-ribbon-v1.2.27.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.27/nanocad-test-ribbon-v1.2.27.zip
+
+## v1.2.27 — WinForms DataGridView for KP rows (TCON-45)
+
+- Pad window is **WinForms** with `DataGridView` + `BindingList` (WPF DataGrid stayed headers-only after load)
+- Status/log reports `pads=` / `grid.Rows=` after each bind
+- Still modal `ShowDialog`; place/rotate uses Opacity=0 (not Hide)
 
 ## v1.2.26 — grid ItemsSource rebind after load (TCON-45)
 
