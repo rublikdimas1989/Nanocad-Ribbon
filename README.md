@@ -4,43 +4,112 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.8.zip`](nanocad-test-ribbon-v1.2.8.zip)  
-  Raw: https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.8.zip
-- Исходники: [`nanocad-test-ribbon/`](nanocad-test-ribbon/)
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.46.zip`](nanocad-test-ribbon-v1.2.46.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.46/nanocad-test-ribbon-v1.2.46.zip
+- **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
 
-Распаковывайте zip в **новую** пустую папку (не поверх старой).
+## v1.2.46 — GDAL path + Open diagnostics (TCON-62)
 
-Подробности: [`nanocad-test-ribbon/README.md`](nanocad-test-ribbon/README.md).
+- Probe `%LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal` first; INSTALL hard-fails if wrap/ECW/csharp missing
+- NcTestEcw error shows GDAL status (candidates, ECW driver, Gdal.Open / LastError)
 
-## Что внутри (v1.2.8)
+## v1.2.45 — embedded ECW GeoTransform via GDAL (TCON-62)
 
-UI-оболочки из End-варианта (WPF), **без** Topology/PipeCalc/PathFinding:
+- End-style: `GdalRuntimeBootstrap` + `Gdal.Open` → `GetGeoTransform` (ECW plugin `gdal_ECW_JP2ECW` / `NCSEcw`)
+- Bundled `installer/gdal/x64` (+ plugins) copied to LoadFile by INSTALL; no PATH gdalinfo required
 
-| Команда | Окно |
-|---------|------|
-| `NcTestWpf` | `MainWindow` — «Трассировка трубопровода» |
-| `NcTestSettings` | «Настройки» (трассировка + траншея/дорога) |
-| `NcTestInitialData` | alias → `NcTestSettings` |
-| `NcTestPadOpt` | «Оптимизация кустовых площадок» (TopologyInputs/Pad) |
-| `NcTestHello` / `NcTestHttp` | прежние тесты |
-| `NcTestDemo` | маленький WinForms smoke |
+## v1.2.44 — PathTextDisplay FlowDirection (TCON-61)
 
-Кнопки ленты: Hello / HTTP GET / **Трассировка** / **Настройки** / **Кустовые площадки**. Клики в UI → MessageBox «сервер позже».
+- Qualify `System.Windows.FlowDirection` / `TextAlignment` for WPF path helpers (CS0104 vs Forms)
 
-## Быстрый старт
+## v1.2.43 — PathTextDisplay Control ambiguity (TCON-60)
 
-`NcSdkDir` уже в `Directory.Build.props` (путь RibbonExecDoc / YandexDisk).
+- WinForms helpers use `System.Windows.Forms.Control` only (no bare `Control` / WPF Controls import)
 
-```powershell
-cd nanocad-test-ribbon\NcTestRibbon
-dotnet build NcTestRibbon.csproj -c Release
-cd ..\installer
-.\INSTALL.bat
-.\VERIFY.bat
-```
+## v1.2.42 — ECW End-style georef attach
 
-nanoCAD: `NcTestSettings` / `NcTestWpf` / `NcTestPadOpt`.
+- `NcTestEcw` / `NcTestRaster`: insert ECW/raster with world coords + scale (RasterImage Orientation from GDAL/world), not plain IMAGEATTACH scale=1
+- Resolves geo via world/TAF sidecar or `gdalinfo -json`; writes `.eww`/world sidecar; ribbon «ECW/растр»
 
-## Local rates (v1.2.8)
+## v1.2.41 — path TextBox scroll to filename
 
-Tab «Настройки трассировки» loads rates from `%LocalAppData%\ASDC\LoadFile\NANOCAD\Tracing_cache\Settings\Price.xlsx` (EPPlus) and saves medium transitions into `tracing.conf` (JSON AppSettings). Place the End Price.xlsx workbook there. Unpack zip into a **NEW** empty folder.
+- LTR paths; after set Text: SelectionStart=Length + ScrollToCaret (and on Load/Shown) so filename stays visible
+
+## v1.2.40 — right-align path fields
+
+- Path TextBoxes in Исходные данные + settings: WinForms `TextAlign=Right`, WPF `TextAlignment=Right`
+
+## v1.2.39 — CS0104 IWin32Window
+
+- Qualify `System.Windows.Forms.IWin32Window` in pad/insert close prompts (vs Interop)
+
+## v1.2.38 — portable paths.json
+
+- Store paths as relative under Tracing_cache or `%LOCALAPPDATA%\…` (no username); expand on load; migrate absolute LocalAppData on save/load
+
+## v1.2.37 — close prompt for yellow coords
+
+- Closing «Исходные данные» with unsaved pad/insert coords asks «Применить новые координаты?» (Yes=save Excel, No=revert)
+
+## v1.2.36 — ribbon: only «Исходные данные»
+
+- Removed ribbon buttons Кустовые / Врезки / БУОС / Узлы; keep single «Исходные данные»
+- `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` remain as typed commands
+
+## v1.2.35 — fix Activate CS0103 (TCON-53)
+
+- Pad/Inserts CAD focus restore uses host `Form.Activate` after UserControl hosting
+
+## v1.2.34 — Исходные данные tabs + Узлы
+
+- One WinForms window «Исходные данные» (TabControl): Кустовые / Врезки / БУОС / Узлы
+- Ribbon buttons open the same window on the matching tab
+- `Topology_Nodes.xlsx` — «Узел 3/4 соединения», sizes only; cost from Price like BUOS
+
+## v1.2.33 — BUOS cost from Price.xlsx (TCON-51)
+
+- Dropped UseInTopology / UseExcelPrice / CostRub from BUOS xlsx+UI
+- Cost = Price.xlsx «Элементы топологии» A→B by name; missing → red «введите в Price стоимость»
+
+## v1.2.32 — Варианты БУОС (catalog)
+
+- `NcTestBuos` — End TopologyBuosType catalogue (Excel «БУОС»), no site coordinates
+- Sample `Topology_Buos.xlsx`; path `paths.json` → `buosWorkbook`
+
+## v1.2.31 — inserts unique «Имя» + oil т/сут (TCON-49)
+
+- Dropped Excel `Id` column; identity = unique «Имя»; duplicates → load error
+- Max oil header/UI: **т/сут** (not м³/сут); sample updated
+
+## v1.2.30 — zoom before insert place
+
+- `NcTestInserts` «Задать положение вручную» zooms to the insert (or planned X/Y) before GetPoint — same rule as KP pads/rotate
+
+## v1.2.29 — Topology inserts (врезки) + interface.conf
+
+- `NcTestInserts` — End «Топология — точки врезки» WinForms grid (Excel «Врезки»), CAD place, show checkbox
+- `NcTestInterface` — font size + insert circle diameter → `Tracing_cache\Settings\interface.conf` (also KP labels)
+- Sample `Topology_Inserts.xlsx`; path in `paths.json` (`insertsWorkbook`)
+
+## v1.2.28 — pad session: stay open, persist show, revert unsaved
+
+- Modeless pad window — stays open after place/rotate; grid shows new X/Y/angle immediately
+- «Показывать на чертеже» persisted in `paths.json`
+- Without «Сохранить положения», close discards preview and restores CAD to last Excel poses
+
+## v1.2.27 — WinForms DataGridView for KP rows (TCON-45)
+
+- Pad window is **WinForms** with `DataGridView` + `BindingList` (WPF DataGrid stayed headers-only after load)
+- Status/log reports `pads=` / `grid.Rows=` after each bind
+- Still modal `ShowDialog`; place/rotate uses Opacity=0 (not Hide)
+
+## v1.2.26 — grid ItemsSource rebind after load (TCON-45)
+
+- After load / place / rotate / Visibility restore: always reassign `ItemsSource` to a fresh `ObservableCollection` copy (no `Items.Refresh`)
+- Disables DataGrid row virtualization (Collapsed→Visible headers-only bug)
+- Ensures 6 KP rows show when log says «Загружено КП: 6»
+
+## v1.2.25 — grid display-only + safe refresh (TCON-45)
+
+- Entire KP grid **read-only** (X/Y/угол too) — position only via place/rotate on drawing
+- Fixes empty grid: cancel EditItem before Refresh; safe rebind after Visibility restore
