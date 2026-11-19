@@ -1,29 +1,31 @@
 namespace NcTestRibbon.Shell
 {
   using System;
-  using System.Collections.Generic;
-  using System.Collections.ObjectModel;
   using System.Globalization;
   using System.IO;
+  using System.Linq;
   using System.Windows;
   using System.Windows.Controls;
   using System.Windows.Data;
+  using System.Windows.Input;
   using System.Windows.Media;
   using Microsoft.Win32;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
 
   /// <summary>
-  /// Display-only KP table from Excel. Edit data in the workbook; paths remembered in paths.json.
+  /// Display-only KP table from Excel. Double-click opens profiles + «Ограничивает в месяце».
   /// </summary>
   public sealed class PadOptimizationWindow : Window
   {
-    private readonly ObservableCollection<PadRow> _pads = new ObservableCollection<PadRow>();
+    private readonly System.Collections.ObjectModel.ObservableCollection<PadRow> _pads
+      = new System.Collections.ObjectModel.ObservableCollection<PadRow>();
     private readonly TextBox _fluidFile;
     private readonly TextBox _tablesFile;
     private readonly TextBox _log;
     private readonly TextBlock _status;
     private readonly DataGrid _grid;
+    private PadWorkbookLoader.WorkbookData _book;
 
     public PadOptimizationWindow()
     {
@@ -104,9 +106,10 @@ namespace NcTestRibbon.Shell
 
       top.Children.Add(new TextBlock
       {
-        Text = "Только просмотр. Правки — в Excel, затем снова «Обзор…».",
+        Text = "Только просмотр. Двойной щелчок по КП — профили и «Ограничивает в месяце». Правки — в Excel.",
         Margin = new Thickness(5, 2, 5, 6),
-        Foreground = Brushes.DarkSlateGray
+        Foreground = Brushes.DarkSlateGray,
+        TextWrapping = TextWrapping.Wrap
       });
 
       _status = new TextBlock
@@ -147,6 +150,7 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
+      _grid.MouseDoubleClick += Grid_MouseDoubleClick;
       root.Children.Add(_grid);
 
       if (!string.IsNullOrWhiteSpace(paths.FluidProperties) && File.Exists(paths.FluidProperties))
@@ -169,6 +173,38 @@ namespace NcTestRibbon.Shell
       {
         Log("Откройте таблицы КП (xlsx) через «Обзор…».");
       }
+    }
+
+    private void Grid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        return;
+      }
+
+      try
+      {
+        OpenPadDetail(row.Record);
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+      }
+    }
+
+    private void OpenPadDetail(PadWorkbookLoader.PadRecord pad)
+    {
+      if (_book == null)
+      {
+        throw new InvalidOperationException("Сначала откройте таблицы КП (xlsx).");
+      }
+
+      PadWorkbookLoader.PadRecord live = _book.Pads.FirstOrDefault(p =>
+        string.Equals(p.Name, pad.Name, StringComparison.OrdinalIgnoreCase)) ?? pad;
+      PadLoadPreview.Result load = PadLoadPreview.Build(live, _book);
+      var detail = new TopologyPadDetailWindow(live, _book, load) { Owner = this };
+      detail.ShowDialog();
+      Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
     }
 
     private void BrowseFluidExcel()
@@ -204,7 +240,6 @@ namespace NcTestRibbon.Shell
         AppPaths.Set(p => p.FluidProperties = path);
       }
 
-      // Path remembered; full fluid-property parse stays with rates/hydraulics later.
       Log("Свойства загружены: " + Path.GetFileName(path));
     }
 
@@ -238,9 +273,10 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("Укажите файл таблиц КП (xlsx).");
       }
 
-      List<PadWorkbookLoader.PadRecord> records = PadWorkbookLoader.LoadPads(path);
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      _book = book;
       _pads.Clear();
-      foreach (PadWorkbookLoader.PadRecord pad in records)
+      foreach (PadWorkbookLoader.PadRecord pad in book.Pads)
       {
         _pads.Add(new PadRow
         {
@@ -252,7 +288,8 @@ namespace NcTestRibbon.Shell
           Oil = pad.ActiveOil,
           Liquid = pad.ActiveLiquid,
           Gas = pad.ActiveGas,
-          FirstLaunch = "1"
+          FirstLaunch = "1",
+          Record = pad
         });
       }
 
@@ -262,7 +299,13 @@ namespace NcTestRibbon.Shell
         AppPaths.Set(p => p.PadsWorkbook = path);
       }
 
-      Log("Загружено КП из Excel: " + records.Count + " (" + Path.GetFileName(path) + ")");
+      string caps = book.CapacitiesFromBuosSheet
+        ? "ёмкости БУОС из листа"
+        : "ёмкости БУОС по умолчанию";
+      Log("Загружено КП: " + book.Pads.Count
+        + "; профилей мес.: " + book.Months
+        + "; " + caps
+        + " (" + Path.GetFileName(path) + ")");
     }
 
     private void Log(string text)
@@ -304,6 +347,7 @@ namespace NcTestRibbon.Shell
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;
       public string FirstLaunch { get; set; } = "1";
+      public PadWorkbookLoader.PadRecord Record { get; set; }
     }
   }
 }

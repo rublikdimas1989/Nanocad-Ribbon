@@ -4,10 +4,11 @@ namespace NcTestRibbon.Rates
   using System.Collections.Generic;
   using System.Globalization;
   using System.IO;
+  using System.Text.RegularExpressions;
   using OfficeOpenXml;
 
   /// <summary>
-  /// Loads KP metadata (+ optional width/length) from workbook sheet «КП».
+  /// Loads KP metadata, monthly profiles («Профили»), and optional BUOS capacities from KP/Top_tree xlsx.
   /// </summary>
   public static class PadWorkbookLoader
   {
@@ -23,6 +24,26 @@ namespace NcTestRibbon.Rates
       public bool ActiveGas { get; set; } = true;
       public double WidthM { get; set; } = 150;
       public double LengthM { get; set; } = 250;
+      public double[] Oil { get; set; } = Array.Empty<double>();
+      public double[] Liquid { get; set; } = Array.Empty<double>();
+      public double[] Gas { get; set; } = Array.Empty<double>();
+    }
+
+    public sealed class WorkbookData
+    {
+      public string Path { get; set; } = string.Empty;
+      public List<PadRecord> Pads { get; set; } = new List<PadRecord>();
+      public int Months { get; set; }
+      public string OilUnit { get; set; } = "m3_day";
+      public string LiquidUnit { get; set; } = "m3_day";
+      public string GasUnit { get; set; } = "m3_day";
+      public string UnitsNote { get; set; } = string.Empty;
+      /// <summary>True when oil is mass (t/day) and liquid is total liquid — End TotalLiquidOilMass.</summary>
+      public bool OilIsTonnesPerDay => OilUnit.IndexOf("t_day", StringComparison.OrdinalIgnoreCase) >= 0
+        || OilUnit.IndexOf("т/сут", StringComparison.OrdinalIgnoreCase) >= 0;
+      public double CombinedCapacity { get; set; } = 4000;
+      public double GasCapacity { get; set; } = 1_500_000;
+      public bool CapacitiesFromBuosSheet { get; set; }
     }
 
     static PadWorkbookLoader()
@@ -32,12 +53,26 @@ namespace NcTestRibbon.Rates
 
     public static List<PadRecord> LoadPads(string workbookPath)
     {
+      return LoadWorkbook(workbookPath).Pads;
+    }
+
+    public static WorkbookData LoadWorkbook(string workbookPath)
+    {
       if (string.IsNullOrWhiteSpace(workbookPath) || !File.Exists(workbookPath))
       {
         throw new FileNotFoundException("Файл таблиц КП не найден.", workbookPath);
       }
 
       using var package = new ExcelPackage(new FileInfo(workbookPath));
+      var data = new WorkbookData { Path = workbookPath };
+      data.Pads = ReadPadSheet(package);
+      ReadProfilesSheet(package, data);
+      ReadBuosCapacities(package, data);
+      return data;
+    }
+
+    private static List<PadRecord> ReadPadSheet(ExcelPackage package)
+    {
       ExcelWorksheet sheet = package.Workbook.Worksheets["КП"]
         ?? package.Workbook.Worksheets[0]
         ?? throw new InvalidDataException("В книге нет листа «КП».");
@@ -115,6 +150,215 @@ namespace NcTestRibbon.Rates
       }
 
       return result;
+    }
+
+    private static void ReadProfilesSheet(ExcelPackage package, WorkbookData data)
+    {
+      ExcelWorksheet sheet = package.Workbook.Worksheets["Профили"];
+      if (sheet?.Dimension == null)
+      {
+        foreach (PadRecord pad in data.Pads)
+        {
+          pad.Oil = Array.Empty<double>();
+          pad.Liquid = Array.Empty<double>();
+          pad.Gas = Array.Empty<double>();
+        }
+
+        data.Months = 0;
+        return;
+      }
+
+      int cols = sheet.Dimension.End.Column;
+      int rows = sheet.Dimension.End.Row;
+      string note = (sheet.Cells[1, 1].Text ?? string.Empty).Trim();
+      data.UnitsNote = note;
+      ParseUnitsNote(note, data);
+
+      int headerRow = 1;
+      string h11 = (sheet.Cells[1, 1].Text ?? string.Empty).Trim();
+      string h21 = rows >= 2 ? (sheet.Cells[2, 1].Text ?? string.Empty).Trim() : string.Empty;
+      if (h21.Equals("Месяц", StringComparison.OrdinalIgnoreCase)
+          || h21.Equals("Month", StringComparison.OrdinalIgnoreCase))
+      {
+        headerRow = 2;
+      }
+      else if (h11.Equals("Месяц", StringComparison.OrdinalIgnoreCase))
+      {
+        headerRow = 1;
+        data.UnitsNote = string.Empty;
+      }
+
+      var oilCols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      var liquidCols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      var gasCols = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      for (int c = 2; c <= cols; c++)
+      {
+        string header = (sheet.Cells[headerRow, c].Text ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(header))
+        {
+          continue;
+        }
+
+        Match match = Regex.Match(header,
+          @"^(?<name>.+?)\s+(?<fluid>нефть|жидкость|газ|oil|liquid|gas)\s*$",
+          RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+          continue;
+        }
+
+        string padName = match.Groups["name"].Value.Trim();
+        string fluid = match.Groups["fluid"].Value.ToLowerInvariant();
+        if (fluid is "нефть" or "oil")
+        {
+          oilCols[padName] = c;
+        }
+        else if (fluid is "жидкость" or "liquid")
+        {
+          liquidCols[padName] = c;
+        }
+        else
+        {
+          gasCols[padName] = c;
+        }
+      }
+
+      int dataStart = headerRow + 1;
+      int monthCount = Math.Max(0, rows - headerRow);
+      data.Months = monthCount;
+
+      foreach (PadRecord pad in data.Pads)
+      {
+        pad.Oil = new double[monthCount];
+        pad.Liquid = new double[monthCount];
+        pad.Gas = new double[monthCount];
+        oilCols.TryGetValue(pad.Name, out int oilCol);
+        liquidCols.TryGetValue(pad.Name, out int liquidCol);
+        gasCols.TryGetValue(pad.Name, out int gasCol);
+        for (int i = 0; i < monthCount; i++)
+        {
+          int r = dataStart + i;
+          if (oilCol > 0)
+          {
+            pad.Oil[i] = ReadDouble(sheet, r, oilCol, 0);
+          }
+
+          if (liquidCol > 0)
+          {
+            pad.Liquid[i] = ReadDouble(sheet, r, liquidCol, 0);
+          }
+
+          if (gasCol > 0)
+          {
+            pad.Gas[i] = ReadDouble(sheet, r, gasCol, 0);
+          }
+        }
+      }
+    }
+
+    private static void ParseUnitsNote(string note, WorkbookData data)
+    {
+      if (string.IsNullOrWhiteSpace(note))
+      {
+        return;
+      }
+
+      Match oil = Regex.Match(note, @"oil\s*=\s*([a-z0-9_]+)", RegexOptions.IgnoreCase);
+      Match liquid = Regex.Match(note, @"liquid\s*=\s*([a-z0-9_]+)", RegexOptions.IgnoreCase);
+      Match gas = Regex.Match(note, @"gas\s*=\s*([a-z0-9_]+)", RegexOptions.IgnoreCase);
+      if (oil.Success)
+      {
+        data.OilUnit = oil.Groups[1].Value;
+      }
+
+      if (liquid.Success)
+      {
+        data.LiquidUnit = liquid.Groups[1].Value;
+      }
+
+      if (gas.Success)
+      {
+        data.GasUnit = gas.Groups[1].Value;
+      }
+
+      if (!oil.Success && !liquid.Success && note.IndexOf("m3_day", StringComparison.OrdinalIgnoreCase) >= 0)
+      {
+        data.OilUnit = data.LiquidUnit = data.GasUnit = "m3_day";
+      }
+    }
+
+    private static void ReadBuosCapacities(ExcelPackage package, WorkbookData data)
+    {
+      ExcelWorksheet sheet = package.Workbook.Worksheets["БУОС"]
+        ?? package.Workbook.Worksheets["BUOS"];
+      if (sheet?.Dimension == null)
+      {
+        return;
+      }
+
+      var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+      int cols = sheet.Dimension.End.Column;
+      for (int c = 1; c <= cols; c++)
+      {
+        string key = (sheet.Cells[1, c].Text ?? string.Empty).Trim();
+        if (!string.IsNullOrEmpty(key) && !headers.ContainsKey(key))
+        {
+          headers[key] = c;
+        }
+      }
+
+      int combinedCol = -1;
+      int gasCol = -1;
+      foreach (KeyValuePair<string, int> pair in headers)
+      {
+        string key = pair.Key;
+        if (combinedCol < 0 && (key.Contains("Combined", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("жидк", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("CollectorCombinedCapacity", StringComparison.OrdinalIgnoreCase)))
+        {
+          combinedCol = pair.Value;
+        }
+
+        if (gasCol < 0 && (key.Contains("GasCapacity", StringComparison.OrdinalIgnoreCase)
+            || key.Contains("газ", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("CollectorGasCapacity", StringComparison.OrdinalIgnoreCase)))
+        {
+          gasCol = pair.Value;
+        }
+      }
+
+      if (combinedCol < 0 && gasCol < 0)
+      {
+        return;
+      }
+
+      double maxCombined = 0;
+      double maxGas = 0;
+      int rows = sheet.Dimension.End.Row;
+      for (int r = 2; r <= rows; r++)
+      {
+        if (combinedCol > 0)
+        {
+          maxCombined = Math.Max(maxCombined, ReadDouble(sheet, r, combinedCol, 0));
+        }
+
+        if (gasCol > 0)
+        {
+          maxGas = Math.Max(maxGas, ReadDouble(sheet, r, gasCol, 0));
+        }
+      }
+
+      if (maxCombined > 0)
+      {
+        data.CombinedCapacity = maxCombined;
+        data.CapacitiesFromBuosSheet = true;
+      }
+
+      if (maxGas > 0)
+      {
+        data.GasCapacity = maxGas;
+        data.CapacitiesFromBuosSheet = true;
+      }
     }
 
     private static double ReadDouble(ExcelWorksheet sheet, int row, int col, double fallback)
