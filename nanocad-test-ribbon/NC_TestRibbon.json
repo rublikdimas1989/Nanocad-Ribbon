@@ -37,34 +37,6 @@
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
-      "intername": "NcTestPadOpt",
-      "displayName": "Кустовые площадки",
-      "tooltip": "Открывает «Исходные данные» на вкладке Кустовые площадки.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestInserts",
-      "displayName": "Точки врезки",
-      "tooltip": "Открывает «Исходные данные» на вкладке Врезки.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestBuos",
-      "displayName": "Варианты БУОС",
-      "tooltip": "Открывает «Исходные данные» на вкладке БУОС.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestNodes",
-      "displayName": "Узлы",
-      "tooltip": "Открывает «Исходные данные» на вкладке Узлы (габарит + цена из Price).",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
       "intername": "NcTestInterface",
       "displayName": "Оформление",
       "tooltip": "Размер шрифта подписей и диаметр круга врезки → Tracing_cache\\Settings\\interface.conf",
@@ -103,26 +75,6 @@
     {
       "text": "Исходные данные",
       "command": "NcTestSourceData",
-      "style": "large"
-    },
-    {
-      "text": "Кустовые площадки",
-      "command": "NcTestPadOpt",
-      "style": "large"
-    },
-    {
-      "text": "Точки врезки",
-      "command": "NcTestInserts",
-      "style": "large"
-    },
-    {
-      "text": "Варианты БУОС",
-      "command": "NcTestBuos",
-      "style": "large"
-    },
-    {
-      "text": "Узлы",
-      "command": "NcTestNodes",
       "style": "large"
     },
     {

@@ -4,9 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.35.zip`](nanocad-test-ribbon-v1.2.35.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.35/nanocad-test-ribbon-v1.2.35.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.36.zip`](nanocad-test-ribbon-v1.2.36.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/nanocad-test-ribbon-v1.2.36.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.36 — ribbon: only «Исходные данные»
+
+- Removed ribbon buttons Кустовые / Врезки / БУОС / Узлы; keep single «Исходные данные»
+- `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` remain as typed commands
 
 ## v1.2.35 — fix Activate CS0103 (TCON-53)
 
