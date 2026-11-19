@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.42.zip`](nanocad-test-ribbon-v1.2.42.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.42/nanocad-test-ribbon-v1.2.42.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.43.zip`](nanocad-test-ribbon-v1.2.43.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.43/nanocad-test-ribbon-v1.2.43.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.43 — PathTextDisplay Control ambiguity (TCON-60)
+
+- WinForms helpers use `System.Windows.Forms.Control` only (no bare `Control` / WPF Controls import)
 
 ## v1.2.42 — ECW End-style georef attach
 

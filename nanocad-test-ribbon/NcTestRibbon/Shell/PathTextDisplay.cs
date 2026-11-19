@@ -2,13 +2,16 @@ namespace NcTestRibbon.Shell
 {
   using System;
   using System.Windows;
-  using System.Windows.Controls;
   using System.Windows.Forms;
   using WpfTextBox = System.Windows.Controls.TextBox;
   using WinFormsTextBox = System.Windows.Forms.TextBox;
+  using WinFormsControl = System.Windows.Forms.Control;
+  using WinFormsForm = System.Windows.Forms.Form;
+  using WinFormsUserControl = System.Windows.Forms.UserControl;
 
   /// <summary>
   /// Keep long paths LTR and scroll so the filename (end) stays visible.
+  /// WinForms helpers use System.Windows.Forms.Control only (no WPF Control).
   /// </summary>
   internal static class PathTextDisplay
   {
@@ -68,7 +71,7 @@ namespace NcTestRibbon.Shell
       }
     }
 
-    public static void HookShowEndOnVisible(WinFormsTextBox box, Control host)
+    public static void HookShowEndOnVisible(WinFormsTextBox box, WinFormsControl host)
     {
       if (box == null || host == null)
       {
@@ -84,12 +87,12 @@ namespace NcTestRibbon.Shell
           ShowEnd(box);
         }
       };
-      if (host is Form form)
+      if (host is WinFormsForm form)
       {
         form.Shown += show;
         form.Load += show;
       }
-      else if (host is UserControl panel)
+      else if (host is WinFormsUserControl panel)
       {
         panel.Load += show;
       }
@@ -103,7 +106,7 @@ namespace NcTestRibbon.Shell
       }
 
       box.FlowDirection = FlowDirection.LeftToRight;
-      box.TextAlignment = System.Windows.TextAlignment.Left;
+      box.TextAlignment = TextAlignment.Left;
     }
 
     public static void ShowEnd(WpfTextBox box)
