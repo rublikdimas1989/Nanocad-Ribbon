@@ -64,7 +64,7 @@ namespace NcTestRibbon.Shell
       root.Children.Add(_cacheInfo);
       _cacheInfo.Text =
         "Кэш: " + TracingCache.Root
-        + "  |  расценки: " + TracingCache.PriceXlsx
+        + "  |  расценки: " + TracingCache.ResolveRatesFilePath()
         + "  |  " + Path.GetFileName(TracingCache.TracingConf)
         + " + " + Path.GetFileName(TracingCache.TrenchRoadConf);
 
