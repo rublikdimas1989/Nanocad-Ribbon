@@ -29,6 +29,9 @@ namespace NcTestRibbon.Configuration
     /// <summary>Last Top_tree / profiles JSON.</summary>
     public string ProfilesJson { get; set; } = string.Empty;
 
+    /// <summary>Remember «Показывать на чертеже» for the pad window.</summary>
+    public bool ShowPadsOnDrawing { get; set; }
+
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
       WriteIndented = true,

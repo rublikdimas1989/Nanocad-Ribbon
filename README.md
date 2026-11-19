@@ -4,8 +4,14 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.27.zip`](nanocad-test-ribbon-v1.2.27.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.27/nanocad-test-ribbon-v1.2.27.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.28.zip`](nanocad-test-ribbon-v1.2.28.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.28/nanocad-test-ribbon-v1.2.28.zip
+
+## v1.2.28 — pad session: stay open, persist show, revert unsaved
+
+- Modeless pad window — stays open after place/rotate; grid shows new X/Y/angle immediately
+- «Показывать на чертеже» persisted in `paths.json`
+- Without «Сохранить положения», close discards preview and restores CAD to last Excel poses
 
 ## v1.2.27 — WinForms DataGridView for KP rows (TCON-45)
 

@@ -17,7 +17,7 @@ namespace NcTestRibbon.Shell
 
   /// <summary>
   /// KP table from Excel (WinForms DataGridView): profiles, CAD overlay, place/rotate, save X/Y.
-  /// Replaces WPF DataGrid which stayed empty (headers only) after load while _pads had rows.
+  /// Modeless: stays open across place/rotate. Unsaved moves revert CAD to Excel on close.
   /// </summary>
   public sealed class PadOptimizationWindow : Form
   {
@@ -33,6 +33,7 @@ namespace NcTestRibbon.Shell
     private readonly Button _saveButton;
     private PadWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
+    private bool _discardingSession;
 
     public PadOptimizationWindow()
     {
@@ -43,10 +44,11 @@ namespace NcTestRibbon.Shell
       StartPosition = FormStartPosition.CenterParent;
       FormBorderStyle = FormBorderStyle.Sizable;
       ShowInTaskbar = true;
-      // Closing must NOT erase KP entities — they stay on the drawing.
+      // Closing discards unsaved place/rotate (CAD back to last Excel); does NOT erase saved KP.
 
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
+      FormClosing += PadOptimizationWindow_FormClosing;
 
       var root = new TableLayoutPanel
       {
@@ -153,6 +155,7 @@ namespace NcTestRibbon.Shell
 
         try
         {
+          AppPaths.Set(p => p.ShowPadsOnDrawing = _showOnDrawing.Checked);
           if (_showOnDrawing.Checked)
           {
             RefreshDrawingOverlay(force: true);
@@ -171,6 +174,7 @@ namespace NcTestRibbon.Shell
           try
           {
             _showOnDrawing.Checked = false;
+            AppPaths.Set(p => p.ShowPadsOnDrawing = false);
           }
           finally
           {
@@ -271,8 +275,101 @@ namespace NcTestRibbon.Shell
         Log("Откройте таблицы КП (xlsx) через «Обзор…».");
       }
 
+      // Restore «Показывать на чертеже» after workbook load so overlay uses current rows.
+      if (paths.ShowPadsOnDrawing)
+      {
+        _suppressShowToggle = true;
+        try
+        {
+          _showOnDrawing.Checked = true;
+        }
+        finally
+        {
+          _suppressShowToggle = false;
+        }
+
+        try
+        {
+          RefreshDrawingOverlay(force: true);
+        }
+        catch (Exception ex)
+        {
+          Log("Показ на чертеже: " + ex.Message);
+        }
+      }
+
       UpdateActionButtons();
       Shown += (_, __) => BindPadsGrid();
+    }
+
+    private void PadOptimizationWindow_FormClosing(object sender, FormClosingEventArgs e)
+    {
+      try
+      {
+        AppPaths.Set(p => p.ShowPadsOnDrawing = _showOnDrawing.Checked);
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        DiscardUnsavedSession();
+      }
+      catch (Exception ex)
+      {
+        WriteCrashLog("FormClosing discard", ex);
+        try
+        {
+          Log("Отмена несохранённых положений: " + ex.Message);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    /// <summary>
+    /// Without «Сохранить положения», restore Record/grid/CAD to last Excel-committed pose.
+    /// </summary>
+    private void DiscardUnsavedSession()
+    {
+      if (_discardingSession)
+      {
+        return;
+      }
+
+      _discardingSession = true;
+      try
+      {
+        List<PadRow> dirty = _pads.Where(p => p.CoordsDirty).ToList();
+        if (dirty.Count == 0)
+        {
+          return;
+        }
+
+        foreach (PadRow row in dirty)
+        {
+          row.RestoreCommitted();
+        }
+
+        BindPadsGrid();
+        UpdateActionButtons();
+
+        // Rewrite CAD to last Excel-committed poses (temporary preview discarded).
+        CadPadOverlay.ShowPads(_pads.Select(ToGeom));
+        if (!_showOnDrawing.Checked)
+        {
+          CadPadOverlay.Clear();
+        }
+
+        Log("Несохранённые положения отменены («" + dirty.Count
+          + "» КП → последние из Excel).");
+      }
+      finally
+      {
+        _discardingSession = false;
+      }
     }
 
     private void Grid_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -389,13 +486,7 @@ namespace NcTestRibbon.Shell
 
         if (poseUpdated)
         {
-          row.Record.X = x;
-          row.Record.Y = y;
-          row.X = x.ToString("G17", CultureInfo.CurrentCulture);
-          row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
-          row.RotationDeg = CadPadOverlay.NormalizeDegrees(rot);
-          row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
-          row.CoordsDirty = true;
+          row.ApplyPreviewPose(x, y, CadPadOverlay.NormalizeDegrees(rot));
           Log("Поворот вручную «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
             + "; угол=" + row.RotationText + "°");
         }
@@ -404,7 +495,7 @@ namespace NcTestRibbon.Shell
           Log("Поворот «" + row.Name + "» выполнен; позу с чертежа прочитать не удалось.");
         }
       });
-      BindPadsGrid(row);
+      RefreshPadRow(row);
       UpdateActionButtons();
     }
 
@@ -425,11 +516,7 @@ namespace NcTestRibbon.Shell
           return;
         }
 
-        row.Record.X = x;
-        row.Record.Y = y;
-        row.X = x.ToString("G17", CultureInfo.CurrentCulture);
-        row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
-        row.CoordsDirty = true;
+        row.ApplyPreviewPose(x, y, row.RotationDeg);
 
         if (!_showOnDrawing.Checked)
         {
@@ -443,22 +530,20 @@ namespace NcTestRibbon.Shell
         Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
       });
-      BindPadsGrid(row);
+      RefreshPadRow(row);
       UpdateActionButtons();
     }
 
     /// <summary>
-    /// Yield modal Form to CAD (jig / zoom / ROTATE) without Hide() —
-    /// Hide() ends Form.ShowDialog. Opacity=0 keeps the dialog open.
+    /// Yield modeless Form to CAD (jig / zoom / ROTATE). Hide is OK for Show() — does not end the window.
     /// </summary>
     private void RunWithCadFocus(Action cadWork)
     {
-      double previousOpacity = Opacity;
       bool wasEnabled = Enabled;
       try
       {
         Enabled = false;
-        Opacity = 0;
+        Hide();
         try
         {
           Application.DoEvents();
@@ -488,10 +573,11 @@ namespace NcTestRibbon.Shell
         {
           if (!IsDisposed)
           {
-            Opacity = previousOpacity <= 0 ? 1 : previousOpacity;
+            Show();
             Enabled = wasEnabled;
             Activate();
-            BindPadsGrid();
+            BringToFront();
+            BindPadsGrid(SelectedPad());
           }
         }
         catch (Exception ex)
@@ -506,6 +592,23 @@ namespace NcTestRibbon.Shell
           }
         }
       }
+    }
+
+    private void RefreshPadRow(PadRow row)
+    {
+      if (row == null)
+      {
+        BindPadsGrid();
+        return;
+      }
+
+      int index = _pads.IndexOf(row);
+      if (index >= 0)
+      {
+        _pads.ResetItem(index);
+      }
+
+      BindPadsGrid(row);
     }
 
     /// <summary>
@@ -613,7 +716,10 @@ namespace NcTestRibbon.Shell
       int updated = PadWorkbookLoader.SavePadCoordinates(_book.Path, dirty);
       foreach (PadRow row in _pads)
       {
-        row.CoordsDirty = false;
+        if (row.CoordsDirty)
+        {
+          row.CaptureCommitted();
+        }
       }
 
       BindPadsGrid();
@@ -734,11 +840,9 @@ namespace NcTestRibbon.Shell
       _pads.Clear();
       foreach (PadWorkbookLoader.PadRecord pad in book.Pads)
       {
-        _pads.Add(new PadRow
+        var row = new PadRow
         {
           Name = pad.Name,
-          X = pad.X.ToString("G17", CultureInfo.CurrentCulture),
-          Y = pad.Y.ToString("G17", CultureInfo.CurrentCulture),
           WidthM = pad.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
           LengthM = pad.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
           SourMedium = pad.SourMedium,
@@ -747,10 +851,11 @@ namespace NcTestRibbon.Shell
           Gas = pad.ActiveGas,
           FirstLaunch = "1",
           Record = pad,
-          CoordsDirty = false,
           RotationDeg = 0,
           RotationText = "0"
-        });
+        };
+        row.CaptureCommittedFromExcel(pad.X, pad.Y, rotationDeg: 0);
+        _pads.Add(row);
       }
 
       _tablesFile.Text = path;
@@ -774,11 +879,6 @@ namespace NcTestRibbon.Shell
             }
           }
         }
-      }
-
-      foreach (PadRow row in _pads)
-      {
-        row.CoordsDirty = false;
       }
 
       string caps = book.CapacitiesFromBuosSheet
@@ -831,24 +931,163 @@ namespace NcTestRibbon.Shell
       };
     }
 
-    public sealed class PadRow
+    public sealed class PadRow : INotifyPropertyChanged
     {
+      private string _x = "0";
+      private string _y = "0";
+      private string _rotationText = "0";
+      private double _rotationDeg;
+      private bool _coordsDirty;
+
       public string Name { get; set; } = string.Empty;
-      public string X { get; set; } = "0";
-      public string Y { get; set; } = "0";
+      public string X
+      {
+        get => _x;
+        set
+        {
+          if (_x == value)
+          {
+            return;
+          }
+
+          _x = value;
+          OnPropertyChanged(nameof(X));
+        }
+      }
+
+      public string Y
+      {
+        get => _y;
+        set
+        {
+          if (_y == value)
+          {
+            return;
+          }
+
+          _y = value;
+          OnPropertyChanged(nameof(Y));
+        }
+      }
+
       public string WidthM { get; set; } = "150";
       public string LengthM { get; set; } = "250";
-      public string RotationText { get; set; } = "0";
-      public double RotationDeg { get; set; }
+      public string RotationText
+      {
+        get => _rotationText;
+        set
+        {
+          if (_rotationText == value)
+          {
+            return;
+          }
+
+          _rotationText = value;
+          OnPropertyChanged(nameof(RotationText));
+        }
+      }
+
+      public double RotationDeg
+      {
+        get => _rotationDeg;
+        set => _rotationDeg = value;
+      }
+
       /// <summary>Display-only: from Excel «Сернистая среда» (Да/Нет).</summary>
       public bool SourMedium { get; set; }
       public bool Liquid { get; set; } = true;
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;
       public string FirstLaunch { get; set; } = "1";
-      public bool CoordsDirty { get; set; }
+      public bool CoordsDirty
+      {
+        get => _coordsDirty;
+        set
+        {
+          if (_coordsDirty == value)
+          {
+            return;
+          }
+
+          _coordsDirty = value;
+          OnPropertyChanged(nameof(CoordsDirty));
+        }
+      }
+
       [Browsable(false)]
       public PadWorkbookLoader.PadRecord Record { get; set; }
+
+      [Browsable(false)]
+      public double CommittedX { get; private set; }
+
+      [Browsable(false)]
+      public double CommittedY { get; private set; }
+
+      [Browsable(false)]
+      public double CommittedRotationDeg { get; private set; }
+
+      public event PropertyChangedEventHandler PropertyChanged;
+
+      public void CaptureCommittedFromExcel(double x, double y, double rotationDeg)
+      {
+        CommittedX = x;
+        CommittedY = y;
+        CommittedRotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
+        if (Record != null)
+        {
+          Record.X = CommittedX;
+          Record.Y = CommittedY;
+        }
+
+        X = CommittedX.ToString("G17", CultureInfo.CurrentCulture);
+        Y = CommittedY.ToString("G17", CultureInfo.CurrentCulture);
+        RotationDeg = CommittedRotationDeg;
+        RotationText = CommittedRotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+        CoordsDirty = false;
+      }
+
+      public void CaptureCommitted()
+      {
+        CommittedX = Record?.X ?? 0;
+        CommittedY = Record?.Y ?? 0;
+        CommittedRotationDeg = CadPadOverlay.NormalizeDegrees(RotationDeg);
+        CoordsDirty = false;
+      }
+
+      public void ApplyPreviewPose(double x, double y, double rotationDeg)
+      {
+        if (Record != null)
+        {
+          Record.X = x;
+          Record.Y = y;
+        }
+
+        X = x.ToString("G17", CultureInfo.CurrentCulture);
+        Y = y.ToString("G17", CultureInfo.CurrentCulture);
+        RotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
+        RotationText = RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+        CoordsDirty = true;
+      }
+
+      public void RestoreCommitted()
+      {
+        if (Record != null)
+        {
+          Record.X = CommittedX;
+          Record.Y = CommittedY;
+        }
+
+        X = CommittedX.ToString("G17", CultureInfo.CurrentCulture);
+        Y = CommittedY.ToString("G17", CultureInfo.CurrentCulture);
+        RotationDeg = CommittedRotationDeg;
+        RotationText = CommittedRotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+        CoordsDirty = false;
+      }
+
+      private void OnPropertyChanged(string name)
+      {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+      }
     }
   }
 }

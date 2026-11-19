@@ -24,6 +24,7 @@ namespace NcTestRibbon
     private const string DefaultHttpUrl = "https://httpbin.org/get";
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
+    private static PadOptimizationWindow _padOptLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -101,6 +102,7 @@ namespace NcTestRibbon
 
     /// <summary>
     /// Display-only KP table from Excel (paths.json). WinForms DataGridView (v1.2.27+).
+    /// Modeless singleton so place/rotate does not end the window (v1.2.28).
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
@@ -109,7 +111,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Modal WinForms pad window — DataGridView shows rows reliably (WPF DataGrid stayed empty).
+    /// Modeless WinForms pad window — stays open across place/rotate CAD prompts.
     /// </summary>
     private void OpenPadOptForm()
     {
@@ -122,24 +124,38 @@ namespace NcTestRibbon
         // Detail profiles dialog is still WPF.
         EnsureWpfApplication(ed);
 
+        if (_padOptLive != null && !_padOptLive.IsDisposed)
+        {
+          _padOptLive.BringToFront();
+          _padOptLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open (modeless).");
+          return;
+        }
+
         IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        ed?.WriteMessage("\n" + label + ": opening WinForms pad grid (ShowDialog)."
+        ed?.WriteMessage("\n" + label + ": opening WinForms pad grid (modeless Show)."
           + " HWND=" + hwnd.ToInt64());
 
-        using (PadOptimizationWindow form = new PadOptimizationWindow())
+        PadOptimizationWindow form = new PadOptimizationWindow();
+        _padOptLive = form;
+        form.FormClosed += (_, __) =>
         {
-          DialogResult result;
-          if (hwnd != IntPtr.Zero)
+          if (ReferenceEquals(_padOptLive, form))
           {
-            result = form.ShowDialog(new WindowWrapper(hwnd));
+            _padOptLive = null;
           }
-          else
-          {
-            result = form.ShowDialog();
-          }
+        };
 
-          ed?.WriteMessage("\n" + label + ": closed, DialogResult=" + result);
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
         }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": modeless open.");
       }
       catch (System.Exception ex)
       {
