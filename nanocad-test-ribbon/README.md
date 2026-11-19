@@ -3,9 +3,10 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.17**): `nanocad-test-ribbon-v1.2.17.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.17.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.17/nanocad-test-ribbon-v1.2.17.zip  
+Актуальный zip с GitHub (версия **1.2.18**): `nanocad-test-ribbon-v1.2.18.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.18.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.18/nanocad-test-ribbon-v1.2.18.zip  
+
 
 
 
@@ -15,7 +16,7 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.17**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.18**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -86,14 +87,15 @@ NcTestPadOpt
 NcTestBlink
 ```
 
-### Кустовые площадки (v1.2.16+)
+### Кустовые площадки (v1.2.18)
 
 `NcTestPadOpt` / лента **Кустовые площадки**:
 
-- **Показывать на чертеже** — прямоугольники (ширина×длина), подпись сверху (высота текста = ½ ширины)
-- Выбрать строку → **Задать положение вручную** (окно скрывается, jig следует за курсором) → жёлтая строка → **Сохранить координаты** (подтверждение, запись X/Y в лист «КП»)
+- **Показывать на чертеже** — слой `NC_KP_PADS` (после отрисовки **locked**); повторный check только обновляет, без дублей
+- 0°: **Длина по X** (широкая), **Ширина по Y** (узкая); подпись высотой = ½ ширины
+- **Угол °** + **Повернуть** (0…360)
+- **Задать положение вручную** → jig → жёлтая строка → автопоказ на чертеже → **Сохранить координаты**
 - **Двойной щелчок** → профили + **Ограничивает в месяце**
-- v1.2.17: CS0104/CS1503 в `CadPadOverlay` (DbPolyline + Geometry.Polyline normal/IntPtr)
 
 ### Мигание сегмента (v1.2.13+)
 

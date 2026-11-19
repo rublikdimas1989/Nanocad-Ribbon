@@ -2,6 +2,7 @@ namespace NcTestRibbon.Cad
 {
   using System;
   using System.Collections.Generic;
+  using System.Linq;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
   using Teigha.Colors;
@@ -12,83 +13,58 @@ namespace NcTestRibbon.Cad
   using DbPolyline = Teigha.DatabaseServices.Polyline;
 
   /// <summary>
-  /// Draws KP width×length rectangles + labels on a dedicated layer; interactive place jig.
+  /// KP rectangles + labels on locked layer NC_KP_PADS.
+  /// Orientation at 0°: Длина along X (wide), Ширина along Y (narrow).
   /// </summary>
   public static class CadPadOverlay
   {
     public const string LayerName = "NC_KP_PADS";
-    private static readonly Dictionary<string, ObjectId> RectIds = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
-    private static readonly Dictionary<string, ObjectId> LabelIds = new Dictionary<string, ObjectId>(StringComparer.OrdinalIgnoreCase);
 
     public static void Clear()
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       if (doc == null)
       {
-        RectIds.Clear();
-        LabelIds.Clear();
         return;
       }
 
-      Database db = doc.Database;
-      using (doc.LockDocument())
-      using (Transaction tr = db.TransactionManager.StartTransaction())
+      RunWrite(doc, (tr, model, db) =>
       {
-        EraseIds(tr, RectIds.Values);
-        EraseIds(tr, LabelIds.Values);
-        tr.Commit();
-      }
-
-      RectIds.Clear();
-      LabelIds.Clear();
-      try
-      {
-        doc.Editor?.Regen();
-      }
-      catch
-      {
-      }
+        UnlockLayer(tr, db);
+        EraseLayerEntities(tr, model);
+        LockLayer(tr, db);
+      });
+      TryRegen(doc);
     }
 
-    public static void ShowPads(IEnumerable<PadGeom> pads)
+    /// <summary>
+    /// Erase existing NC_KP_PADS entities, then draw pads (no duplicates on re-check).
+    /// </summary>
+    public static int ShowPads(IEnumerable<PadGeom> pads)
     {
-      if (pads == null)
-      {
-        return;
-      }
-
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
-      Database db = doc.Database;
-      using (doc.LockDocument())
-      using (Transaction tr = db.TransactionManager.StartTransaction())
+      PadGeom[] list = (pads ?? Enumerable.Empty<PadGeom>())
+        .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+        .ToArray();
+
+      int drawn = 0;
+      RunWrite(doc, (tr, model, db) =>
       {
-        EnsureLayer(tr, db);
-        BlockTableRecord model = (BlockTableRecord)tr.GetObject(
-          SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-
-        EraseIds(tr, RectIds.Values);
-        EraseIds(tr, LabelIds.Values);
-        RectIds.Clear();
-        LabelIds.Clear();
-
-        foreach (PadGeom pad in pads)
+        EnsureLayer(tr, db, unlockForWrite: true);
+        EraseLayerEntities(tr, model);
+        foreach (PadGeom pad in list)
         {
-          if (pad == null || string.IsNullOrWhiteSpace(pad.Name))
-          {
-            continue;
-          }
-
-          ObjectId rectId = AddRectangle(tr, model, pad);
-          ObjectId labelId = AddLabel(tr, model, pad);
-          RectIds[pad.Name] = rectId;
-          LabelIds[pad.Name] = labelId;
+          AddRectangle(tr, model, db, pad);
+          AddLabel(tr, model, db, pad);
+          drawn++;
         }
 
-        tr.Commit();
-      }
-
-      doc.Editor?.Regen();
+        LockLayer(tr, db);
+      });
+      TryRegen(doc);
+      TryUpdateScreen(doc);
+      return drawn;
     }
 
     public static void UpdatePad(PadGeom pad)
@@ -98,41 +74,21 @@ namespace NcTestRibbon.Cad
         return;
       }
 
-      Document doc = CadApp.DocumentManager.MdiActiveDocument;
-      if (doc == null)
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+
+      RunWrite(doc, (tr, model, db) =>
       {
-        return;
-      }
-
-      Database db = doc.Database;
-      using (doc.LockDocument())
-      using (Transaction tr = db.TransactionManager.StartTransaction())
-      {
-        EnsureLayer(tr, db);
-        BlockTableRecord model = (BlockTableRecord)tr.GetObject(
-          SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
-
-        if (RectIds.TryGetValue(pad.Name, out ObjectId oldRect) && !oldRect.IsNull)
-        {
-          EraseOne(tr, oldRect);
-        }
-
-        if (LabelIds.TryGetValue(pad.Name, out ObjectId oldLabel) && !oldLabel.IsNull)
-        {
-          EraseOne(tr, oldLabel);
-        }
-
-        RectIds[pad.Name] = AddRectangle(tr, model, pad);
-        LabelIds[pad.Name] = AddLabel(tr, model, pad);
-        tr.Commit();
-      }
-
-      doc.Editor?.Regen();
+        EnsureLayer(tr, db, unlockForWrite: true);
+        EraseNamedPad(tr, model, pad.Name);
+        AddRectangle(tr, model, db, pad);
+        AddLabel(tr, model, db, pad);
+        LockLayer(tr, db);
+      });
+      TryRegen(doc);
+      TryUpdateScreen(doc);
     }
 
-    /// <summary>
-    /// Interactive place: rectangle+label follow cursor (DrawJig); click commits center X/Y.
-    /// </summary>
     public static bool TryPlace(PadGeom pad, out double x, out double y)
     {
       x = pad?.X ?? 0;
@@ -145,7 +101,7 @@ namespace NcTestRibbon.Cad
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
       Editor ed = doc.Editor;
-      var jig = new PadPlaceJig(pad.Name, pad.WidthM, pad.LengthM, new Point3d(pad.X, pad.Y, 0));
+      var jig = new PadPlaceJig(pad, new Point3d(pad.X, pad.Y, 0));
       PromptResult result = ed.Drag(jig);
       if (result.Status != PromptStatus.OK)
       {
@@ -159,80 +115,285 @@ namespace NcTestRibbon.Cad
       return true;
     }
 
-    private static ObjectId AddRectangle(Transaction tr, BlockTableRecord model, PadGeom pad)
+    private static void RunWrite(Document doc, Action<Transaction, BlockTableRecord, Database> action)
     {
-      double halfW = Math.Max(pad.WidthM, 1) / 2.0;
-      double halfL = Math.Max(pad.LengthM, 1) / 2.0;
+      Database db = doc.Database;
+      using (doc.LockDocument())
+      using (Transaction tr = db.TransactionManager.StartTransaction())
+      {
+        BlockTable bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+        ObjectId msId = bt[BlockTableRecord.ModelSpace];
+        BlockTableRecord model = (BlockTableRecord)tr.GetObject(msId, OpenMode.ForWrite);
+        action(tr, model, db);
+        tr.Commit();
+      }
+    }
+
+    private static void AddRectangle(Transaction tr, BlockTableRecord model, Database db, PadGeom pad)
+    {
+      // 0°: Длина → X (горизонталь), Ширина → Y (вертикаль) → широкая КП.
+      double halfX = Math.Max(pad.LengthM, 1) / 2.0;
+      double halfY = Math.Max(pad.WidthM, 1) / 2.0;
+      Point2d[] local =
+      {
+        new Point2d(-halfX, -halfY),
+        new Point2d(+halfX, -halfY),
+        new Point2d(+halfX, +halfY),
+        new Point2d(-halfX, +halfY)
+      };
+
       var pl = new DbPolyline();
-      pl.SetDatabaseDefaults();
+      pl.SetDatabaseDefaults(db);
       pl.Layer = LayerName;
       pl.Color = Color.FromColorIndex(ColorMethod.ByAci, 3);
-      pl.AddVertexAt(0, new Point2d(pad.X - halfW, pad.Y - halfL), 0, 0, 0);
-      pl.AddVertexAt(1, new Point2d(pad.X + halfW, pad.Y - halfL), 0, 0, 0);
-      pl.AddVertexAt(2, new Point2d(pad.X + halfW, pad.Y + halfL), 0, 0, 0);
-      pl.AddVertexAt(3, new Point2d(pad.X - halfW, pad.Y + halfL), 0, 0, 0);
+      pl.Visible = true;
+      for (int i = 0; i < 4; i++)
+      {
+        Point2d w = Rotate(pad.X, pad.Y, local[i].X, local[i].Y, pad.RotationDeg);
+        pl.AddVertexAt(i, w, 0, 0, 0);
+      }
+
       pl.Closed = true;
-      ObjectId id = model.AppendEntity(pl);
+      model.AppendEntity(pl);
       tr.AddNewlyCreatedDBObject(pl, true);
-      return id;
+      SetPadName(tr, db, pl, pad.Name);
     }
 
-    private static ObjectId AddLabel(Transaction tr, BlockTableRecord model, PadGeom pad)
+    private static void AddLabel(Transaction tr, BlockTableRecord model, Database db, PadGeom pad)
     {
+      double halfY = Math.Max(pad.WidthM, 1) / 2.0;
       double height = Math.Max(pad.WidthM, 1) / 2.0;
-      double halfL = Math.Max(pad.LengthM, 1) / 2.0;
+      Point2d anchor = Rotate(pad.X, pad.Y, 0, halfY + height * 0.15, pad.RotationDeg);
+
       var text = new DBText();
-      text.SetDatabaseDefaults();
+      text.SetDatabaseDefaults(db);
       text.Layer = LayerName;
       text.Color = Color.FromColorIndex(ColorMethod.ByAci, 2);
+      text.Visible = true;
       text.Height = height;
       text.TextString = pad.Name ?? string.Empty;
+      text.Rotation = DegreesToRadians(pad.RotationDeg);
       text.HorizontalMode = TextHorizontalMode.TextCenter;
       text.VerticalMode = TextVerticalMode.TextBottom;
-      text.AlignmentPoint = new Point3d(pad.X, pad.Y + halfL + height * 0.15, 0);
+      text.AlignmentPoint = new Point3d(anchor.X, anchor.Y, 0);
       text.Position = text.AlignmentPoint;
-      ObjectId id = model.AppendEntity(text);
-      tr.AddNewlyCreatedDBObject(text, true);
-      return id;
-    }
-
-    private static void EnsureLayer(Transaction tr, Database db)
-    {
-      LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-      if (layers.Has(LayerName))
-      {
-        return;
-      }
-
-      layers.UpgradeOpen();
-      var layer = new LayerTableRecord
-      {
-        Name = LayerName,
-        Color = Color.FromColorIndex(ColorMethod.ByAci, 3)
-      };
-      layers.Add(layer);
-      tr.AddNewlyCreatedDBObject(layer, true);
-    }
-
-    private static void EraseIds(Transaction tr, IEnumerable<ObjectId> ids)
-    {
-      foreach (ObjectId id in ids)
-      {
-        EraseOne(tr, id);
-      }
-    }
-
-    private static void EraseOne(Transaction tr, ObjectId id)
-    {
-      if (id.IsNull || id.IsErased)
-      {
-        return;
-      }
-
       try
       {
-        DBObject obj = tr.GetObject(id, OpenMode.ForWrite, openErased: true);
-        obj?.Erase();
+        text.AdjustAlignment(db);
+      }
+      catch
+      {
+      }
+
+      model.AppendEntity(text);
+      tr.AddNewlyCreatedDBObject(text, true);
+      SetPadName(tr, db, text, pad.Name);
+    }
+
+    private static void SetPadName(Transaction tr, Database db, Entity entity, string name)
+    {
+      try
+      {
+        const string app = "NC_KP_PAD";
+        RegAppTable apps = (RegAppTable)tr.GetObject(db.RegAppTableId, OpenMode.ForRead);
+        if (!apps.Has(app))
+        {
+          apps.UpgradeOpen();
+          var record = new RegAppTableRecord { Name = app };
+          apps.Add(record);
+          tr.AddNewlyCreatedDBObject(record, true);
+        }
+
+        entity.XData = new ResultBuffer(
+          new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
+          new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty));
+      }
+      catch
+      {
+        // XData optional — erase-by-layer still works for full refresh.
+      }
+    }
+
+    private static string ReadPadName(Entity entity)
+    {
+      try
+      {
+        ResultBuffer data = entity.GetXDataForApplication("NC_KP_PAD");
+        if (data == null)
+        {
+          return null;
+        }
+
+        foreach (TypedValue tv in data)
+        {
+          if (tv.TypeCode == (int)DxfCode.ExtendedDataAsciiString)
+          {
+            return Convert.ToString(tv.Value);
+          }
+        }
+      }
+      catch
+      {
+      }
+
+      return null;
+    }
+
+    private static void EraseNamedPad(Transaction tr, BlockTableRecord model, string name)
+    {
+      foreach (ObjectId id in CollectModelIds(model))
+      {
+        if (id.IsNull || id.IsErased)
+        {
+          continue;
+        }
+
+        Entity ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+        if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        string stored = ReadPadName(ent);
+        if (!string.Equals(stored, name, StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        ent.UpgradeOpen();
+        ent.Erase();
+      }
+    }
+
+    private static void EraseLayerEntities(Transaction tr, BlockTableRecord model)
+    {
+      foreach (ObjectId id in CollectModelIds(model))
+      {
+        if (id.IsNull || id.IsErased)
+        {
+          continue;
+        }
+
+        Entity ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+        if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        ent.UpgradeOpen();
+        ent.Erase();
+      }
+    }
+
+    private static List<ObjectId> CollectModelIds(BlockTableRecord model)
+    {
+      var ids = new List<ObjectId>();
+      foreach (ObjectId id in model)
+      {
+        ids.Add(id);
+      }
+
+      return ids;
+    }
+
+    private static void EnsureLayer(Transaction tr, Database db, bool unlockForWrite)
+    {
+      LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+      LayerTableRecord layer;
+      if (!layers.Has(LayerName))
+      {
+        layers.UpgradeOpen();
+        layer = new LayerTableRecord
+        {
+          Name = LayerName,
+          Color = Color.FromColorIndex(ColorMethod.ByAci, 3)
+        };
+        layers.Add(layer);
+        tr.AddNewlyCreatedDBObject(layer, true);
+      }
+      else
+      {
+        layer = (LayerTableRecord)tr.GetObject(layers[LayerName], OpenMode.ForWrite);
+      }
+
+      layer.IsOff = false;
+      layer.IsFrozen = false;
+      if (unlockForWrite)
+      {
+        layer.IsLocked = false;
+      }
+    }
+
+    private static void UnlockLayer(Transaction tr, Database db)
+    {
+      LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+      if (!layers.Has(LayerName))
+      {
+        return;
+      }
+
+      LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[LayerName], OpenMode.ForWrite);
+      layer.IsLocked = false;
+      layer.IsOff = false;
+      layer.IsFrozen = false;
+    }
+
+    private static void LockLayer(Transaction tr, Database db)
+    {
+      LayerTable layers = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+      if (!layers.Has(LayerName))
+      {
+        return;
+      }
+
+      LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[LayerName], OpenMode.ForWrite);
+      layer.IsLocked = true;
+      layer.IsOff = false;
+      layer.IsFrozen = false;
+    }
+
+    private static Point2d Rotate(double cx, double cy, double lx, double ly, double degrees)
+    {
+      double rad = DegreesToRadians(NormalizeDegrees(degrees));
+      double c = Math.Cos(rad);
+      double s = Math.Sin(rad);
+      return new Point2d(cx + lx * c - ly * s, cy + lx * s + ly * c);
+    }
+
+    private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180.0;
+
+    public static double NormalizeDegrees(double degrees)
+    {
+      if (!double.IsFinite(degrees))
+      {
+        return 0;
+      }
+
+      double d = degrees % 360.0;
+      if (d < 0)
+      {
+        d += 360.0;
+      }
+
+      return d;
+    }
+
+    private static void TryRegen(Document doc)
+    {
+      try
+      {
+        doc.Editor?.Regen();
+      }
+      catch
+      {
+      }
+    }
+
+    private static void TryUpdateScreen(Document doc)
+    {
+      try
+      {
+        doc.Editor?.UpdateScreen();
       }
       catch
       {
@@ -244,30 +405,31 @@ namespace NcTestRibbon.Cad
       public string Name { get; set; } = string.Empty;
       public double X { get; set; }
       public double Y { get; set; }
+      /// <summary>Short side — vertical at 0°.</summary>
       public double WidthM { get; set; } = 150;
+      /// <summary>Long side — horizontal at 0°.</summary>
       public double LengthM { get; set; } = 250;
+      /// <summary>Rotation degrees CCW, 0…360.</summary>
+      public double RotationDeg { get; set; }
     }
 
     private sealed class PadPlaceJig : DrawJig
     {
-      private readonly string _name;
-      private readonly double _width;
-      private readonly double _length;
+      private readonly PadGeom _pad;
       private Point3d _center;
 
       public Point3d Center => _center;
 
-      public PadPlaceJig(string name, double width, double length, Point3d start)
+      public PadPlaceJig(PadGeom pad, Point3d start)
       {
-        _name = name ?? string.Empty;
-        _width = Math.Max(width, 1);
-        _length = Math.Max(length, 1);
+        _pad = pad;
         _center = start;
       }
 
       protected override SamplerStatus Sampler(JigPrompts prompts)
       {
-        var options = new JigPromptPointOptions("\nУкажите новое положение КП «" + _name + "» (ЛКМ — принять, Esc — отмена): ")
+        var options = new JigPromptPointOptions(
+          "\nУкажите новое положение КП «" + _pad.Name + "» (ЛКМ — принять, Esc — отмена): ")
         {
           UserInputControls = UserInputControls.Accept3dCoordinates
             | UserInputControls.NullResponseAccepted
@@ -299,22 +461,35 @@ namespace NcTestRibbon.Cad
           return false;
         }
 
-        double halfW = _width / 2.0;
-        double halfL = _length / 2.0;
-        var corners = new Point3dCollection
+        double halfX = Math.Max(_pad.LengthM, 1) / 2.0;
+        double halfY = Math.Max(_pad.WidthM, 1) / 2.0;
+        Point2d[] local =
         {
-          new Point3d(_center.X - halfW, _center.Y - halfL, 0),
-          new Point3d(_center.X + halfW, _center.Y - halfL, 0),
-          new Point3d(_center.X + halfW, _center.Y + halfL, 0),
-          new Point3d(_center.X - halfW, _center.Y + halfL, 0),
-          new Point3d(_center.X - halfW, _center.Y - halfL, 0)
+          new Point2d(-halfX, -halfY),
+          new Point2d(+halfX, -halfY),
+          new Point2d(+halfX, +halfY),
+          new Point2d(-halfX, +halfY),
+          new Point2d(-halfX, -halfY)
         };
-        // Teigha: Geometry.Polyline(Point3dCollection, Vector3d normal, IntPtr) — not (…, int, int).
+        var corners = new Point3dCollection();
+        foreach (Point2d p in local)
+        {
+          Point2d w = Rotate(_center.X, _center.Y, p.X, p.Y, _pad.RotationDeg);
+          corners.Add(new Point3d(w.X, w.Y, 0));
+        }
+
         draw.Geometry.Polyline(corners, Vector3d.ZAxis, IntPtr.Zero);
 
-        double height = _width / 2.0;
-        Point3d labelAt = new Point3d(_center.X, _center.Y + halfL + height * 0.15, 0);
-        draw.Geometry.Text(labelAt, Vector3d.ZAxis, Vector3d.XAxis, height, 1.0, 0.0, _name);
+        double height = Math.Max(_pad.WidthM, 1) / 2.0;
+        Point2d label = Rotate(_center.X, _center.Y, 0, halfY + height * 0.15, _pad.RotationDeg);
+        draw.Geometry.Text(
+          new Point3d(label.X, label.Y, 0),
+          Vector3d.ZAxis,
+          new Vector3d(Math.Cos(DegreesToRadians(_pad.RotationDeg)), Math.Sin(DegreesToRadians(_pad.RotationDeg)), 0),
+          height,
+          1.0,
+          0.0,
+          _pad.Name);
         return true;
       }
     }

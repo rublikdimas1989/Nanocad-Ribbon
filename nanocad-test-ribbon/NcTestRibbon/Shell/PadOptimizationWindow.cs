@@ -16,7 +16,7 @@ namespace NcTestRibbon.Shell
   using NcTestRibbon.Rates;
 
   /// <summary>
-  /// KP table from Excel: view profiles, draw pads on CAD, place manually, save X/Y.
+  /// KP table from Excel: profiles, CAD overlay (locked layer), place/rotate, save X/Y.
   /// </summary>
   public sealed class PadOptimizationWindow : Window
   {
@@ -25,18 +25,20 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _fluidFile;
     private readonly TextBox _tablesFile;
     private readonly TextBox _log;
+    private readonly TextBox _rotationBox;
     private readonly TextBlock _status;
     private readonly DataGrid _grid;
     private readonly CheckBox _showOnDrawing;
     private readonly Button _placeButton;
+    private readonly Button _rotateButton;
     private readonly Button _saveButton;
     private PadWorkbookLoader.WorkbookData _book;
 
     public PadOptimizationWindow()
     {
       Title = "Кустовые площадки";
-      Width = 1100;
-      Height = 680;
+      Width = 1140;
+      Height = 700;
       MinWidth = 720;
       MinHeight = 480;
       WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -71,7 +73,7 @@ namespace NcTestRibbon.Shell
         return row;
       }
 
-      TextBox Field(Panel parent, string label, string value, double width)
+      TextBox Field(Panel parent, string label, string value, double width, bool readOnly = true)
       {
         parent.Children.Add(new TextBlock
         {
@@ -85,7 +87,7 @@ namespace NcTestRibbon.Shell
           Width = width,
           Padding = new Thickness(4),
           Margin = new Thickness(3),
-          IsReadOnly = true
+          IsReadOnly = readOnly
         };
         parent.Children.Add(box);
         return box;
@@ -109,6 +111,7 @@ namespace NcTestRibbon.Shell
           {
             MessageBox.Show(this, ex.Message, "Проверьте исходные данные",
               MessageBoxButton.OK, MessageBoxImage.Warning);
+            Log(ex.Message);
           }
         };
         parent.Children.Add(button);
@@ -130,13 +133,25 @@ namespace NcTestRibbon.Shell
         VerticalAlignment = VerticalAlignment.Center,
         Margin = new Thickness(5, 3, 12, 3)
       };
-      _showOnDrawing.Checked += (_, __) => RefreshDrawingOverlay();
+      _showOnDrawing.Checked += (_, __) =>
+      {
+        try
+        {
+          RefreshDrawingOverlay(force: true);
+        }
+        catch (Exception ex)
+        {
+          MessageBox.Show(this, ex.Message, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+          Log("Показ на чертеже: " + ex.Message);
+          _showOnDrawing.IsChecked = false;
+        }
+      };
       _showOnDrawing.Unchecked += (_, __) =>
       {
         try
         {
           CadPadOverlay.Clear();
-          Log("Подписи КП на чертеже скрыты.");
+          Log("КП на чертеже скрыты (слой " + CadPadOverlay.LayerName + ").");
         }
         catch (Exception ex)
         {
@@ -147,12 +162,17 @@ namespace NcTestRibbon.Shell
 
       Button(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
       _placeButton.IsEnabled = false;
+
+      _rotationBox = Field(cadRow, "Угол °:", "0", 60, readOnly: false);
+      Button(cadRow, "Повернуть", () => ApplyRotationToSelected(), out _rotateButton);
+      _rotateButton.IsEnabled = false;
+
       Button(cadRow, "Сохранить координаты", () => SaveCoordinates(), out _saveButton);
       _saveButton.IsEnabled = false;
 
       top.Children.Add(new TextBlock
       {
-        Text = "Двойной щелчок — профили. Жёлтая строка — координаты изменены, сохраните в Excel.",
+        Text = "0°: Длина по X (широкая), Ширина по Y. Слой NC_KP_PADS блокируется. Повтор «Показывать» только обновляет.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -190,6 +210,7 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
       _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
       _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
+      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
       _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
       _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
@@ -197,7 +218,14 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
       _grid.MouseDoubleClick += Grid_MouseDoubleClick;
-      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
+      _grid.SelectionChanged += (_, __) =>
+      {
+        UpdateActionButtons();
+        if (_grid.SelectedItem is PadRow row)
+        {
+          _rotationBox.Text = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+        }
+      };
       _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
@@ -239,7 +267,9 @@ namespace NcTestRibbon.Shell
 
     private void UpdateActionButtons()
     {
-      _placeButton.IsEnabled = _grid.SelectedItem is PadRow { Record: not null };
+      bool hasRow = _grid.SelectedItem is PadRow { Record: not null };
+      _placeButton.IsEnabled = hasRow;
+      _rotateButton.IsEnabled = hasRow;
       _saveButton.IsEnabled = _pads.Any(p => p.CoordsDirty);
     }
 
@@ -275,11 +305,42 @@ namespace NcTestRibbon.Shell
       Log("Профили: " + live.Name + " (" + (load.Months?.Count ?? 0) + " мес.)");
     }
 
+    private void ApplyRotationToSelected()
+    {
+      if (_grid.SelectedItem is not PadRow row || row.Record == null)
+      {
+        throw new InvalidOperationException("Выберите КП в таблице.");
+      }
+
+      if (!TryParseAngle(_rotationBox.Text, out double angle))
+      {
+        throw new InvalidOperationException("Угол: число 0…360.");
+      }
+
+      row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
+      row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+      _rotationBox.Text = row.RotationText;
+      _grid.Items.Refresh();
+
+      if (_showOnDrawing.IsChecked == true)
+      {
+        CadPadOverlay.UpdatePad(ToGeom(row));
+      }
+
+      Log("Поворот «" + row.Name + "»: " + row.RotationText + "°");
+    }
+
     private void PlaceSelectedPad()
     {
       if (_grid.SelectedItem is not PadRow row || row.Record == null)
       {
         throw new InvalidOperationException("Выберите КП в таблице.");
+      }
+
+      if (TryParseAngle(_rotationBox.Text, out double angle))
+      {
+        row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
+        row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
       }
 
       var geom = ToGeom(row);
@@ -297,14 +358,21 @@ namespace NcTestRibbon.Shell
         row.X = x.ToString("G17", CultureInfo.CurrentCulture);
         row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
         row.CoordsDirty = true;
-        if (_showOnDrawing.IsChecked == true)
+
+        // Always materialize the placed pad on the drawing.
+        if (_showOnDrawing.IsChecked != true)
+        {
+          _showOnDrawing.IsChecked = true;
+        }
+        else
         {
           CadPadOverlay.UpdatePad(ToGeom(row));
         }
 
         _grid.Items.Refresh();
         UpdateActionButtons();
-        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y);
+        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+          + "; угол=" + row.RotationText + "°");
       }
       finally
       {
@@ -352,9 +420,9 @@ namespace NcTestRibbon.Shell
       Log("Сохранено координат в Excel: " + updated + " (" + Path.GetFileName(_book.Path) + ")");
     }
 
-    private void RefreshDrawingOverlay()
+    private void RefreshDrawingOverlay(bool force = false)
     {
-      if (_showOnDrawing.IsChecked != true)
+      if (!force && _showOnDrawing.IsChecked != true)
       {
         return;
       }
@@ -362,11 +430,31 @@ namespace NcTestRibbon.Shell
       if (_pads.Count == 0)
       {
         CadPadOverlay.Clear();
+        Log("Нет КП для отображения.");
         return;
       }
 
-      CadPadOverlay.ShowPads(_pads.Select(ToGeom));
-      Log("На чертеже: " + _pads.Count + " КП (слой " + CadPadOverlay.LayerName + ").");
+      int drawn = CadPadOverlay.ShowPads(_pads.Select(ToGeom));
+      Log("На чертеже обновлено КП: " + drawn
+        + " (слой " + CadPadOverlay.LayerName + ", заблокирован; 0°: Длина→X, Ширина→Y).");
+    }
+
+    private static bool TryParseAngle(string text, out double angle)
+    {
+      angle = 0;
+      if (string.IsNullOrWhiteSpace(text))
+      {
+        return false;
+      }
+
+      text = text.Trim().Replace(',', '.');
+      if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out angle)
+          && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out angle))
+      {
+        return false;
+      }
+
+      return double.IsFinite(angle) && angle >= 0 && angle <= 360;
     }
 
     private static CadPadOverlay.PadGeom ToGeom(PadRow row)
@@ -387,7 +475,8 @@ namespace NcTestRibbon.Shell
         X = row.Record?.X ?? 0,
         Y = row.Record?.Y ?? 0,
         WidthM = width > 0 ? width : 150,
-        LengthM = length > 0 ? length : 250
+        LengthM = length > 0 ? length : 250,
+        RotationDeg = row.RotationDeg
       };
     }
 
@@ -474,7 +563,9 @@ namespace NcTestRibbon.Shell
           Gas = pad.ActiveGas,
           FirstLaunch = "1",
           Record = pad,
-          CoordsDirty = false
+          CoordsDirty = false,
+          RotationDeg = 0,
+          RotationText = "0"
         });
       }
 
@@ -494,7 +585,7 @@ namespace NcTestRibbon.Shell
       UpdateActionButtons();
       if (_showOnDrawing.IsChecked == true)
       {
-        RefreshDrawingOverlay();
+        RefreshDrawingOverlay(force: true);
       }
     }
 
@@ -533,6 +624,8 @@ namespace NcTestRibbon.Shell
       public string Y { get; set; } = "0";
       public string WidthM { get; set; } = "150";
       public string LengthM { get; set; } = "250";
+      public string RotationText { get; set; } = "0";
+      public double RotationDeg { get; set; }
       public bool Liquid { get; set; } = true;
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;
