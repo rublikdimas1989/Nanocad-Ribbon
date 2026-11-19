@@ -1,9 +1,11 @@
 namespace NcTestRibbon.Cad
 {
   using System;
+  using System.Collections.Generic;
   using System.Diagnostics;
   using System.Globalization;
   using System.IO;
+  using System.Reflection;
   using System.Text;
   using System.Text.Json;
 
@@ -76,15 +78,41 @@ namespace NcTestRibbon.Cad
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "ASDC", "LoadFile", "NANOCAD", "gdal", "x64", "gdal_wrap.dll");
       throw new InvalidOperationException(
-        "Нет геопривязки для «" + Path.GetFileName(rasterPath) + "».\n"
+        PackageStamp() + "\n"
+        + "Нет геопривязки для «" + Path.GetFileName(rasterPath) + "».\n"
         + "Ожидается embedded GDAL GeoTransform (как End) или world/TAF рядом с файлом.\n\n"
         + "GDAL status:\n" + (string.IsNullOrWhiteSpace(managedNote) ? "(нет)" : managedNote) + "\n\n"
-        + "Проверьте, что INSTALL.bat скопировал:\n"
-        + "  " + loadFileHint + "\n"
-        + "  …\\gdal\\x64\\plugins\\gdal_ECW_JP2ECW.dll\n"
-        + "  …\\gdal\\x64\\plugins\\NCSEcw.dll\n"
-        + "и рядом с плагином: gdal_csharp.dll.\n"
-        + "Затем NETLOAD / перезапуск nanoCAD.");
+        + "Bootstrap diagnostics:\n" + Truncate(GdalRuntimeBootstrap.Diagnostics, 2500) + "\n\n"
+        + "Проверьте INSTALL → %LOCALAPPDATA%\\ASDC\\LoadFile\\NANOCAD\\gdal\\x64\\…\n"
+        + "  wrap: " + loadFileHint + " exists=" + File.Exists(loadFileHint) + "\n"
+        + "  ECW:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "gdal_ECW_JP2ECW.dll")) + "\n"
+        + "  NCS:  " + File.Exists(Path.Combine(Path.GetDirectoryName(loadFileHint) ?? "", "plugins", "NCSEcw.dll")) + "\n"
+        + "Если stamp ≠ v1.2.47 — старый DLL: NEW folder + INSTALL + NETLOAD.");
+    }
+
+    public static string PackageStamp()
+    {
+      try
+      {
+        Assembly asm = typeof(RasterGeoTransform).Assembly;
+        string info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        string file = asm.GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
+        return "NcTestRibbon " + (string.IsNullOrWhiteSpace(info) ? ("FileVersion=" + file) : info);
+      }
+      catch
+      {
+        return "NcTestRibbon (version unknown)";
+      }
+    }
+
+    private static string Truncate(string text, int max)
+    {
+      if (string.IsNullOrEmpty(text) || text.Length <= max)
+      {
+        return text ?? string.Empty;
+      }
+
+      return text.Substring(0, max) + "…";
     }
 
     /// <summary>Write ESRI world sidecar; returns full path written.</summary>
@@ -181,11 +209,15 @@ namespace NcTestRibbon.Cad
       geo = null;
       note = string.Empty;
       var status = new StringBuilder();
+      status.AppendLine(PackageStamp());
       try
       {
         string arch = Environment.Is64BitProcess ? "x64" : "x86";
+        bool wantEcw = Path.GetExtension(rasterPath)
+          .Equals(".ecw", StringComparison.OrdinalIgnoreCase);
         List<string> candidates = EnumerateGdalBaseCandidates();
         status.AppendLine("arch=" + arch);
+        status.AppendLine("wantEcw=" + wantEcw);
         status.AppendLine("candidates:");
         foreach (string c in candidates)
         {
@@ -220,14 +252,34 @@ namespace NcTestRibbon.Cad
         }
 
         status.AppendLine("init OK");
+        string pluginDir = Path.Combine(chosen, "gdal", arch, "plugins");
+        status.AppendLine("pluginDir=" + pluginDir);
+        status.AppendLine(
+          "gdal_ECW_JP2ECW.dll exists="
+          + File.Exists(Path.Combine(pluginDir, "gdal_ECW_JP2ECW.dll")));
+        status.AppendLine(
+          "NCSEcw.dll exists="
+          + File.Exists(Path.Combine(pluginDir, "NCSEcw.dll")));
+
+        OSGeo.GDAL.Driver ecwDriver = null;
         try
         {
-          OSGeo.GDAL.Driver ecw = OSGeo.GDAL.Gdal.GetDriverByName("ECW");
-          status.AppendLine("ECW driver: " + (ecw != null ? ecw.ShortName : "MISSING"));
+          ecwDriver = OSGeo.GDAL.Gdal.GetDriverByName("ECW");
+          status.AppendLine("ECW driver: " + (ecwDriver != null ? ecwDriver.ShortName : "MISSING"));
+          OSGeo.GDAL.Driver jp2 = OSGeo.GDAL.Gdal.GetDriverByName("JP2ECW");
+          status.AppendLine("JP2ECW driver: " + (jp2 != null ? jp2.ShortName : "MISSING"));
         }
         catch (Exception dex)
         {
           status.AppendLine("ECW driver check: " + dex.Message);
+        }
+
+        if (wantEcw && ecwDriver == null)
+        {
+          note = status.ToString().TrimEnd()
+            + "\nECW driver not registered — cannot read embedded GeoTransform.\n"
+            + Truncate(GdalRuntimeBootstrap.Diagnostics, 2000);
+          return false;
         }
 
         OSGeo.GDAL.Dataset dataset = null;
@@ -239,19 +291,31 @@ namespace NcTestRibbon.Cad
         {
           note = status.ToString().TrimEnd()
             + "\nGdal.Open threw: " + openEx.GetType().Name + ": " + openEx.Message
-            + "\nLastError: " + SafeGdalLastError();
+            + "\nLastError: " + SafeGdalLastError()
+            + "\n" + Truncate(GdalRuntimeBootstrap.Diagnostics, 1500);
           return false;
         }
 
         if (dataset == null)
         {
           note = status.ToString().TrimEnd()
-            + "\nGdal.Open returned null. LastError: " + SafeGdalLastError();
+            + "\nGdal.Open returned null. LastError: " + SafeGdalLastError()
+            + "\n" + Truncate(GdalRuntimeBootstrap.Diagnostics, 1500);
           return false;
         }
 
         using (dataset)
         {
+          string driverName = string.Empty;
+          try
+          {
+            driverName = dataset.GetDriver()?.ShortName ?? string.Empty;
+          }
+          catch
+          {
+          }
+
+          status.AppendLine("openedDriver=" + driverName);
           if (dataset.RasterXSize <= 0 || dataset.RasterYSize <= 0)
           {
             note = status.ToString().TrimEnd() + "\nGdal.Open: empty raster size.";
@@ -263,6 +327,7 @@ namespace NcTestRibbon.Cad
           status.AppendLine(
             "GT=[" + string.Join(", ", Array.ConvertAll(t, v => v.ToString("R", CultureInfo.InvariantCulture))) + "]");
           status.AppendLine("size=" + dataset.RasterXSize + "x" + dataset.RasterYSize);
+          status.AppendLine("LastErrorAfterGT: " + SafeGdalLastError());
 
           foreach (double value in t)
           {
@@ -278,7 +343,7 @@ namespace NcTestRibbon.Cad
           if (identity || !double.IsFinite(det) || Math.Abs(det) < 1e-30)
           {
             note = status.ToString().TrimEnd()
-              + "\nGeoTransform identity/degenerate — ECW opened but no usable embedded affine.";
+              + "\nGeoTransform identity/degenerate — file opened but no usable embedded affine.";
             return false;
           }
 
@@ -292,9 +357,9 @@ namespace NcTestRibbon.Cad
             PixelSizeY = t[5],
             WidthPx = dataset.RasterXSize,
             HeightPx = dataset.RasterYSize,
-            Source = "OSGeo.GDAL"
+            Source = "OSGeo.GDAL/" + driverName
           };
-          note = "GDAL GetGeoTransform (embedded) @ " + chosen;
+          note = PackageStamp() + " GDAL GetGeoTransform (embedded) driver=" + driverName + " @ " + chosen;
           return true;
         }
       }

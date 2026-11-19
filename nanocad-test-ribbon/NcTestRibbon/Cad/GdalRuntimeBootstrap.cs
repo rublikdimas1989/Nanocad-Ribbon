@@ -218,15 +218,47 @@ namespace NcTestRibbon.Cad
                     }
 
                     // ---------------------------------------------------------
-                    // 3. Загружаем core GDAL, НО AllRegister пока не вызываем.
+                    // 3. Preload native cores + ECW BEFORE any managed Gdal.*
+                    //    (gdal_csharp DllImports gdal_wrap; must be LoadLibraryEx'd
+                    //    from absolute path under LoadFile\gdal\x64).
+                    // ---------------------------------------------------------
+
+                    string gdalCorePath =
+                        Path.Combine(nativeDir, "gdal.dll");
+
+                    NativeLoadResult gdalCoreLoad =
+                        TryLoadNativeLibrary(gdalCorePath);
+
+                    NativeLoadResult wrapLoad =
+                        TryLoadNativeLibrary(wrapPath);
+
+                    if (!wrapLoad.Success)
+                    {
+                        throw new FileNotFoundException(
+                            "LoadLibraryEx(gdal_wrap.dll) failed: " +
+                            wrapLoad.Description +
+                            " path=" + wrapPath);
+                    }
+
+                    NativeLoadResult ncsLoad =
+                        TryLoadNativeLibrary(ncsEcwPath);
+
+                    if (ncsLoad.Success)
+                        _ncsEcwHandle = ncsLoad.Handle;
+
+                    NativeLoadResult pluginLoad =
+                        TryLoadNativeLibrary(ecwPluginPath);
+
+                    if (pluginLoad.Success)
+                        _ecwPluginHandle = pluginLoad.Handle;
+
+                    // ---------------------------------------------------------
+                    // 4. First managed Gdal.* call (wrap already loaded).
                     // ---------------------------------------------------------
 
                     string gdalVersion =
                         SafeGdalVersionInfo();
 
-                    // Важное изменение R3:
-                    // задаём config option GDAL_DRIVER_PATH непосредственно
-                    // внутри GDAL ДО AllRegister().
                     if (!string.IsNullOrWhiteSpace(dataDir))
                     {
                         Gdal.SetConfigOption("GDAL_DATA", dataDir);
@@ -247,27 +279,7 @@ namespace NcTestRibbon.Cad
                     }
 
                     // ---------------------------------------------------------
-                    // 4. Явно пробуем загрузить vendor ECW runtime и plugin.
-                    //
-                    // Это одновременно:
-                    // - помогает Windows loader;
-                    // - даёт ТОЧНЫЙ Win32 error, если DLL не грузится.
-                    // ---------------------------------------------------------
-
-                    NativeLoadResult ncsLoad =
-                        TryLoadNativeLibrary(ncsEcwPath);
-
-                    if (ncsLoad.Success)
-                        _ncsEcwHandle = ncsLoad.Handle;
-
-                    NativeLoadResult pluginLoad =
-                        TryLoadNativeLibrary(ecwPluginPath);
-
-                    if (pluginLoad.Success)
-                        _ecwPluginHandle = pluginLoad.Handle;
-
-                    // ---------------------------------------------------------
-                    // 5. Теперь стандартная регистрация GDAL.
+                    // 5. AllRegister + optional manual ECW register export.
                     // ---------------------------------------------------------
 
                     Gdal.AllRegister();
@@ -307,7 +319,13 @@ namespace NcTestRibbon.Cad
                     sb.AppendLine($"App base: {baseDir}");
 
                     sb.AppendLine($"GDAL native: {nativeDir}");
+                    sb.AppendLine($"gdal.dll: {gdalCorePath}");
+                    sb.AppendLine(
+                        $"gdal.dll LoadLibraryEx: {gdalCoreLoad.Description}");
+                    AppendFileVersion(sb, "gdal.dll version", gdalCorePath);
                     sb.AppendLine($"gdal_wrap.dll: {wrapPath}");
+                    sb.AppendLine(
+                        $"gdal_wrap LoadLibraryEx: {wrapLoad.Description}");
                     AppendFileVersion(sb, "gdal_wrap.dll version", wrapPath);
 
                     sb.AppendLine(

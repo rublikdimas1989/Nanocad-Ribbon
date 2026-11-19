@@ -337,6 +337,7 @@ namespace NcTestRibbon
 
           string rasterPath = dlg.FileName;
           AppPaths.Set(p => p.Background = rasterPath);
+          ed?.WriteMessage("\n" + label + ": " + RasterGeoTransform.PackageStamp());
 
           CadRasterAttach.Result result = CadRasterAttach.Attach(rasterPath, writeWorldSidecar: true);
           CadRasterAttach.ZoomToImage(result.ImageId);

@@ -4,9 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.46.zip`](nanocad-test-ribbon-v1.2.46.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.46/nanocad-test-ribbon-v1.2.46.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.47.zip`](nanocad-test-ribbon-v1.2.47.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.47/nanocad-test-ribbon-v1.2.47.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.47 — GDAL preload + version stamp (TCON-62)
+
+- LoadLibraryEx `gdal.dll`/`gdal_wrap`/`NCSEcw`/`gdal_ECW_JP2ECW` before any managed `Gdal.*`
+- Errors/command line show `NcTestRibbon 1.2.47+…` so stale DLLs are obvious
+- Open diagnostics: ECW driver, plugin exists, GT array, LastError, bootstrap dump
 
 ## v1.2.46 — GDAL path + Open diagnostics (TCON-62)
 
