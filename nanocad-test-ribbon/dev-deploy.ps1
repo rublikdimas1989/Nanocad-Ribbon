@@ -28,7 +28,27 @@ if (-not (Test-Path $json)) {
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item $dll (Join-Path $dest 'NC_TestRibbon.dll') -Force
 Copy-Item $json (Join-Path $dest 'NC_TestRibbon.json') -Force
-Write-Host "Copied to $dest"
+
+# Copy NuGet deps (EPPlus etc.) from build output and/or installer\deps.
+$skip = @{
+    'NC_TestRibbon.dll' = $true
+    'hostmgd.dll'       = $true
+    'hostdbmgd.dll'     = $true
+}
+$byName = @{}
+$depsDir = Join-Path $root 'installer\deps'
+if (Test-Path $depsDir) {
+    Get-ChildItem $depsDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+        ForEach-Object { $byName[$_.Name] = $_.FullName }
+}
+$dllDir = Split-Path -Parent $dll
+Get-ChildItem $dllDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+    Where-Object { -not $skip.ContainsKey($_.Name) } |
+    ForEach-Object { $byName[$_.Name] = $_.FullName }
+foreach ($name in @($byName.Keys)) {
+    Copy-Item $byName[$name] (Join-Path $dest $name) -Force
+}
+Write-Host ("Copied to {0} (+ {1} dependency DLL(s))" -f $dest, $byName.Count)
 
 function Get-NanoCadProfiles {
     $result = @()
