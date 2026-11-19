@@ -443,7 +443,7 @@
                                 <Button x:Name="BtnLoadRates" Content="Применить расценки" Padding="8,4"/>
                             </StackPanel>
                             <TextBlock Text="Файл расценок (фиксированный):" FontSize="11" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                            <TextBlock x:Name="TxtRatesFilePath" Text="Tracing_cache\Settings\Price.xlsx" FontSize="11" Foreground="#1565C0" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                            <TextBlock x:Name="TxtRatesFilePath" Text="Tracing_cache\Settings\Price.xlsx | Price.xlsm" FontSize="11" Foreground="#1565C0" TextWrapping="Wrap" Margin="0,0,0,5"/>
 
                             <TextBlock x:Name="TxtPipeCatalogStatus" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,4"/>
                             <TextBlock Text="Конфиг трассировки: Tracing_cache\Settings\tracing.conf"
