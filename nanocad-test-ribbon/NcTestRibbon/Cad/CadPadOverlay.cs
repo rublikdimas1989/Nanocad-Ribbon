@@ -116,7 +116,7 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Unlock layer, select pad entities, run standard CAD ROTATE (sync if Editor.Command exists).
+    /// Unlock layer, select pad entities, rotate about the rectangle center (CAD ROTATE base = center).
     /// Returns false if the user cancelled. When true, poseUpdated indicates X/Y/angle were read back.
     /// </summary>
     public static bool TryManualRotate(
@@ -140,10 +140,13 @@ namespace NcTestRibbon.Cad
       Editor ed = doc.Editor;
 
       ObjectId[] ids = Array.Empty<ObjectId>();
+      Point3d center = Point3d.Origin;
+      bool haveCenter = false;
       RunWrite(doc, (tr, model, db) =>
       {
         EnsureLayer(tr, db, unlockForWrite: true);
         ids = FindNamedPadIds(tr, model, padName);
+        haveCenter = TryGetRectangleCenter(tr, ids, out center);
         // Leave unlocked so ROTATE can modify entities.
       });
 
@@ -151,6 +154,12 @@ namespace NcTestRibbon.Cad
       {
         throw new InvalidOperationException(
           "КП «" + padName + "» нет на чертеже. Включите «Показывать на чертеже».");
+      }
+
+      if (!haveCenter)
+      {
+        throw new InvalidOperationException(
+          "Не удалось определить центр прямоугольника КП «" + padName + "».");
       }
 
       try
@@ -161,16 +170,15 @@ namespace NcTestRibbon.Cad
       {
       }
 
-      ed.WriteMessage("\nПоворот КП «" + padName + "»: стандартная команда ROTATE (база + угол).");
-      bool ran = TryEditorCommand(ed, "_.ROTATE");
-      if (!ran)
+      ed.WriteMessage(
+        "\nПоворот КП «" + padName + "»: база = центр прямоугольника ("
+        + center.X.ToString("0.###") + "; " + center.Y.ToString("0.###") + ").");
+
+      // Always rotate about KP rectangle center (no free base-point pick).
+      if (!RotateAboutCenter(ed, doc, ids, center))
       {
-        // Fallback: same prompts as ROTATE, then TransformBy.
-        if (!RotateByPrompts(ed, doc, ids))
-        {
-          RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
-          return false;
-        }
+        RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
+        return false;
       }
 
       poseUpdated = TryReadPadPose(padName, out x, out y, out rotationDeg);
@@ -383,50 +391,39 @@ namespace NcTestRibbon.Cad
       return ids.ToArray();
     }
 
-    private static bool TryEditorCommand(Editor ed, string command)
+    private static bool TryGetRectangleCenter(Transaction tr, ObjectId[] ids, out Point3d center)
     {
-      try
+      center = Point3d.Origin;
+      foreach (ObjectId id in ids)
       {
-        System.Reflection.MethodInfo method = ed.GetType().GetMethod(
-          "Command",
-          System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
-        if (method == null)
+        if (id.IsNull || id.IsErased)
         {
-          return false;
+          continue;
         }
 
-        System.Reflection.ParameterInfo[] ps = method.GetParameters();
-        if (ps.Length == 1 && ps[0].ParameterType.IsArray)
+        DbPolyline pl = tr.GetObject(id, OpenMode.ForRead) as DbPolyline;
+        if (pl == null || pl.NumberOfVertices < 3)
         {
-          method.Invoke(ed, new object[] { new object[] { command } });
-          return true;
+          continue;
         }
 
-        if (ps.Length >= 1)
-        {
-          method.Invoke(ed, new object[] { command });
-          return true;
-        }
-      }
-      catch
-      {
+        Point2d p0 = pl.GetPoint2dAt(0);
+        Point2d p2 = pl.GetPoint2dAt(2);
+        center = new Point3d((p0.X + p2.X) / 2.0, (p0.Y + p2.Y) / 2.0, 0);
+        return true;
       }
 
       return false;
     }
 
-    private static bool RotateByPrompts(Editor ed, Document doc, ObjectId[] ids)
+    /// <summary>
+    /// ROTATE-equivalent: angle prompt only; base is always the KP rectangle center.
+    /// </summary>
+    private static bool RotateAboutCenter(Editor ed, Document doc, ObjectId[] ids, Point3d center)
     {
-      PromptPointResult basePt = ed.GetPoint("\nБазовая точка поворота: ");
-      if (basePt.Status != PromptStatus.OK)
+      var angOpts = new PromptAngleOptions("\nУгол поворота (база = центр КП): ")
       {
-        ed.WriteMessage("\nПоворот отменён.");
-        return false;
-      }
-
-      var angOpts = new PromptAngleOptions("\nУгол поворота: ")
-      {
-        BasePoint = basePt.Value,
+        BasePoint = center,
         UseBasePoint = true,
         AllowNone = false
       };
@@ -437,7 +434,7 @@ namespace NcTestRibbon.Cad
         return false;
       }
 
-      Matrix3d xform = Matrix3d.Rotation(ang.Value, Vector3d.ZAxis, basePt.Value);
+      Matrix3d xform = Matrix3d.Rotation(ang.Value, Vector3d.ZAxis, center);
       RunWrite(doc, (tr, model, db) =>
       {
         EnsureLayer(tr, db, unlockForWrite: true);

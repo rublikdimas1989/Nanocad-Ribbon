@@ -25,7 +25,6 @@ namespace NcTestRibbon.Shell
     private readonly TextBox _fluidFile;
     private readonly TextBox _tablesFile;
     private readonly TextBox _log;
-    private readonly TextBox _rotationBox;
     private readonly TextBlock _status;
     private readonly DataGrid _grid;
     private readonly CheckBox _showOnDrawing;
@@ -151,7 +150,6 @@ namespace NcTestRibbon.Shell
       Button(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
       _placeButton.IsEnabled = false;
 
-      _rotationBox = Field(cadRow, "Угол °:", "0", 60, readOnly: false);
       Button(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
       _rotateButton.IsEnabled = false;
 
@@ -160,7 +158,7 @@ namespace NcTestRibbon.Shell
 
       top.Children.Add(new TextBlock
       {
-        Text = "0°: Длина по X (широкая), Ширина по Y. Слой NC_KP_PADS блокируется после отрисовки. Закрытие окна объекты не удаляет. «Повернуть вручную» = CAD ROTATE.",
+        Text = "0°: Длина по X (широкая), Ширина по Y. «Повернуть вручную» — поворот вокруг центра КП. Закрытие окна объекты не удаляет.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -190,7 +188,7 @@ namespace NcTestRibbon.Shell
       {
         ItemsSource = _pads,
         AutoGenerateColumns = false,
-        IsReadOnly = true,
+        IsReadOnly = false,
         CanUserAddRows = false,
         CanUserDeleteRows = false,
         SelectionMode = DataGridSelectionMode.Single
@@ -201,19 +199,15 @@ namespace NcTestRibbon.Shell
       _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
       _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
       _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
+      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), readOnly: false));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
       _grid.MouseDoubleClick += Grid_MouseDoubleClick;
-      _grid.SelectionChanged += (_, __) =>
-      {
-        UpdateActionButtons();
-        if (_grid.SelectedItem is PadRow row)
-        {
-          _rotationBox.Text = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
-        }
-      };
+      _grid.SelectionChanged += (_, __) => UpdateActionButtons();
+      _grid.CellEditEnding += (_, __) => UpdateActionButtons();
+      _grid.CurrentCellChanged += (_, __) => UpdateActionButtons();
       _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
@@ -327,7 +321,6 @@ namespace NcTestRibbon.Shell
           row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
           row.RotationDeg = CadPadOverlay.NormalizeDegrees(rot);
           row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
-          _rotationBox.Text = row.RotationText;
           row.CoordsDirty = true;
           _grid.Items.Refresh();
           UpdateActionButtons();
@@ -352,12 +345,6 @@ namespace NcTestRibbon.Shell
       if (_grid.SelectedItem is not PadRow row || row.Record == null)
       {
         throw new InvalidOperationException("Выберите КП в таблице.");
-      }
-
-      if (TryParseAngle(_rotationBox.Text, out double angle))
-      {
-        row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
-        row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
       }
 
       var geom = ToGeom(row);
@@ -417,7 +404,8 @@ namespace NcTestRibbon.Shell
 
       MessageBoxResult confirm = MessageBox.Show(
         this,
-        "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
+        "Перезаписать положения (X/Y) и «сернистая среда» в файле?\n\n"
+          + _book.Path + "\n\nСтрок: " + dirty.Count,
         "Сохранить положения",
         MessageBoxButton.YesNo,
         MessageBoxImage.Question);
@@ -454,24 +442,6 @@ namespace NcTestRibbon.Shell
       int drawn = CadPadOverlay.ShowPads(_pads.Select(ToGeom));
       Log("На чертеже обновлено КП: " + drawn
         + " (слой " + CadPadOverlay.LayerName + ", заблокирован; 0°: Длина→X, Ширина→Y).");
-    }
-
-    private static bool TryParseAngle(string text, out double angle)
-    {
-      angle = 0;
-      if (string.IsNullOrWhiteSpace(text))
-      {
-        return false;
-      }
-
-      text = text.Trim().Replace(',', '.');
-      if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out angle)
-          && !double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out angle))
-      {
-        return false;
-      }
-
-      return double.IsFinite(angle) && angle >= 0 && angle <= 360;
     }
 
     private static CadPadOverlay.PadGeom ToGeom(PadRow row)
@@ -575,6 +545,7 @@ namespace NcTestRibbon.Shell
           Y = pad.Y.ToString("G17", CultureInfo.CurrentCulture),
           WidthM = pad.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
           LengthM = pad.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
+          SourMedium = pad.SourMedium,
           Oil = pad.ActiveOil,
           Liquid = pad.ActiveLiquid,
           Gas = pad.ActiveGas,
@@ -592,12 +563,36 @@ namespace NcTestRibbon.Shell
         AppPaths.Set(p => p.PadsWorkbook = path);
       }
 
+      // Overlay sourMedium from sibling / remembered Top_tree JSON when Excel has no column.
+      int fromJson = 0;
+      if (!book.SourMediumFromSheet)
+      {
+        string jsonHint = AppPaths.Load().ProfilesJson;
+        fromJson = PadWorkbookLoader.ApplySourMediumFromJson(book, jsonHint);
+        if (fromJson > 0)
+        {
+          foreach (PadRow row in _pads)
+          {
+            if (row.Record != null)
+            {
+              row.SourMedium = row.Record.SourMedium;
+            }
+          }
+        }
+      }
+
+      foreach (PadRow row in _pads)
+      {
+        row.CoordsDirty = false;
+      }
+
       string caps = book.CapacitiesFromBuosSheet
         ? "ёмкости БУОС из листа"
         : "ёмкости БУОС по умолчанию";
       Log("Загружено КП: " + book.Pads.Count
         + "; профилей мес.: " + book.Months
         + "; " + caps
+        + (fromJson > 0 ? "; sourMedium из JSON: " + fromJson : string.Empty)
         + " (" + Path.GetFileName(path) + ")");
       UpdateActionButtons();
       if (_showOnDrawing.IsChecked == true)
@@ -619,23 +614,30 @@ namespace NcTestRibbon.Shell
       {
         Header = header,
         Binding = new Binding(path),
+        IsReadOnly = true,
         Width = new DataGridLength(1, DataGridLengthUnitType.Star)
       };
     }
 
-    private static DataGridCheckBoxColumn CheckCol(string header, string path)
+    private static DataGridCheckBoxColumn CheckCol(string header, string path, bool readOnly = true)
     {
       return new DataGridCheckBoxColumn
       {
         Header = header,
-        Binding = new Binding(path),
-        IsReadOnly = true,
-        Width = 85
+        Binding = new Binding(path)
+        {
+          Mode = BindingMode.TwoWay,
+          UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
+        },
+        IsReadOnly = readOnly,
+        Width = header.Length > 10 ? 120 : 85
       };
     }
 
     public sealed class PadRow
     {
+      private bool _sourMedium;
+
       public string Name { get; set; } = string.Empty;
       public string X { get; set; } = "0";
       public string Y { get; set; } = "0";
@@ -643,6 +645,27 @@ namespace NcTestRibbon.Shell
       public string LengthM { get; set; } = "250";
       public string RotationText { get; set; } = "0";
       public double RotationDeg { get; set; }
+
+      public bool SourMedium
+      {
+        get => _sourMedium;
+        set
+        {
+          if (_sourMedium == value)
+          {
+            return;
+          }
+
+          _sourMedium = value;
+          if (Record != null)
+          {
+            Record.SourMedium = value;
+          }
+
+          CoordsDirty = true;
+        }
+      }
+
       public bool Liquid { get; set; } = true;
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;

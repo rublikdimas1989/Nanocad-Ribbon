@@ -4,6 +4,7 @@ namespace NcTestRibbon.Rates
   using System.Collections.Generic;
   using System.Globalization;
   using System.IO;
+  using System.Text.Json;
   using System.Text.RegularExpressions;
   using OfficeOpenXml;
 
@@ -24,6 +25,8 @@ namespace NcTestRibbon.Rates
       public bool ActiveGas { get; set; } = true;
       public double WidthM { get; set; } = 150;
       public double LengthM { get; set; } = 250;
+      /// <summary>pads[].sourMedium — сернистая среда.</summary>
+      public bool SourMedium { get; set; }
       public double[] Oil { get; set; } = Array.Empty<double>();
       public double[] Liquid { get; set; } = Array.Empty<double>();
       public double[] Gas { get; set; } = Array.Empty<double>();
@@ -44,6 +47,8 @@ namespace NcTestRibbon.Rates
       public double CombinedCapacity { get; set; } = 4000;
       public double GasCapacity { get; set; } = 1_500_000;
       public bool CapacitiesFromBuosSheet { get; set; }
+      /// <summary>True when sheet «КП» already had a sourMedium column.</summary>
+      public bool SourMediumFromSheet { get; set; }
     }
 
     static PadWorkbookLoader()
@@ -65,14 +70,15 @@ namespace NcTestRibbon.Rates
 
       using var package = new ExcelPackage(new FileInfo(workbookPath));
       var data = new WorkbookData { Path = workbookPath };
-      data.Pads = ReadPadSheet(package);
+      data.Pads = ReadPadSheet(package, out bool sourFromSheet);
+      data.SourMediumFromSheet = sourFromSheet;
       ReadProfilesSheet(package, data);
       ReadBuosCapacities(package, data);
       return data;
     }
 
     /// <summary>
-    /// Writes updated X/Y for named pads into sheet «КП» of the open workbook.
+    /// Writes updated X/Y and sourMedium for named pads into sheet «КП».
     /// </summary>
     public static int SavePadCoordinates(string workbookPath, IEnumerable<PadRecord> pads)
     {
@@ -138,6 +144,15 @@ namespace NcTestRibbon.Rates
         throw new InvalidDataException("Лист «КП» должен содержать столбцы name/x/y.");
       }
 
+      int sourCol = Col("sourMedium", "сернистая среда", "сернистая", "SourMedium");
+      if (sourCol < 0)
+      {
+        sourCol = cols + 1;
+        sheet.Cells[1, sourCol].Value = "sourMedium";
+        headers["sourMedium"] = sourCol;
+        cols = sourCol;
+      }
+
       int updated = 0;
       for (int r = 2; r <= rows; r++)
       {
@@ -149,6 +164,7 @@ namespace NcTestRibbon.Rates
 
         sheet.Cells[r, xCol].Value = pad.X;
         sheet.Cells[r, yCol].Value = pad.Y;
+        sheet.Cells[r, sourCol].Value = pad.SourMedium;
         updated++;
       }
 
@@ -156,8 +172,156 @@ namespace NcTestRibbon.Rates
       return updated;
     }
 
-    private static List<PadRecord> ReadPadSheet(ExcelPackage package)
+    /// <summary>
+    /// Overlay pads[].sourMedium from Top_tree / KP JSON (ui.pads) onto workbook pads by name.
+    /// Looks at explicit path, sibling .json next to the xlsx, then common names.
+    /// </summary>
+    public static int ApplySourMediumFromJson(WorkbookData data, string preferredJsonPath = null)
     {
+      if (data?.Pads == null || data.Pads.Count == 0)
+      {
+        return 0;
+      }
+
+      var candidates = new List<string>();
+      void Add(string path)
+      {
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path) && !candidates.Contains(path))
+        {
+          candidates.Add(path);
+        }
+      }
+
+      Add(preferredJsonPath);
+      if (!string.IsNullOrWhiteSpace(data.Path))
+      {
+        string dir = Path.GetDirectoryName(data.Path) ?? string.Empty;
+        string stem = Path.GetFileNameWithoutExtension(data.Path);
+        Add(Path.Combine(dir, stem + ".json"));
+        Add(Path.Combine(dir, "Top_tree_config.json"));
+      }
+
+      foreach (string jsonPath in candidates)
+      {
+        try
+        {
+          using var doc = JsonDocument.Parse(File.ReadAllText(jsonPath));
+          if (!TryGetPadsArray(doc.RootElement, out JsonElement pads))
+          {
+            continue;
+          }
+
+          var byName = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+          foreach (JsonElement pad in pads.EnumerateArray())
+          {
+            if (!pad.TryGetProperty("name", out JsonElement nameEl))
+            {
+              continue;
+            }
+
+            string name = nameEl.GetString();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+              continue;
+            }
+
+            if (pad.TryGetProperty("sourMedium", out JsonElement sourEl))
+            {
+              byName[name] = ReadJsonBool(sourEl, false);
+            }
+          }
+
+          if (byName.Count == 0)
+          {
+            continue;
+          }
+
+          int applied = 0;
+          foreach (PadRecord pad in data.Pads)
+          {
+            if (byName.TryGetValue(pad.Name, out bool sour))
+            {
+              pad.SourMedium = sour;
+              applied++;
+            }
+          }
+
+          if (applied > 0)
+          {
+            return applied;
+          }
+        }
+        catch
+        {
+          // try next candidate
+        }
+      }
+
+      return 0;
+    }
+
+    private static bool TryGetPadsArray(JsonElement root, out JsonElement pads)
+    {
+      pads = default;
+      if (root.ValueKind == JsonValueKind.Object)
+      {
+        if (root.TryGetProperty("ui", out JsonElement ui)
+            && ui.ValueKind == JsonValueKind.Object
+            && ui.TryGetProperty("pads", out pads)
+            && pads.ValueKind == JsonValueKind.Array)
+        {
+          return true;
+        }
+
+        if (root.TryGetProperty("pads", out pads) && pads.ValueKind == JsonValueKind.Array)
+        {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    private static bool ReadJsonBool(JsonElement el, bool fallback)
+    {
+      return el.ValueKind switch
+      {
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number => el.TryGetInt32(out int n) ? n != 0 : fallback,
+        JsonValueKind.String => ParseBoolText(el.GetString(), fallback),
+        _ => fallback
+      };
+    }
+
+    private static bool ParseBoolText(string text, bool fallback)
+    {
+      if (string.IsNullOrWhiteSpace(text))
+      {
+        return fallback;
+      }
+
+      text = text.Trim();
+      if (text == "1" || text.Equals("true", StringComparison.OrdinalIgnoreCase)
+          || text.Equals("yes", StringComparison.OrdinalIgnoreCase)
+          || text.Equals("да", StringComparison.OrdinalIgnoreCase))
+      {
+        return true;
+      }
+
+      if (text == "0" || text.Equals("false", StringComparison.OrdinalIgnoreCase)
+          || text.Equals("no", StringComparison.OrdinalIgnoreCase)
+          || text.Equals("нет", StringComparison.OrdinalIgnoreCase))
+      {
+        return false;
+      }
+
+      return fallback;
+    }
+
+    private static List<PadRecord> ReadPadSheet(ExcelPackage package, out bool sourMediumColumnPresent)
+    {
+      sourMediumColumnPresent = false;
       ExcelWorksheet sheet = package.Workbook.Worksheets["КП"]
         ?? package.Workbook.Worksheets[0]
         ?? throw new InvalidDataException("В книге нет листа «КП».");
@@ -202,6 +366,8 @@ namespace NcTestRibbon.Rates
       int gasCol = Col("active_gas", "gas");
       int widthCol = Col("Ширина", "width", "widthM");
       int lengthCol = Col("Длина", "length", "lengthM");
+      int sourCol = Col("sourMedium", "сернистая среда", "сернистая", "SourMedium");
+      sourMediumColumnPresent = sourCol > 0;
 
       var result = new List<PadRecord>();
       for (int r = 2; r <= rows; r++)
@@ -225,7 +391,8 @@ namespace NcTestRibbon.Rates
           ActiveLiquid = liquidCol < 0 || ReadBool(sheet, r, liquidCol, true),
           ActiveGas = gasCol < 0 || ReadBool(sheet, r, gasCol, true),
           WidthM = widthCol > 0 ? ReadDouble(sheet, r, widthCol, 150) : 150,
-          LengthM = lengthCol > 0 ? ReadDouble(sheet, r, lengthCol, 250) : 250
+          LengthM = lengthCol > 0 ? ReadDouble(sheet, r, lengthCol, 250) : 250,
+          SourMedium = sourCol > 0 && ReadBool(sheet, r, sourCol, false)
         });
       }
 
