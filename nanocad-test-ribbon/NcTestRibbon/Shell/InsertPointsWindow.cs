@@ -224,8 +224,32 @@ namespace NcTestRibbon.Shell
       try { AppPaths.Set(p => p.ShowInsertsOnDrawing = _showOnDrawing.Checked); }
       catch { }
 
-      try { DiscardUnsaved(); }
-      catch (Exception ex) { Log("Отмена несохранённых положений: " + ex.Message); }
+      try
+      {
+        if (!_rows.Any(r => r.CoordsDirty))
+        {
+          return;
+        }
+
+        DialogResult apply = MessageBox.Show(
+          FindForm() ?? (IWin32Window)this,
+          "Применить новые координаты?",
+          "Точки врезки",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (apply == DialogResult.Yes)
+        {
+          SaveCoordinates(confirmOverwrite: false);
+        }
+        else
+        {
+          DiscardUnsaved();
+        }
+      }
+      catch (Exception ex)
+      {
+        Log("Закрытие: координаты врезок — " + ex.Message);
+      }
     }
 
     private void DiscardUnsaved()
@@ -390,6 +414,11 @@ namespace NcTestRibbon.Shell
 
     private void SaveCoordinates()
     {
+      SaveCoordinates(confirmOverwrite: true);
+    }
+
+    private void SaveCoordinates(bool confirmOverwrite)
+    {
       if (_book == null || string.IsNullOrWhiteSpace(_book.Path))
       {
         throw new InvalidOperationException("Нет открытого файла врезок.");
@@ -404,9 +433,10 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("Нет изменённых координат.");
       }
 
-      if (MessageBox.Show(this,
-        "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
-        "Сохранить положения", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+      if (confirmOverwrite
+        && MessageBox.Show(this,
+          "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
+          "Сохранить положения", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
       {
         return;
       }

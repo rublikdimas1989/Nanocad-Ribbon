@@ -3,13 +3,13 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.36**): `nanocad-test-ribbon-v1.2.36.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.36.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/nanocad-test-ribbon-v1.2.36.zip  
+Актуальный zip с GitHub (версия **1.2.37**): `nanocad-test-ribbon-v1.2.37.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.37.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/nanocad-test-ribbon-v1.2.37.zip  
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/Topology_Inserts.xlsx)  
-Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/Topology_Buos.xlsx)  
-Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/Topology_Nodes.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/Topology_Buos.xlsx)  
+Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/Topology_Nodes.xlsx)  
 
 
 
@@ -31,7 +31,7 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.36**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.37**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -131,9 +131,11 @@ NcTestBlink
 - `LabelFontHeightM` — подписи КП и врезок
 - `InsertCircleDiameterM` — диаметр круга врезки
 
-### Исходные данные (v1.2.36)
+### Исходные данные (v1.2.37)
 
 Одно WinForms-окно **«Исходные данные»** (`NcTestSourceData`) с вкладками. На ленте только эта кнопка; `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` остаются командами для отладки.
+
+При закрытии окна, если есть жёлтые строки (несохранённые X/Y КП или врезок): вопрос **«Применить новые координаты?»** — Да = запись в Excel как «Сохранить положения», Нет = откат сетки и чертежа к последним Excel.
 
 ### Варианты БУОС (v1.2.33 / TCON-51)
 

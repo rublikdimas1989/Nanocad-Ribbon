@@ -4,9 +4,13 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.36.zip`](nanocad-test-ribbon-v1.2.36.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.36/nanocad-test-ribbon-v1.2.36.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.37.zip`](nanocad-test-ribbon-v1.2.37.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.37/nanocad-test-ribbon-v1.2.37.zip
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.37 — close prompt for yellow coords
+
+- Closing «Исходные данные» with unsaved pad/insert coords asks «Применить новые координаты?» (Yes=save Excel, No=revert)
 
 ## v1.2.36 — ribbon: only «Исходные данные»
 

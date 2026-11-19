@@ -307,14 +307,32 @@ namespace NcTestRibbon.Shell
 
       try
       {
-        DiscardUnsavedSession();
+        if (!_pads.Any(p => p.CoordsDirty))
+        {
+          return;
+        }
+
+        DialogResult apply = MessageBox.Show(
+          FindForm() ?? (IWin32Window)this,
+          "Применить новые координаты?",
+          "Кустовые площадки",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (apply == DialogResult.Yes)
+        {
+          SaveCoordinates(confirmOverwrite: false);
+        }
+        else
+        {
+          DiscardUnsavedSession();
+        }
       }
       catch (Exception ex)
       {
-        WriteCrashLog("FormClosing discard", ex);
+        WriteCrashLog("FormClosing coords", ex);
         try
         {
-          Log("Отмена несохранённых положений: " + ex.Message);
+          Log("Закрытие: координаты КП — " + ex.Message);
         }
         catch
         {
@@ -700,6 +718,11 @@ namespace NcTestRibbon.Shell
 
     private void SaveCoordinates()
     {
+      SaveCoordinates(confirmOverwrite: true);
+    }
+
+    private void SaveCoordinates(bool confirmOverwrite)
+    {
       if (_book == null || string.IsNullOrWhiteSpace(_book.Path))
       {
         throw new InvalidOperationException("Нет открытого файла таблиц КП.");
@@ -714,15 +737,18 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("Нет изменённых координат.");
       }
 
-      DialogResult confirm = MessageBox.Show(
-        this,
-        "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
-        "Сохранить положения",
-        MessageBoxButtons.YesNo,
-        MessageBoxIcon.Question);
-      if (confirm != DialogResult.Yes)
+      if (confirmOverwrite)
       {
-        return;
+        DialogResult confirm = MessageBox.Show(
+          this,
+          "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
+          "Сохранить положения",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (confirm != DialogResult.Yes)
+        {
+          return;
+        }
       }
 
       int updated = PadWorkbookLoader.SavePadCoordinates(_book.Path, dirty);
