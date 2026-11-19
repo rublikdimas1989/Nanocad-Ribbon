@@ -4,6 +4,7 @@ namespace NcTestRibbon.Cad
   using System.IO;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
+  using Teigha.Colors;
   using Teigha.DatabaseServices;
   using Teigha.Geometry;
   using CadApp = HostMgd.ApplicationServices.Application;
@@ -50,10 +51,7 @@ namespace NcTestRibbon.Cad
       }
 
       string layer = string.IsNullOrWhiteSpace(layerName) ? LayerName : layerName.Trim();
-      int opacity = opacityPercent;
-      if (opacity < 0) opacity = 0;
-      if (opacity > 100) opacity = 100;
-      int fade = 100 - opacity;
+      int opacity = ClampOpacity(opacityPercent);
 
       RasterGeoTransform geo = RasterGeoTransform.Resolve(rasterPath, out string geoNote);
       string worldWritten = string.Empty;
@@ -122,8 +120,8 @@ namespace NcTestRibbon.Cad
         image.ShowImage = true;
         image.Orientation = new CoordinateSystem3d(origin, uAxis, vAxis);
         image.Layer = layer;
-        try { image.Fade = (byte)fade; }
-        catch { /* older host without Fade */ }
+        // Explicit entity Transparency (not ByLayer / Fade). Layer unlocked during create.
+        ApplyEntityTransparency(image, opacity);
 
         BlockTableRecord model = (BlockTableRecord)tr.GetObject(
           SymbolUtilityServices.GetBlockModelSpaceId(db), OpenMode.ForWrite);
@@ -189,6 +187,131 @@ namespace NcTestRibbon.Cad
       ObjectId id = imageDict.SetAt(unique, def);
       tr.AddNewlyCreatedDBObject(def, true);
       return id;
+    }
+
+    /// <summary>
+    /// Opacity % (100=opaque) → entity Transparency (0..90). Never ByLayer / Fade.
+    /// </summary>
+    public static int ClampOpacity(int percent)
+    {
+      if (percent < 0) return 0;
+      if (percent > 100) return 100;
+      return percent;
+    }
+
+    public static byte OpacityToTransparencyValue(int opacityPercent)
+    {
+      int opacity = ClampOpacity(opacityPercent);
+      int transparent = 100 - opacity;
+      if (transparent < 0) transparent = 0;
+      if (transparent > 90) transparent = 90; // CAD alpha transparency max
+      return (byte)transparent;
+    }
+
+    public static void ApplyEntityTransparency(Entity entity, int opacityPercent)
+    {
+      if (entity == null)
+      {
+        return;
+      }
+
+      byte value = OpacityToTransparencyValue(opacityPercent);
+      // Explicit ByAlpha — not Transparency.ByLayer / ByBlock.
+      entity.Transparency = new Transparency(value);
+    }
+
+    /// <summary>
+    /// Set Transparency on images of a layer. Prefer keeping layer locked; unlock/relock only if API throws.
+    /// </summary>
+    public static void SetOpacityOnLayer(string layerName, int opacityPercent)
+    {
+      if (string.IsNullOrWhiteSpace(layerName))
+      {
+        return;
+      }
+
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+      int opacity = ClampOpacity(opacityPercent);
+
+      using (doc.LockDocument())
+      using (Transaction tr = doc.TransactionManager.StartTransaction())
+      {
+        LayerTable layers = (LayerTable)tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead);
+        if (!layers.Has(layerName))
+        {
+          tr.Commit();
+          return;
+        }
+
+        bool wasLocked = false;
+        LayerTableRecord layerRec = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForRead);
+        wasLocked = layerRec.IsLocked;
+
+        BlockTableRecord model = (BlockTableRecord)tr.GetObject(
+          SymbolUtilityServices.GetBlockModelSpaceId(doc.Database), OpenMode.ForRead);
+
+        bool needUnlock = false;
+        var images = new System.Collections.Generic.List<ObjectId>();
+        foreach (ObjectId id in model)
+        {
+          Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+          if (ent is RasterImage
+            && string.Equals(ent.Layer, layerName, StringComparison.OrdinalIgnoreCase))
+          {
+            images.Add(id);
+          }
+        }
+
+        foreach (ObjectId id in images)
+        {
+          try
+          {
+            // Prefer write while layer stays locked.
+            RasterImage image = tr.GetObject(id, OpenMode.ForWrite, false) as RasterImage;
+            if (image == null)
+            {
+              continue;
+            }
+
+            ApplyEntityTransparency(image, opacity);
+            image.ShowImage = true;
+          }
+          catch
+          {
+            needUnlock = true;
+            break;
+          }
+        }
+
+        if (needUnlock)
+        {
+          // Host refused write on locked layer → unlock, set Transparency, re-lock.
+          layerRec = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
+          layerRec.IsLocked = false;
+          foreach (ObjectId id in images)
+          {
+            RasterImage image = tr.GetObject(id, OpenMode.ForWrite, false) as RasterImage;
+            if (image == null)
+            {
+              continue;
+            }
+
+            ApplyEntityTransparency(image, opacity);
+            image.ShowImage = true;
+          }
+
+          if (wasLocked)
+          {
+            layerRec.IsLocked = true;
+          }
+        }
+
+        tr.Commit();
+      }
+
+      try { doc.Editor?.Regen(); } catch { }
+      try { CadApp.UpdateScreen(); } catch { }
     }
 
     private static void EnsureLayer(Transaction tr, Database db)

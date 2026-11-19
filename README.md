@@ -4,11 +4,16 @@
 
 ## Скачать
 
-- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.54.zip`](nanocad-test-ribbon-v1.2.54.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.54/nanocad-test-ribbon-v1.2.54.zip
+- **Актуальный пакет (slim):** [`nanocad-test-ribbon-v1.2.55.zip`](nanocad-test-ribbon-v1.2.55.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.55/nanocad-test-ribbon-v1.2.55.zip
 - **GDAL runtime (once):** [`nanocad-gdal-runtime-3.12.1.zip`](nanocad-gdal-runtime-3.12.1.zip) — or reuse `LoadFile\gdal` from v1.2.48  
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 - **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.55 — RasterImage Transparency (not Fade)
+
+- Cartography opacity sets entity `Transparency` (explicit, not ByLayer/Fade)
+- Prefer write while layer stays locked; unlock → set → re-lock only if API throws
 
 ## v1.2.54 — Fade byte cast (CS0266)
 

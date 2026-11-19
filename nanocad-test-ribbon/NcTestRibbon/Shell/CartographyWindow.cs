@@ -358,7 +358,9 @@ namespace NcTestRibbon.Shell
         if (CadMapRaster.HasDrawingImage(kind))
         {
           CadMapRaster.SetOpacity(kind, opacity);
-          SetStatus(CadMapRaster.DisplayName(kind) + ": прозрачность " + opacity + "% (Fade=" + (100 - opacity) + ")");
+          SetStatus(CadMapRaster.DisplayName(kind) + ": Transparency "
+            + CadRasterAttach.OpacityToTransparencyValue(opacity)
+            + " (opacity " + opacity + "%)");
         }
         else
         {

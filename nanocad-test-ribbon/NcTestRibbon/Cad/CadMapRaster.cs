@@ -130,40 +130,8 @@ namespace NcTestRibbon.Cad
 
     public static void SetOpacity(Kind kind, int opacityPercent)
     {
-      int opacity = ClampOpacity(opacityPercent);
-      int fade = 100 - opacity;
-      Document doc = CadApp.DocumentManager.MdiActiveDocument
-        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
-      string layerName = LayerName(kind);
-      using (doc.LockDocument())
-      using (Transaction tr = doc.TransactionManager.StartTransaction())
-      {
-        EnsureLayer(tr, doc.Database, layerName, unlockForWrite: true);
-        foreach (ObjectId id in EnumerateImagesOnLayer(tr, doc.Database, layerName))
-        {
-          RasterImage image = tr.GetObject(id, OpenMode.ForWrite) as RasterImage;
-          if (image == null)
-          {
-            continue;
-          }
-
-          try { image.Fade = (byte)fade; }
-          catch { /* older host */ }
-          image.ShowImage = true;
-        }
-
-        LayerTable layers = (LayerTable)tr.GetObject(doc.Database.LayerTableId, OpenMode.ForRead);
-        if (layers.Has(layerName))
-        {
-          LayerTableRecord layer = (LayerTableRecord)tr.GetObject(layers[layerName], OpenMode.ForWrite);
-          layer.IsLocked = true;
-        }
-
-        tr.Commit();
-      }
-
-      try { doc.Editor?.Regen(); } catch { }
-      try { CadApp.UpdateScreen(); } catch { }
+      // Prefer Transparency while layer stays locked; unlock/relock only if API throws.
+      CadRasterAttach.SetOpacityOnLayer(LayerName(kind), opacityPercent);
     }
 
     public static bool IsLayerOn(Kind kind)
@@ -336,12 +304,7 @@ namespace NcTestRibbon.Cad
       return dest;
     }
 
-    public static int ClampOpacity(int percent)
-    {
-      if (percent < 0) return 0;
-      if (percent > 100) return 100;
-      return percent;
-    }
+    public static int ClampOpacity(int percent) => CadRasterAttach.ClampOpacity(percent);
 
     private static ObjectId FindFirstImageId(string layerName)
     {
