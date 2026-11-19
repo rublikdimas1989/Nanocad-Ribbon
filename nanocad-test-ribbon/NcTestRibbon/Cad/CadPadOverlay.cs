@@ -101,6 +101,10 @@ namespace NcTestRibbon.Cad
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
       Editor ed = doc.Editor;
+
+      // Same zoom-to-KP as «Повернуть вручную» before the move jig.
+      ZoomToPadOrGeom(ed, doc, pad);
+
       var jig = new PadPlaceJig(pad, new Point3d(pad.X, pad.Y, 0));
       PromptResult result = ed.Drag(jig);
       if (result.Status != PromptStatus.OK)
@@ -419,6 +423,48 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
+    /// Zoom to drawn KP entities when present; otherwise fit to pad geom (place before first draw).
+    /// </summary>
+    private static void ZoomToPadOrGeom(Editor ed, Document doc, PadGeom pad)
+    {
+      if (pad == null || string.IsNullOrWhiteSpace(pad.Name))
+      {
+        ZoomToGeom(ed, doc, pad);
+        return;
+      }
+
+      ObjectId[] ids = FindPadIdsReadOnly(doc, pad.Name);
+      if (ids.Length > 0)
+      {
+        ZoomToPad(ed, doc, ids);
+        return;
+      }
+
+      ZoomToGeom(ed, doc, pad);
+    }
+
+    private static ObjectId[] FindPadIdsReadOnly(Document doc, string padName)
+    {
+      try
+      {
+        using (doc.LockDocument())
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          BlockTable bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          BlockTableRecord model = (BlockTableRecord)tr.GetObject(
+            bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          ObjectId[] ids = FindNamedPadIds(tr, model, padName);
+          tr.Commit();
+          return ids;
+        }
+      }
+      catch
+      {
+        return Array.Empty<ObjectId>();
+      }
+    }
+
+    /// <summary>
     /// Fit the current view around the KP entities (rectangle + label) with margin.
     /// </summary>
     private static void ZoomToPad(Editor ed, Document doc, ObjectId[] ids)
@@ -466,38 +512,96 @@ namespace NcTestRibbon.Cad
           return;
         }
 
-        double width = Math.Max(maxX - minX, 1.0);
-        double height = Math.Max(maxY - minY, 1.0);
-        // ~35% margin so the pad is not edge-clipped while rotating.
-        width *= 1.7;
-        height *= 1.7;
-        double cx = (minX + maxX) / 2.0;
-        double cy = (minY + maxY) / 2.0;
-
-        using (ViewTableRecord view = ed.GetCurrentView())
-        {
-          double aspect = view.Width / Math.Max(view.Height, 1e-9);
-          if (width / height > aspect)
-          {
-            height = width / aspect;
-          }
-          else
-          {
-            width = height * aspect;
-          }
-
-          view.CenterPoint = new Point2d(cx, cy);
-          view.Width = width;
-          view.Height = height;
-          ed.SetCurrentView(view);
-        }
-
-        TryUpdateScreen(doc);
+        ApplyViewExtents(ed, doc, minX, minY, maxX, maxY);
       }
       catch
       {
-        // Zoom is best-effort — rotate must still work.
+        // Zoom is best-effort — place/rotate must still work.
       }
+    }
+
+    private static void ZoomToGeom(Editor ed, Document doc, PadGeom pad)
+    {
+      if (ed == null || doc == null || pad == null)
+      {
+        return;
+      }
+
+      try
+      {
+        double halfX = Math.Max(pad.LengthM, 1) / 2.0;
+        double halfY = Math.Max(pad.WidthM, 1) / 2.0;
+        Point2d[] local =
+        {
+          new Point2d(-halfX, -halfY),
+          new Point2d(+halfX, -halfY),
+          new Point2d(+halfX, +halfY),
+          new Point2d(-halfX, +halfY)
+        };
+
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+        foreach (Point2d p in local)
+        {
+          Point2d w = Rotate(pad.X, pad.Y, p.X, p.Y, pad.RotationDeg);
+          minX = Math.Min(minX, w.X);
+          minY = Math.Min(minY, w.Y);
+          maxX = Math.Max(maxX, w.X);
+          maxY = Math.Max(maxY, w.Y);
+        }
+
+        // Include label above the pad (same offset as AddLabel).
+        double height = Math.Max(pad.WidthM, 1) / 2.0;
+        Point2d label = Rotate(pad.X, pad.Y, 0, halfY + height * 1.15, pad.RotationDeg);
+        minX = Math.Min(minX, label.X - height);
+        minY = Math.Min(minY, label.Y - height);
+        maxX = Math.Max(maxX, label.X + height);
+        maxY = Math.Max(maxY, label.Y + height);
+
+        ApplyViewExtents(ed, doc, minX, minY, maxX, maxY);
+      }
+      catch
+      {
+      }
+    }
+
+    private static void ApplyViewExtents(
+      Editor ed,
+      Document doc,
+      double minX,
+      double minY,
+      double maxX,
+      double maxY)
+    {
+      double width = Math.Max(maxX - minX, 1.0);
+      double height = Math.Max(maxY - minY, 1.0);
+      // ~35% margin so the pad is not edge-clipped while placing/rotating.
+      width *= 1.7;
+      height *= 1.7;
+      double cx = (minX + maxX) / 2.0;
+      double cy = (minY + maxY) / 2.0;
+
+      using (ViewTableRecord view = ed.GetCurrentView())
+      {
+        double aspect = view.Width / Math.Max(view.Height, 1e-9);
+        if (width / height > aspect)
+        {
+          height = width / aspect;
+        }
+        else
+        {
+          width = height * aspect;
+        }
+
+        view.CenterPoint = new Point2d(cx, cy);
+        view.Width = width;
+        view.Height = height;
+        ed.SetCurrentView(view);
+      }
+
+      TryUpdateScreen(doc);
     }
 
     private static bool TryExpandExtents(

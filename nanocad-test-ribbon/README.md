@@ -3,9 +3,10 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.22**): `nanocad-test-ribbon-v1.2.22.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.22.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.22/nanocad-test-ribbon-v1.2.22.zip  
+Актуальный zip с GitHub (версия **1.2.23**): `nanocad-test-ribbon-v1.2.23.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.23.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.23/nanocad-test-ribbon-v1.2.23.zip  
+
 
 
 Книги КП: [Burskoe_6](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/burskoe-6-kp/Burskoe_6_KP.xlsx) · [Burskoe_10](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/burskoe-10-kp/Burskoe_10_KP.xlsx)  
@@ -22,7 +23,7 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.22**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.23**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -93,7 +94,7 @@ NcTestPadOpt
 NcTestBlink
 ```
 
-### Кустовые площадки (v1.2.22)
+### Кустовые площадки (v1.2.23)
 
 `NcTestPadOpt` / лента **Кустовые площадки**:
 
@@ -101,7 +102,7 @@ NcTestBlink
 - Закрытие окна **не удаляет** КП с чертежа
 - В таблице правятся только **X/Y** и **угол**; **Сернистая среда** — только просмотр (из Excel «Сернистая среда» Да/Нет)
 - **Повернуть вручную** — zoom к КП, затем поворот вокруг **центра** прямоугольника
-- **Задать положение вручную** → jig → **Сохранить положения** (X/Y)
+- **Задать положение вручную** — zoom к КП, затем jig → **Сохранить положения** (X/Y)
 - **Двойной щелчок** → профили + **Ограничивает в месяце**
 
 ### Мигание сегмента (v1.2.13+)
