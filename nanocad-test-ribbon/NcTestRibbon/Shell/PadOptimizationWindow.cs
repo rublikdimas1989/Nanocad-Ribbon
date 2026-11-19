@@ -158,7 +158,7 @@ namespace NcTestRibbon.Shell
 
       top.Children.Add(new TextBlock
       {
-        Text = "0°: Длина по X (широкая), Ширина по Y. «Повернуть вручную» — поворот вокруг центра КП. Закрытие окна объекты не удаляет.",
+        Text = "В таблице правятся только X/Y и угол. «Сернистая среда» — из Excel (Да/Нет), только просмотр. «Повернуть вручную» — вокруг центра КП.",
         Margin = new Thickness(5, 2, 5, 6),
         Foreground = Brushes.DarkSlateGray,
         TextWrapping = TextWrapping.Wrap
@@ -194,20 +194,19 @@ namespace NcTestRibbon.Shell
         SelectionMode = DataGridSelectionMode.Single
       };
       _grid.Columns.Add(TextCol("КП", nameof(PadRow.Name)));
-      _grid.Columns.Add(TextCol("X", nameof(PadRow.X)));
-      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y)));
-      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText)));
+      _grid.Columns.Add(TextCol("X", nameof(PadRow.X), readOnly: false));
+      _grid.Columns.Add(TextCol("Y", nameof(PadRow.Y), readOnly: false));
+      _grid.Columns.Add(TextCol("Угол °", nameof(PadRow.RotationText), readOnly: false));
       _grid.Columns.Add(TextCol("Ширина, м", nameof(PadRow.WidthM)));
       _grid.Columns.Add(TextCol("Длина, м", nameof(PadRow.LengthM)));
-      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), readOnly: false));
+      _grid.Columns.Add(CheckCol("Сернистая среда", nameof(PadRow.SourMedium), readOnly: true));
       _grid.Columns.Add(CheckCol("Жидкость", nameof(PadRow.Liquid)));
       _grid.Columns.Add(CheckCol("Нефть", nameof(PadRow.Oil)));
       _grid.Columns.Add(CheckCol("ПНГ", nameof(PadRow.Gas)));
       _grid.Columns.Add(TextCol("Первый запуск, месяц", nameof(PadRow.FirstLaunch)));
       _grid.MouseDoubleClick += Grid_MouseDoubleClick;
       _grid.SelectionChanged += (_, __) => UpdateActionButtons();
-      _grid.CellEditEnding += (_, __) => UpdateActionButtons();
-      _grid.CurrentCellChanged += (_, __) => UpdateActionButtons();
+      _grid.CellEditEnding += Grid_CellEditEnding;
       _grid.LoadingRow += Grid_LoadingRow;
       root.Children.Add(_grid);
 
@@ -245,6 +244,77 @@ namespace NcTestRibbon.Shell
       {
         e.Row.ClearValue(Control.BackgroundProperty);
       }
+    }
+
+    private void Grid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+      if (e.EditAction != DataGridEditAction.Commit || e.Row?.Item is not PadRow row || row.Record == null)
+      {
+        UpdateActionButtons();
+        return;
+      }
+
+      string header = e.Column?.Header as string ?? string.Empty;
+      if (e.EditingElement is TextBox box)
+      {
+        string text = box.Text ?? string.Empty;
+        if (header == "X" && TryParseCoord(text, out double x))
+        {
+          row.X = x.ToString("G17", CultureInfo.CurrentCulture);
+          row.Record.X = x;
+          row.CoordsDirty = true;
+        }
+        else if (header == "Y" && TryParseCoord(text, out double y))
+        {
+          row.Y = y.ToString("G17", CultureInfo.CurrentCulture);
+          row.Record.Y = y;
+          row.CoordsDirty = true;
+        }
+        else if (header == "Угол °" && TryParseAngle(text, out double angle))
+        {
+          row.RotationDeg = CadPadOverlay.NormalizeDegrees(angle);
+          row.RotationText = row.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture);
+          row.CoordsDirty = true;
+          if (_showOnDrawing.IsChecked == true)
+          {
+            try
+            {
+              CadPadOverlay.UpdatePad(ToGeom(row));
+            }
+            catch (Exception ex)
+            {
+              Log("Обновление угла на чертеже: " + ex.Message);
+            }
+          }
+        }
+      }
+
+      UpdateActionButtons();
+      _grid.Items.Refresh();
+    }
+
+    private static bool TryParseCoord(string text, out double value)
+    {
+      value = 0;
+      if (string.IsNullOrWhiteSpace(text))
+      {
+        return false;
+      }
+
+      text = text.Trim().Replace(',', '.');
+      return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+        || double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value);
+    }
+
+    private static bool TryParseAngle(string text, out double angle)
+    {
+      angle = 0;
+      if (!TryParseCoord(text, out angle))
+      {
+        return false;
+      }
+
+      return double.IsFinite(angle) && angle >= 0 && angle <= 360;
     }
 
     private void UpdateActionButtons()
@@ -404,8 +474,7 @@ namespace NcTestRibbon.Shell
 
       MessageBoxResult confirm = MessageBox.Show(
         this,
-        "Перезаписать положения (X/Y) и «сернистая среда» в файле?\n\n"
-          + _book.Path + "\n\nСтрок: " + dirty.Count,
+        "Перезаписать положения (X/Y) в файле?\n\n" + _book.Path + "\n\nСтрок: " + dirty.Count,
         "Сохранить положения",
         MessageBoxButton.YesNo,
         MessageBoxImage.Question);
@@ -608,13 +677,17 @@ namespace NcTestRibbon.Shell
       _status.Text = text;
     }
 
-    private static DataGridTextColumn TextCol(string header, string path)
+    private static DataGridTextColumn TextCol(string header, string path, bool readOnly = true)
     {
       return new DataGridTextColumn
       {
         Header = header,
-        Binding = new Binding(path),
-        IsReadOnly = true,
+        Binding = new Binding(path)
+        {
+          Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay,
+          UpdateSourceTrigger = UpdateSourceTrigger.LostFocus
+        },
+        IsReadOnly = readOnly,
         Width = new DataGridLength(1, DataGridLengthUnitType.Star)
       };
     }
@@ -624,11 +697,7 @@ namespace NcTestRibbon.Shell
       return new DataGridCheckBoxColumn
       {
         Header = header,
-        Binding = new Binding(path)
-        {
-          Mode = BindingMode.TwoWay,
-          UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged
-        },
+        Binding = new Binding(path),
         IsReadOnly = readOnly,
         Width = header.Length > 10 ? 120 : 85
       };
@@ -636,8 +705,6 @@ namespace NcTestRibbon.Shell
 
     public sealed class PadRow
     {
-      private bool _sourMedium;
-
       public string Name { get; set; } = string.Empty;
       public string X { get; set; } = "0";
       public string Y { get; set; } = "0";
@@ -645,27 +712,8 @@ namespace NcTestRibbon.Shell
       public string LengthM { get; set; } = "250";
       public string RotationText { get; set; } = "0";
       public double RotationDeg { get; set; }
-
-      public bool SourMedium
-      {
-        get => _sourMedium;
-        set
-        {
-          if (_sourMedium == value)
-          {
-            return;
-          }
-
-          _sourMedium = value;
-          if (Record != null)
-          {
-            Record.SourMedium = value;
-          }
-
-          CoordsDirty = true;
-        }
-      }
-
+      /// <summary>Display-only: from Excel «Сернистая среда» (Да/Нет).</summary>
+      public bool SourMedium { get; set; }
       public bool Liquid { get; set; } = true;
       public bool Oil { get; set; } = true;
       public bool Gas { get; set; } = true;

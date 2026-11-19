@@ -78,7 +78,7 @@ namespace NcTestRibbon.Rates
     }
 
     /// <summary>
-    /// Writes updated X/Y and sourMedium for named pads into sheet «КП».
+    /// Writes updated X/Y for named pads into sheet «КП» (сернистая среда is Excel-only).
     /// </summary>
     public static int SavePadCoordinates(string workbookPath, IEnumerable<PadRecord> pads)
     {
@@ -144,15 +144,6 @@ namespace NcTestRibbon.Rates
         throw new InvalidDataException("Лист «КП» должен содержать столбцы name/x/y.");
       }
 
-      int sourCol = Col("sourMedium", "сернистая среда", "сернистая", "SourMedium");
-      if (sourCol < 0)
-      {
-        sourCol = cols + 1;
-        sheet.Cells[1, sourCol].Value = "sourMedium";
-        headers["sourMedium"] = sourCol;
-        cols = sourCol;
-      }
-
       int updated = 0;
       for (int r = 2; r <= rows; r++)
       {
@@ -164,7 +155,6 @@ namespace NcTestRibbon.Rates
 
         sheet.Cells[r, xCol].Value = pad.X;
         sheet.Cells[r, yCol].Value = pad.Y;
-        sheet.Cells[r, sourCol].Value = pad.SourMedium;
         updated++;
       }
 
@@ -366,7 +356,7 @@ namespace NcTestRibbon.Rates
       int gasCol = Col("active_gas", "gas");
       int widthCol = Col("Ширина", "width", "widthM");
       int lengthCol = Col("Длина", "length", "lengthM");
-      int sourCol = Col("sourMedium", "сернистая среда", "сернистая", "SourMedium");
+      int sourCol = Col("Сернистая среда", "сернистая среда", "сернистая", "sourMedium", "SourMedium");
       sourMediumColumnPresent = sourCol > 0;
 
       var result = new List<PadRecord>();
