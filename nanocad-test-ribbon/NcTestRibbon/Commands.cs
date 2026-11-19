@@ -2,6 +2,7 @@ namespace NcTestRibbon
 {
   using System;
   using System.Diagnostics;
+  using System.IO;
   using System.Net.Http;
   using System.Threading.Tasks;
   using System.Windows.Forms;
@@ -9,6 +10,7 @@ namespace NcTestRibbon
   using System.Windows.Interop;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
+  using NcTestRibbon.Cad;
   using NcTestRibbon.Shell;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
@@ -22,6 +24,7 @@ namespace NcTestRibbon
     private const string DefaultHttpUrl = "https://httpbin.org/get";
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
+    private static SourceDataWindow _sourceDataLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -94,17 +97,171 @@ namespace NcTestRibbon
     [CommandMethod("NcTestInitialData")]
     public void NcTestInitialData()
     {
-      NcTestSettings();
+      NcTestSourceData();
     }
 
     /// <summary>
-    /// Opens pad-optimization shell (TopologyInputsWindow / TopologyPadWindow UI).
-    /// Code-built WPF — no XAML pack URI.
+    /// «Исходные данные» — Кустовые / Врезки / БУОС / Узлы tabs (default: pads).
+    /// </summary>
+    [CommandMethod("NcTestSourceData")]
+    public void NcTestSourceData()
+    {
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestSourceData");
+    }
+
+    /// <summary>
+    /// Display-only KP table tab inside «Исходные данные».
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
     {
-      OpenWpfWindow(ed: null, "NcTestPadOpt", () => new PadOptimizationWindow());
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadOpt");
+    }
+
+    /// <summary>
+    /// Topology insert points tab — End TopologyTieIns analogue.
+    /// </summary>
+    [CommandMethod("NcTestInserts")]
+    public void NcTestInserts()
+    {
+      OpenSourceDataForm(SourceDataTab.Inserts, "NcTestInserts");
+    }
+
+    /// <summary>
+    /// BUOS type catalogue tab — Excel, no site coordinates.
+    /// </summary>
+    [CommandMethod("NcTestBuos")]
+    public void NcTestBuos()
+    {
+      OpenSourceDataForm(SourceDataTab.Buos, "NcTestBuos");
+    }
+
+    /// <summary>
+    /// Junction / node types tab — sizes + Price lookup.
+    /// </summary>
+    [CommandMethod("NcTestNodes")]
+    public void NcTestNodes()
+    {
+      OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
+    }
+
+    private void OpenSourceDataForm(SourceDataTab tab, string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        // Detail profiles dialog (pads) is still WPF.
+        EnsureWpfApplication(ed);
+
+        if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+        {
+          _sourceDataLive.SelectTab(tab);
+          ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        SourceDataWindow form = new SourceDataWindow(tab);
+        _sourceDataLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_sourceDataLive, form))
+          {
+            _sourceDataLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Исходные данные open → " + tab + ".");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    /// <summary>
+    /// CAD label font + insert circle diameter → interface.conf
+    /// </summary>
+    [CommandMethod("NcTestInterface")]
+    public void NcTestInterface()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestInterface";
+      try
+      {
+        EnsureVisualStyles(ed);
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        using (InterfaceSettingsWindow form = new InterfaceSettingsWindow())
+        {
+          DialogResult result = hwnd != IntPtr.Zero
+            ? form.ShowDialog(new WindowWrapper(hwnd))
+            : form.ShowDialog();
+          ed?.WriteMessage("\n" + label + ": DialogResult=" + result);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+      }
+    }
+
+    /// <summary>
+    /// Toggle End-style CAD blink on a selected polyline/curve.
+    /// Pickfirst (or prompt) → blink until the same command / ribbon button is pressed again.
+    /// </summary>
+    [CommandMethod("NcTestBlink", CommandFlags.UsePickSet | CommandFlags.Redraw)]
+    public void NcTestBlink()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      if (ed == null)
+      {
+        return;
+      }
+
+      try
+      {
+        CadSegmentBlinker.ToggleFromSelection(ed);
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestBlink", ex);
+        CadSegmentBlinker.Stop();
+      }
+    }
+
+    /// <summary>Force-stop blink (same as releasing the ribbon toggle).</summary>
+    [CommandMethod("NcTestBlinkOff")]
+    public void NcTestBlinkOff()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      CadSegmentBlinker.Stop();
+      ed?.WriteMessage("\nNcTestBlinkOff: мигание ВЫКЛ.");
     }
 
     /// <summary>Small WinForms smoke dialog (fallback).</summary>
@@ -182,6 +339,7 @@ namespace NcTestRibbon
     {
       if (WpfApp.Current != null || _wpfAppCreated)
       {
+        HookWpfUnhandled(ed);
         return;
       }
 
@@ -192,11 +350,50 @@ namespace NcTestRibbon
           ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown
         };
         _wpfAppCreated = true;
+        HookWpfUnhandled(ed);
         ed?.WriteMessage("\nWPF Application created (OnExplicitShutdown).");
       }
       catch (System.Exception ex)
       {
         ed?.WriteMessage("\nWPF Application init: " + ex.Message);
+      }
+    }
+
+    private static bool _wpfUnhandledHooked;
+
+    private static void HookWpfUnhandled(Editor ed)
+    {
+      if (_wpfUnhandledHooked || WpfApp.Current == null)
+      {
+        return;
+      }
+
+      try
+      {
+        WpfApp.Current.DispatcherUnhandledException += (_, e) =>
+        {
+          try
+          {
+            string dir = NcTestRibbon.Shell.TracingCache.SettingsDir;
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+              Path.Combine(dir, "nc_test_ribbon_crash.log"),
+              DateTime.Now.ToString("s") + " [AppDispatcher] "
+              + e.Exception.GetType().FullName + ": " + e.Exception.Message
+              + Environment.NewLine + e.Exception.StackTrace + Environment.NewLine + "----\n");
+            ed?.WriteMessage("\nWPF unhandled: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+          }
+          catch
+          {
+          }
+
+          e.Handled = true;
+        };
+        _wpfUnhandledHooked = true;
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nWPF unhandled hook: " + ex.Message);
       }
     }
 
