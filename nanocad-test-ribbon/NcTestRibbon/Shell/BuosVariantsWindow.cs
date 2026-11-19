@@ -14,7 +14,7 @@ namespace NcTestRibbon.Shell
   /// End BuosCatalogPanel / TopologyBuosType catalogue — display-only Excel grid (no site X/Y).
   /// Cost from Price.xlsx sheet «Элементы топологии» by BUOS name.
   /// </summary>
-  public sealed class BuosVariantsWindow : Form
+  public sealed class BuosVariantsWindow : UserControl
   {
     private readonly BindingList<BuosRow> _rows = new BindingList<BuosRow>();
     private readonly TextBox _file;
@@ -27,13 +27,7 @@ namespace NcTestRibbon.Shell
     public BuosVariantsWindow()
     {
       Text = "Варианты БУОС";
-      Width = 1000;
-      Height = 520;
-      MinimumSize = new Size(720, 360);
-      StartPosition = FormStartPosition.CenterParent;
-      FormBorderStyle = FormBorderStyle.Sizable;
-      ShowInTaskbar = true;
-
+      Dock = DockStyle.Fill;
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
 

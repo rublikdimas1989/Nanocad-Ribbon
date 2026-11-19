@@ -24,9 +24,7 @@ namespace NcTestRibbon
     private const string DefaultHttpUrl = "https://httpbin.org/get";
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
-    private static PadOptimizationWindow _padOptLive;
-    private static InsertPointsWindow _insertsLive;
-    private static BuosVariantsWindow _buosLive;
+    private static SourceDataWindow _sourceDataLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -99,52 +97,79 @@ namespace NcTestRibbon
     [CommandMethod("NcTestInitialData")]
     public void NcTestInitialData()
     {
-      NcTestSettings();
+      NcTestSourceData();
     }
 
     /// <summary>
-    /// Display-only KP table from Excel (paths.json). WinForms DataGridView (v1.2.27+).
-    /// Modeless singleton so place/rotate does not end the window (v1.2.28).
+    /// «Исходные данные» — Кустовые / Врезки / БУОС / Узлы tabs (default: pads).
+    /// </summary>
+    [CommandMethod("NcTestSourceData")]
+    public void NcTestSourceData()
+    {
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestSourceData");
+    }
+
+    /// <summary>
+    /// Display-only KP table tab inside «Исходные данные».
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
     {
-      OpenPadOptForm();
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadOpt");
     }
 
     /// <summary>
-    /// Modeless WinForms pad window — stays open across place/rotate CAD prompts.
+    /// Topology insert points tab — End TopologyTieIns analogue.
     /// </summary>
-    private void OpenPadOptForm()
+    [CommandMethod("NcTestInserts")]
+    public void NcTestInserts()
+    {
+      OpenSourceDataForm(SourceDataTab.Inserts, "NcTestInserts");
+    }
+
+    /// <summary>
+    /// BUOS type catalogue tab — Excel, no site coordinates.
+    /// </summary>
+    [CommandMethod("NcTestBuos")]
+    public void NcTestBuos()
+    {
+      OpenSourceDataForm(SourceDataTab.Buos, "NcTestBuos");
+    }
+
+    /// <summary>
+    /// Junction / node types tab — sizes + Price lookup.
+    /// </summary>
+    [CommandMethod("NcTestNodes")]
+    public void NcTestNodes()
+    {
+      OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
+    }
+
+    private void OpenSourceDataForm(SourceDataTab tab, string label)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
-      const string label = "NcTestPadOpt";
       try
       {
         EnsureVisualStyles(ed);
-        // Detail profiles dialog is still WPF.
+        // Detail profiles dialog (pads) is still WPF.
         EnsureWpfApplication(ed);
 
-        if (_padOptLive != null && !_padOptLive.IsDisposed)
+        if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
         {
-          _padOptLive.BringToFront();
-          _padOptLive.Activate();
-          ed?.WriteMessage("\n" + label + ": already open (modeless).");
+          _sourceDataLive.SelectTab(tab);
+          ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
           return;
         }
 
         IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        ed?.WriteMessage("\n" + label + ": opening WinForms pad grid (modeless Show)."
-          + " HWND=" + hwnd.ToInt64());
-
-        PadOptimizationWindow form = new PadOptimizationWindow();
-        _padOptLive = form;
+        SourceDataWindow form = new SourceDataWindow(tab);
+        _sourceDataLive = form;
         form.FormClosed += (_, __) =>
         {
-          if (ReferenceEquals(_padOptLive, form))
+          if (ReferenceEquals(_sourceDataLive, form))
           {
-            _padOptLive = null;
+            _sourceDataLive = null;
           }
         };
 
@@ -157,7 +182,7 @@ namespace NcTestRibbon
           form.Show();
         }
 
-        ed?.WriteMessage("\n" + label + ": modeless open.");
+        ed?.WriteMessage("\n" + label + ": Исходные данные open → " + tab + ".");
       }
       catch (System.Exception ex)
       {
@@ -174,68 +199,6 @@ namespace NcTestRibbon
         catch
         {
         }
-      }
-    }
-
-    /// <summary>
-    /// Topology insert points (врезки) — End TopologyTieIns analogue, Excel + CAD place.
-    /// </summary>
-    [CommandMethod("NcTestInserts")]
-    public void NcTestInserts()
-    {
-      OpenInsertsForm();
-    }
-
-    /// <summary>
-    /// BUOS type catalogue (End TopologyBuosType) — Excel, no site coordinates.
-    /// </summary>
-    [CommandMethod("NcTestBuos")]
-    public void NcTestBuos()
-    {
-      OpenBuosForm();
-    }
-
-    private void OpenBuosForm()
-    {
-      Document doc = CadApp.DocumentManager.MdiActiveDocument;
-      Editor ed = doc?.Editor;
-      const string label = "NcTestBuos";
-      try
-      {
-        EnsureVisualStyles(ed);
-        if (_buosLive != null && !_buosLive.IsDisposed)
-        {
-          _buosLive.BringToFront();
-          _buosLive.Activate();
-          ed?.WriteMessage("\n" + label + ": already open (modeless).");
-          return;
-        }
-
-        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        BuosVariantsWindow form = new BuosVariantsWindow();
-        _buosLive = form;
-        form.FormClosed += (_, __) =>
-        {
-          if (ReferenceEquals(_buosLive, form))
-          {
-            _buosLive = null;
-          }
-        };
-
-        if (hwnd != IntPtr.Zero)
-        {
-          form.Show(new WindowWrapper(hwnd));
-        }
-        else
-        {
-          form.Show();
-        }
-
-        ed?.WriteMessage("\n" + label + ": modeless open.");
-      }
-      catch (System.Exception ex)
-      {
-        WriteException(ed, label, ex);
       }
     }
 
@@ -259,50 +222,6 @@ namespace NcTestRibbon
             : form.ShowDialog();
           ed?.WriteMessage("\n" + label + ": DialogResult=" + result);
         }
-      }
-      catch (System.Exception ex)
-      {
-        WriteException(ed, label, ex);
-      }
-    }
-
-    private void OpenInsertsForm()
-    {
-      Document doc = CadApp.DocumentManager.MdiActiveDocument;
-      Editor ed = doc?.Editor;
-      const string label = "NcTestInserts";
-      try
-      {
-        EnsureVisualStyles(ed);
-        if (_insertsLive != null && !_insertsLive.IsDisposed)
-        {
-          _insertsLive.BringToFront();
-          _insertsLive.Activate();
-          ed?.WriteMessage("\n" + label + ": already open (modeless).");
-          return;
-        }
-
-        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        InsertPointsWindow form = new InsertPointsWindow();
-        _insertsLive = form;
-        form.FormClosed += (_, __) =>
-        {
-          if (ReferenceEquals(_insertsLive, form))
-          {
-            _insertsLive = null;
-          }
-        };
-
-        if (hwnd != IntPtr.Zero)
-        {
-          form.Show(new WindowWrapper(hwnd));
-        }
-        else
-        {
-          form.Show();
-        }
-
-        ed?.WriteMessage("\n" + label + ": modeless open.");
       }
       catch (System.Exception ex)
       {

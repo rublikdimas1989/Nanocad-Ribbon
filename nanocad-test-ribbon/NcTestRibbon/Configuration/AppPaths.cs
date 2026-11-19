@@ -23,6 +23,9 @@ namespace NcTestRibbon.Configuration
     /// <summary>Last opened BUOS variants workbook (xlsx, sheet «БУОС»).</summary>
     public string BuosWorkbook { get; set; } = string.Empty;
 
+    /// <summary>Last opened junction/node types workbook (xlsx, sheet «Узлы»).</summary>
+    public string NodesWorkbook { get; set; } = string.Empty;
+
     /// <summary>Last rates workbook (Price.xlsx / .xlsm or custom path).</summary>
     public string PriceWorkbook { get; set; } = string.Empty;
 

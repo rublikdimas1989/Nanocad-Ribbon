@@ -3,12 +3,13 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.33**): `nanocad-test-ribbon-v1.2.33.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.33.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/nanocad-test-ribbon-v1.2.33.zip  
+Актуальный zip с GitHub (версия **1.2.34**): `nanocad-test-ribbon-v1.2.34.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.34.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.34/nanocad-test-ribbon-v1.2.34.zip  
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/Topology_Inserts.xlsx)  
-Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/Topology_Buos.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.34/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.34/Topology_Buos.xlsx)  
+Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.34/Topology_Nodes.xlsx)  
 
 
 
@@ -30,7 +31,7 @@ Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanoc
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.33**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.34**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -42,9 +43,11 @@ Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanoc
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
 | `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
-| `NcTestPadOpt` | КП из Excel; чертёж / ручная расстановка / сохранение X/Y; двойной щелчок → профили |
-| `NcTestInserts` | Точки врезки (End Topology): Excel «Врезки», CAD place, слой NC_INSERTS |
-| `NcTestBuos` | Варианты БУОС (каталог типов): производительность/габарит, без координат |
+| `NcTestSourceData` | «Исходные данные» — вкладки Кустовые / Врезки / БУОС / Узлы |
+| `NcTestPadOpt` | То же окно → вкладка Кустовые (КП Excel + CAD place) |
+| `NcTestInserts` | То же окно → вкладка Врезки |
+| `NcTestBuos` | То же окно → вкладка БУОС |
+| `NcTestNodes` | То же окно → вкладка Узлы (габарит + цена из Price) |
 | `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
 | `NcTestBlinkOff` | принудительно выключить мигание |
@@ -131,14 +134,25 @@ NcTestBlink
 - `LabelFontHeightM` — подписи КП и врезок
 - `InsertCircleDiameterM` — диаметр круга врезки
 
+### Исходные данные (v1.2.34)
+
+Одно WinForms-окно **«Исходные данные»** (`NcTestSourceData`) с вкладками. Кнопки ленты Кустовые / Врезки / БУОС / Узлы открывают то же окно на нужной вкладке.
+
 ### Варианты БУОС (v1.2.33 / TCON-51)
 
-`NcTestBuos` — каталог типов (End `TopologyBuosType` / BuosCatalogPanel), **без** координат и «в подборе»:
+Вкладка **БУОС** — каталог типов (End `TopologyBuosType`), **без** координат и «в подборе»:
 
 - Лист Excel **«БУОС»**: Имя, производительность жидкость/ПНГ, длина/ширина площадки
-- Стоимость — из `Price.xlsx` лист **«Элементы топологии»** (A=имя, B=цена); нет цены → красный текст «введите в Price стоимость»
-- Display-only; уникальное Имя; path в `paths.json` → `buosWorkbook`
-- Sample: `Topology_Buos.xlsx`
+- Стоимость — из `Price.xlsx` лист **«Элементы топологии»** (A=имя, B=цена); нет цены → красный «введите в Price стоимость»
+- Sample: `Topology_Buos.xlsx`; `paths.json` → `buosWorkbook`
+
+### Узлы (v1.2.34)
+
+Вкладка **Узлы** — типы «Узел 3 соединения» / «Узел 4 соединения»:
+
+- Лист Excel **«Узлы»**: Имя, длина/ширина площадки (без производительности)
+- Стоимость — тот же Price lookup, что у БУОС
+- Sample: `Topology_Nodes.xlsx`; `paths.json` → `nodesWorkbook`
 
 ### Мигание сегмента (v1.2.13+)
 

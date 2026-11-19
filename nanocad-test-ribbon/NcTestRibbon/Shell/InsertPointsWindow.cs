@@ -15,7 +15,7 @@ namespace NcTestRibbon.Shell
   /// <summary>
   /// End TopologyTieInsWindow analogue (WinForms): display-only grid, CAD place for X/Y.
   /// </summary>
-  public sealed class InsertPointsWindow : Form
+  public sealed class InsertPointsWindow : UserControl
   {
     private readonly BindingList<InsertRow> _rows = new BindingList<InsertRow>();
     private readonly TextBox _file;
@@ -31,15 +31,8 @@ namespace NcTestRibbon.Shell
 
     public InsertPointsWindow()
     {
-      Text = "Топология — точки врезки / сброса после БУОС";
-      Width = 1180;
-      Height = 560;
-      MinimumSize = new Size(850, 350);
-      StartPosition = FormStartPosition.CenterParent;
-      FormBorderStyle = FormBorderStyle.Sizable;
-      ShowInTaskbar = true;
-      FormClosing += InsertPointsWindow_FormClosing;
-
+      Text = "Точки врезки";
+      Dock = DockStyle.Fill;
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
 
@@ -226,7 +219,7 @@ namespace NcTestRibbon.Shell
       }
     }
 
-    private void InsertPointsWindow_FormClosing(object sender, FormClosingEventArgs e)
+    public void NotifyHostClosing()
     {
       try { AppPaths.Set(p => p.ShowInsertsOnDrawing = _showOnDrawing.Checked); }
       catch { }

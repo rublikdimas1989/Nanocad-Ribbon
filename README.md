@@ -4,10 +4,15 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.33.zip`](nanocad-test-ribbon-v1.2.33.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.33/nanocad-test-ribbon-v1.2.33.zip
-- **Sample inserts:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
-- **Sample BUOS:** [`Topology_Buos.xlsx`](Topology_Buos.xlsx)
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.34.zip`](nanocad-test-ribbon-v1.2.34.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.34/nanocad-test-ribbon-v1.2.34.zip
+- **Samples:** `Topology_Inserts.xlsx`, `Topology_Buos.xlsx`, `Topology_Nodes.xlsx`
+
+## v1.2.34 — Исходные данные tabs + Узлы
+
+- One WinForms window «Исходные данные» (TabControl): Кустовые / Врезки / БУОС / Узлы
+- Ribbon buttons open the same window on the matching tab
+- `Topology_Nodes.xlsx` — «Узел 3/4 соединения», sizes only; cost from Price like BUOS
 
 ## v1.2.33 — BUOS cost from Price.xlsx (TCON-51)
 

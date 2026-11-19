@@ -30,23 +30,37 @@
       "iconResource": "NC_ICONS.http.ico"
     },
     {
+      "intername": "NcTestSourceData",
+      "displayName": "Исходные данные",
+      "tooltip": "Кустовые / Врезки / БУОС / Узлы — одно окно с вкладками.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
       "intername": "NcTestPadOpt",
       "displayName": "Кустовые площадки",
-      "tooltip": "Кустовые площадки: просмотр КП из Excel (xlsx). Правки — в книге; пути в paths.json.",
+      "tooltip": "Открывает «Исходные данные» на вкладке Кустовые площадки.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestInserts",
       "displayName": "Точки врезки",
-      "tooltip": "Точки врезки / сброса (End Topology): Excel лист «Врезки», положение на чертеже.",
+      "tooltip": "Открывает «Исходные данные» на вкладке Врезки.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestBuos",
       "displayName": "Варианты БУОС",
-      "tooltip": "Каталог типов БУОС (производительность, габарит). Без координат площадок.",
+      "tooltip": "Открывает «Исходные данные» на вкладке БУОС.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestNodes",
+      "displayName": "Узлы",
+      "tooltip": "Открывает «Исходные данные» на вкладке Узлы (габарит + цена из Price).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
@@ -87,6 +101,11 @@
       "style": "large"
     },
     {
+      "text": "Исходные данные",
+      "command": "NcTestSourceData",
+      "style": "large"
+    },
+    {
       "text": "Кустовые площадки",
       "command": "NcTestPadOpt",
       "style": "large"
@@ -99,6 +118,11 @@
     {
       "text": "Варианты БУОС",
       "command": "NcTestBuos",
+      "style": "large"
+    },
+    {
+      "text": "Узлы",
+      "command": "NcTestNodes",
       "style": "large"
     },
     {

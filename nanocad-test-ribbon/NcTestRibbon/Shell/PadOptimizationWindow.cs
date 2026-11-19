@@ -19,7 +19,7 @@ namespace NcTestRibbon.Shell
   /// KP table from Excel (WinForms DataGridView): profiles, CAD overlay, place/rotate, save X/Y.
   /// Modeless: stays open across place/rotate. Unsaved moves revert CAD to Excel on close.
   /// </summary>
-  public sealed class PadOptimizationWindow : Form
+  public sealed class PadOptimizationWindow : UserControl
   {
     private readonly BindingList<PadRow> _pads = new BindingList<PadRow>();
     private readonly TextBox _fluidFile;
@@ -37,18 +37,11 @@ namespace NcTestRibbon.Shell
 
     public PadOptimizationWindow()
     {
+      // Hosted in SourceDataWindow; closing host discards unsaved place/rotate.
       Text = "Кустовые площадки";
-      Width = 1140;
-      Height = 700;
-      MinimumSize = new Size(720, 480);
-      StartPosition = FormStartPosition.CenterParent;
-      FormBorderStyle = FormBorderStyle.Sizable;
-      ShowInTaskbar = true;
-      // Closing discards unsaved place/rotate (CAD back to last Excel); does NOT erase saved KP.
-
+      Dock = DockStyle.Fill;
       AppPaths paths = AppPaths.Load();
       TracingCache.EnsureCreated();
-      FormClosing += PadOptimizationWindow_FormClosing;
 
       var root = new TableLayoutPanel
       {
@@ -299,10 +292,10 @@ namespace NcTestRibbon.Shell
       }
 
       UpdateActionButtons();
-      Shown += (_, __) => BindPadsGrid();
+      Load += (_, __) => BindPadsGrid();
     }
 
-    private void PadOptimizationWindow_FormClosing(object sender, FormClosingEventArgs e)
+    public void NotifyHostClosing()
     {
       try
       {
