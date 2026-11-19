@@ -25,16 +25,65 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx, conf).",
+      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx|xlsm, conf).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
     {
-      "intername": "NcTestPadOpt",
-      "displayName": "Кустовые площадки",
-      "tooltip": "UI-оболочка «Оптимизация кустовых площадок» (TopologyInputsWindow / TopologyPadWindow). Логика — stub.",
+      "intername": "NcTestSourceData",
+      "displayName": "Исходные данные",
+      "tooltip": "Кустовые / Врезки / БУОС / Узлы — одно окно с вкладками.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestInterface",
+      "displayName": "Оформление",
+      "tooltip": "Размер шрифта подписей и диаметр круга врезки → Tracing_cache\\Settings\\interface.conf",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestBlink",
+      "displayName": "Мигание",
+      "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestEcw",
+      "displayName": "ECW/растр",
+      "tooltip": "Вставить ECW/растр с End-геопривязкой (world coords + масштаб), не plain IMAGEATTACH.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestCartography",
+      "displayName": "Картография",
+      "tooltip": "Forest / Height / космоснимок: показ + прозрачность; Открыть… (TIF→ECW / colorize). Слои NC_MAP_* locked; uncheck → layer Off.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestTif",
+      "displayName": "TIF→ECW",
+      "tooltip": "Команда: GeoTIFF → Maps\\*_geo (лента — в Картография).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestForest",
+      "displayName": "Forest",
+      "tooltip": "Команда: Forest colorize (лента — в Картография).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestHeight",
+      "displayName": "Height",
+      "tooltip": "Команда: Height colorize (лента — в Картография).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
     }
   ],
   "buttons": [
@@ -59,8 +108,28 @@
       "style": "large"
     },
     {
-      "text": "Кустовые площадки",
-      "command": "NcTestPadOpt",
+      "text": "Исходные данные",
+      "command": "NcTestSourceData",
+      "style": "large"
+    },
+    {
+      "text": "Оформление",
+      "command": "NcTestInterface",
+      "style": "large"
+    },
+    {
+      "text": "Мигание",
+      "command": "NcTestBlink",
+      "style": "large"
+    },
+    {
+      "text": "ECW/растр",
+      "command": "NcTestEcw",
+      "style": "large"
+    },
+    {
+      "text": "Картография",
+      "command": "NcTestCartography",
       "style": "large"
     }
   ]
