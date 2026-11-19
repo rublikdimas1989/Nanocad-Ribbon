@@ -17,6 +17,9 @@ namespace NcTestRibbon.Configuration
     /// <summary>Last opened KP / Top_tree workbook (xlsx).</summary>
     public string PadsWorkbook { get; set; } = string.Empty;
 
+    /// <summary>Last opened inserts / tie-ins workbook (xlsx, sheet «Врезки»).</summary>
+    public string InsertsWorkbook { get; set; } = string.Empty;
+
     /// <summary>Last rates workbook (Price.xlsx / .xlsm or custom path).</summary>
     public string PriceWorkbook { get; set; } = string.Empty;
 
@@ -31,6 +34,9 @@ namespace NcTestRibbon.Configuration
 
     /// <summary>Remember «Показывать на чертеже» for the pad window.</summary>
     public bool ShowPadsOnDrawing { get; set; }
+
+    /// <summary>Remember «Показывать на чертеже» for insert points.</summary>
+    public bool ShowInsertsOnDrawing { get; set; }
 
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {

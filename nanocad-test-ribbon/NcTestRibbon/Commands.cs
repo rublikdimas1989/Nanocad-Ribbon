@@ -25,6 +25,7 @@ namespace NcTestRibbon
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
     private static PadOptimizationWindow _padOptLive;
+    private static InsertPointsWindow _insertsLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -172,6 +173,86 @@ namespace NcTestRibbon
         catch
         {
         }
+      }
+    }
+
+    /// <summary>
+    /// Topology insert points (врезки) — End TopologyTieIns analogue, Excel + CAD place.
+    /// </summary>
+    [CommandMethod("NcTestInserts")]
+    public void NcTestInserts()
+    {
+      OpenInsertsForm();
+    }
+
+    /// <summary>
+    /// CAD label font + insert circle diameter → interface.conf
+    /// </summary>
+    [CommandMethod("NcTestInterface")]
+    public void NcTestInterface()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestInterface";
+      try
+      {
+        EnsureVisualStyles(ed);
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        using (InterfaceSettingsWindow form = new InterfaceSettingsWindow())
+        {
+          DialogResult result = hwnd != IntPtr.Zero
+            ? form.ShowDialog(new WindowWrapper(hwnd))
+            : form.ShowDialog();
+          ed?.WriteMessage("\n" + label + ": DialogResult=" + result);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+      }
+    }
+
+    private void OpenInsertsForm()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestInserts";
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_insertsLive != null && !_insertsLive.IsDisposed)
+        {
+          _insertsLive.BringToFront();
+          _insertsLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open (modeless).");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        InsertPointsWindow form = new InsertPointsWindow();
+        _insertsLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_insertsLive, form))
+          {
+            _insertsLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": modeless open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
       }
     }
 

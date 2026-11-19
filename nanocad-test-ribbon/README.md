@@ -3,9 +3,12 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный zip с GitHub (версия **1.2.28**): `nanocad-test-ribbon-v1.2.28.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.28.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.28/nanocad-test-ribbon-v1.2.28.zip  
+Актуальный zip с GitHub (версия **1.2.29**): `nanocad-test-ribbon-v1.2.29.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.29.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/nanocad-test-ribbon-v1.2.29.zip  
+
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/Topology_Inserts.xlsx)  
+
 
 
 
@@ -25,7 +28,7 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.28**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.29**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 3. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat` (checks EPPlus.dll in LoadFile)
 4. nanoCAD: `NcTestPadOpt` / `NcTestBlink` / `NcTestSettings` / `NcTestWpf` / `NcTestHello` / `NcTestHttp`
@@ -38,6 +41,8 @@ Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.
 | `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога) |
 | `NcTestInitialData` | alias → `NcTestSettings` |
 | `NcTestPadOpt` | КП из Excel; чертёж / ручная расстановка / сохранение X/Y; двойной щелчок → профили |
+| `NcTestInserts` | Точки врезки (End Topology): Excel «Врезки», CAD place, слой NC_INSERTS |
+| `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
 | `NcTestBlinkOff` | принудительно выключить мигание |
 | `NcTestDemo` | маленький WinForms smoke |
@@ -96,7 +101,7 @@ NcTestPadOpt
 NcTestBlink
 ```
 
-### Кустовые площадки (v1.2.28)
+### Кустовые площадки (v1.2.28+)
 
 `NcTestPadOpt` / лента **Кустовые площадки**:
 
@@ -107,6 +112,20 @@ NcTestBlink
 - Положение/угол только **Задать положение вручную** / **Повернуть вручную** на чертеже
 - Crash log: `Tracing_cache\Settings\nc_test_ribbon_crash.log`
 - **Двойной щелчок** → профили + **Ограничивает в месяце**
+
+### Точки врезки + оформление (v1.2.29)
+
+`NcTestInserts` — как End «Топология — точки врезки / сброса после БУОС»:
+
+- Лист Excel **«Врезки»**: Id, Имя, Включена, X, Y, Среда, P противодавления, Макс. приём нефти
+- Таблица display-only; положение только **Задать положение вручную** (CAD)
+- «Показывать на чертеже» → слой `NC_INSERTS` (круг + подпись); persist `paths.json`
+- Sample: `Topology_Inserts.xlsx` (в корне репо / release)
+
+`NcTestInterface` — `Tracing_cache\Settings\interface.conf`:
+
+- `LabelFontHeightM` — подписи КП и врезок
+- `InsertCircleDiameterM` — диаметр круга врезки
 
 ### Мигание сегмента (v1.2.13+)
 

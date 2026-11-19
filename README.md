@@ -4,8 +4,16 @@
 
 ## Скачать
 
-- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.28.zip`](nanocad-test-ribbon-v1.2.28.zip)  
-  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.28/nanocad-test-ribbon-v1.2.28.zip
+- **Актуальный пакет:** [`nanocad-test-ribbon-v1.2.29.zip`](nanocad-test-ribbon-v1.2.29.zip)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/nanocad-test-ribbon-v1.2.29.zip
+- **Sample inserts xlsx:** [`Topology_Inserts.xlsx`](Topology_Inserts.xlsx)  
+  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.29/Topology_Inserts.xlsx
+
+## v1.2.29 — Topology inserts (врезки) + interface.conf
+
+- `NcTestInserts` — End «Топология — точки врезки» WinForms grid (Excel «Врезки»), CAD place, show checkbox
+- `NcTestInterface` — font size + insert circle diameter → `Tracing_cache\Settings\interface.conf` (also KP labels)
+- Sample `Topology_Inserts.xlsx`; path in `paths.json` (`insertsWorkbook`)
 
 ## v1.2.28 — pad session: stay open, persist show, revert unsaved
 

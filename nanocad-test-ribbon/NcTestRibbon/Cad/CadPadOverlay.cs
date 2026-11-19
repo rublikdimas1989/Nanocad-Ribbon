@@ -287,7 +287,17 @@ namespace NcTestRibbon.Cad
     private static void AddLabel(Transaction tr, BlockTableRecord model, Database db, PadGeom pad)
     {
       double halfY = Math.Max(pad.WidthM, 1) / 2.0;
-      double height = Math.Max(pad.WidthM, 1) / 2.0;
+      // Shared with inserts via Tracing_cache\Settings\interface.conf (LabelFontHeightM).
+      double configured = 0;
+      try
+      {
+        configured = NcTestRibbon.Configuration.InterfaceConf.Load().LabelFontHeightM;
+      }
+      catch
+      {
+      }
+
+      double height = configured > 0 ? configured : Math.Max(pad.WidthM, 1) / 2.0;
       Point2d anchor = Rotate(pad.X, pad.Y, 0, halfY + height * 0.15, pad.RotationDeg);
 
       var text = new DBText();

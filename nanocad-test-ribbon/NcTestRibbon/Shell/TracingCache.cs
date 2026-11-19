@@ -35,6 +35,7 @@ namespace NcTestRibbon.Shell
 
     public static string TracingConf => Path.Combine(SettingsDir, "tracing.conf");
     public static string TrenchRoadConf => Path.Combine(SettingsDir, "trench_road.conf");
+    public static string InterfaceConf => Path.Combine(SettingsDir, "interface.conf");
     public static string PathsJson => Path.Combine(SettingsDir, "paths.json");
 
     /// <summary>
