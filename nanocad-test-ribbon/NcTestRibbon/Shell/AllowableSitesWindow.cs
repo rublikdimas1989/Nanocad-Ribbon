@@ -20,14 +20,12 @@ namespace NcTestRibbon.Shell
   public sealed class AllowableSitesWindow : Form
   {
     private readonly Label _buosSize;
-    private readonly Label _nodeSize;
     private readonly TextBox _buosRiver;
     private readonly TextBox _buosInfra;
     private readonly TextBox _nodeRiver;
     private readonly Label _aoiInfo;
     private readonly Label _status;
     private readonly CheckBox _showBuos;
-    private readonly CheckBox _showNodes;
     private readonly Button _btnUpload;
     private readonly Button _calcBuos;
     private readonly Button _cancelCalc;
@@ -73,19 +71,10 @@ namespace NcTestRibbon.Shell
       {
         AutoSize = true,
         MaximumSize = new Size(600, 0),
-        Margin = new Padding(0, 0, 0, 6),
-        Font = new Font(Font, FontStyle.Bold)
-      };
-      root.Controls.Add(_buosSize);
-
-      _nodeSize = new Label
-      {
-        AutoSize = true,
-        MaximumSize = new Size(600, 0),
         Margin = new Padding(0, 0, 0, 12),
         Font = new Font(Font, FontStyle.Bold)
       };
-      root.Controls.Add(_nodeSize);
+      root.Controls.Add(_buosSize);
 
       root.Controls.Add(MakeLabel("БУОС: от контура площадки до линии реки, м"));
       _buosRiver = MakeNum(geo.BuosRiverBufferM);
@@ -160,15 +149,6 @@ namespace NcTestRibbon.Shell
       _calcBuos.Click += async (_, __) => await CalculateBuosAsync().ConfigureAwait(true);
       calcRow.Controls.Add(_calcBuos);
 
-      var calcNodes = new Button
-      {
-        Text = "Рассчитать слой узлов",
-        AutoSize = true,
-        Margin = new Padding(0, 0, 8, 4)
-      };
-      calcNodes.Click += (_, __) => SetStatus("Расчёт слоя узлов: пока не реализовано.");
-      calcRow.Controls.Add(calcNodes);
-
       _cancelCalc = new Button
       {
         Text = "Отменить расчёт",
@@ -241,16 +221,6 @@ namespace NcTestRibbon.Shell
       };
       _showBuos.CheckedChanged += (_, __) => PersistUiFlags();
       root.Controls.Add(_showBuos);
-
-      _showNodes = new CheckBox
-      {
-        Text = "Показать слой узлов",
-        AutoSize = true,
-        Checked = geo.ShowNodesLayer,
-        Margin = new Padding(0, 0, 0, 8)
-      };
-      _showNodes.CheckedChanged += (_, __) => PersistUiFlags();
-      root.Controls.Add(_showNodes);
 
       _status = new Label
       {
@@ -328,11 +298,10 @@ namespace NcTestRibbon.Shell
       try
       {
         AppPaths paths = AppPaths.Load();
-        if (TryLargestBuos(paths.BuosWorkbook, out double bw, out double bl, out string bName))
+        if (TryLargestBuos(paths.BuosWorkbook, out double bw, out double bl, out _))
         {
           _buosSize.Text = "Площадка БУОС ширина х длина - "
-            + FormatDim(bw) + " х " + FormatDim(bl)
-            + (string.IsNullOrEmpty(bName) ? string.Empty : "  («" + bName + "»)");
+            + FormatDim(bw) + " х " + FormatDim(bl);
           _buosSize.ForeColor = SystemColors.ControlText;
         }
         else
@@ -340,25 +309,11 @@ namespace NcTestRibbon.Shell
           _buosSize.Text = "Площадка БУОС ширина х длина - — (откройте каталог во «Исходные данные» → БУОС)";
           _buosSize.ForeColor = Color.DarkRed;
         }
-
-        if (TryLargestNode(paths.NodesWorkbook, out double nw, out double nl, out string nName))
-        {
-          _nodeSize.Text = "Площадка узла ширина х длина - "
-            + FormatDim(nw) + " х " + FormatDim(nl)
-            + (string.IsNullOrEmpty(nName) ? string.Empty : "  («" + nName + "»)");
-          _nodeSize.ForeColor = SystemColors.ControlText;
-        }
-        else
-        {
-          _nodeSize.Text = "Площадка узла ширина х длина - — (откройте каталог во «Исходные данные» → Узлы)";
-          _nodeSize.ForeColor = Color.DarkRed;
-        }
       }
       catch (Exception ex)
       {
         _buosSize.Text = "Площадка БУОС: ошибка каталога — " + ex.Message;
-        _nodeSize.Text = "Площадка узла: ошибка каталога — " + ex.Message;
-        _buosSize.ForeColor = _nodeSize.ForeColor = Color.DarkRed;
+        _buosSize.ForeColor = Color.DarkRed;
       }
     }
 
@@ -375,33 +330,6 @@ namespace NcTestRibbon.Shell
       }
 
       var data = BuosWorkbookLoader.LoadWorkbook(workbook);
-      var best = data.Variants
-        .Where(v => v != null && v.WidthM > 0 && v.LengthM > 0)
-        .OrderByDescending(v => v.WidthM * v.LengthM)
-        .ThenByDescending(v => v.WidthM)
-        .ThenByDescending(v => v.LengthM)
-        .FirstOrDefault();
-      if (best == null)
-      {
-        return false;
-      }
-
-      widthM = best.WidthM;
-      lengthM = best.LengthM;
-      name = best.Name;
-      return true;
-    }
-
-    internal static bool TryLargestNode(string workbook, out double widthM, out double lengthM, out string name)
-    {
-      widthM = lengthM = 0;
-      name = null;
-      if (string.IsNullOrWhiteSpace(workbook) || !File.Exists(workbook))
-      {
-        return false;
-      }
-
-      var data = NodesWorkbookLoader.LoadWorkbook(workbook);
       var best = data.Variants
         .Where(v => v != null && v.WidthM > 0 && v.LengthM > 0)
         .OrderByDescending(v => v.WidthM * v.LengthM)
@@ -443,7 +371,6 @@ namespace NcTestRibbon.Shell
           ApplyOffsetsTo(c);
           c.SetAoi(minX, minY, maxX, maxY);
           c.ShowBuosLayer = _showBuos.Checked;
-          c.ShowNodesLayer = _showNodes.Checked;
         });
         GeometryConf geo = GeometryConf.Load();
         CadAoiOverlay.Show(geo);
@@ -471,7 +398,6 @@ namespace NcTestRibbon.Shell
           ApplyOffsetsTo(c);
           c.ClearAoi();
           c.ShowBuosLayer = _showBuos.Checked;
-          c.ShowNodesLayer = _showNodes.Checked;
         });
         CadAoiOverlay.Clear();
         UpdateAoiInfo(GeometryConf.Load());
@@ -702,7 +628,6 @@ namespace NcTestRibbon.Shell
       {
         ApplyOffsetsTo(c);
         c.ShowBuosLayer = _showBuos.Checked;
-        c.ShowNodesLayer = _showNodes.Checked;
       });
     }
 
@@ -713,7 +638,6 @@ namespace NcTestRibbon.Shell
         GeometryConf.Set(c =>
         {
           c.ShowBuosLayer = _showBuos.Checked;
-          c.ShowNodesLayer = _showNodes.Checked;
         });
         try { CadBuosSitesOverlay.SetVisible(_showBuos.Checked); }
         catch (Exception ex)
