@@ -5,6 +5,7 @@ namespace NcTestRibbon.Shell
   using System.Globalization;
   using System.IO;
   using System.Linq;
+  using System.Threading;
   using System.Threading.Tasks;
   using System.Windows.Forms;
   using NcTestRibbon.Cad;
@@ -28,7 +29,10 @@ namespace NcTestRibbon.Shell
     private readonly CheckBox _showBuos;
     private readonly CheckBox _showNodes;
     private readonly Button _btnUpload;
+    private readonly Button _calcBuos;
+    private readonly Button _cancelCalc;
     private bool _busy;
+    private CancellationTokenSource _calcCts;
 
     public AllowableSitesWindow()
     {
@@ -144,14 +148,14 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(calcRow);
 
-      var calcBuos = new Button
+      _calcBuos = new Button
       {
         Text = "Рассчитать слой БУОС",
         AutoSize = true,
         Margin = new Padding(0, 0, 8, 4)
       };
-      calcBuos.Click += (_, __) => SetStatus("Расчёт слоя БУОС: пока не реализовано.");
-      calcRow.Controls.Add(calcBuos);
+      _calcBuos.Click += async (_, __) => await CalculateBuosAsync().ConfigureAwait(true);
+      calcRow.Controls.Add(_calcBuos);
 
       var calcNodes = new Button
       {
@@ -162,14 +166,25 @@ namespace NcTestRibbon.Shell
       calcNodes.Click += (_, __) => SetStatus("Расчёт слоя узлов: пока не реализовано.");
       calcRow.Controls.Add(calcNodes);
 
-      var cancelCalc = new Button
+      _cancelCalc = new Button
       {
         Text = "Отменить расчёт",
         AutoSize = true,
         Margin = new Padding(0, 0, 8, 4)
       };
-      cancelCalc.Click += (_, __) => SetStatus("Нет активного расчёта.");
-      calcRow.Controls.Add(cancelCalc);
+      _cancelCalc.Click += (_, __) =>
+      {
+        if (_calcCts != null && !_calcCts.IsCancellationRequested)
+        {
+          _calcCts.Cancel();
+          SetStatus("Отмена расчёта…");
+        }
+        else
+        {
+          SetStatus("Нет активного расчёта.");
+        }
+      };
+      calcRow.Controls.Add(_cancelCalc);
 
       _btnUpload = new Button
       {
@@ -215,16 +230,19 @@ namespace NcTestRibbon.Shell
         AutoSize = true,
         MaximumSize = new Size(600, 0),
         Margin = new Padding(0, 8, 0, 4),
-        Text = "Центры перебираются с шагом 50 м. Для БУОС проверяются 0°, 30°, 60°, 90°, 120°, 150°. "
-          + "Расчёт слоёв в этой сборке ещё не перенесён — кнопки расчёта показывают статус. "
-          + "Общая прямоугольная область интереса сохраняется в geometry.conf и подсвечивается, пока окно открыто. "
-          + "«Обновить карту на сервере» пишет DXF рядом с чертежом и загружает только DXF (multipart field dxf) на хост из net.conf."
+        Text = "Центры перебираются с шагом CenterStepM (net.conf, по умолчанию 50 м). "
+          + "Углы БУОС — RotationAnglesDeg в net.conf (0…150°). "
+          + "AOI → geometry.conf. "
+          + "«Обновить карту» → POST api/v1/datasets (DXF) → DatasetId в net.conf. "
+          + "«Рассчитать слой БУОС» → POST BuosSearchPath (по умолчанию api/v1/buos/search) с datasetId, AOI, размером крупнейшего БУОС и riverBufferM."
       });
 
       MapUploadClient.StatusChanged += OnUploadStatus;
       FormClosed += (_, __) =>
       {
         MapUploadClient.StatusChanged -= OnUploadStatus;
+        try { _calcCts?.Cancel(); }
+        catch { }
         try { PersistOffsets(); }
         catch { }
         // Hide AOI frame; keep geometry.conf coords for next open.
@@ -442,7 +460,8 @@ namespace NcTestRibbon.Shell
         string dxf = CadDxfExport.SaveMapSidecar();
         SetStatus("Передача DXF на " + NetConf.Load().Host + "…");
         string datasetId = await MapUploadClient.UploadMapAsync(dxf).ConfigureAwait(true);
-        string ok = MapUploadClient.StatusOk + " (datasetId=" + datasetId + ")";
+        NetConf.Set(c => c.DatasetId = datasetId);
+        string ok = MapUploadClient.StatusOk + " (DatasetId=" + datasetId + " → net.conf)";
         MapUploadClient.PublishStatus(MapUploadClient.StatusOk);
         SetStatus(ok);
       }
@@ -454,6 +473,64 @@ namespace NcTestRibbon.Shell
       finally
       {
         _busy = false;
+        _btnUpload.Enabled = true;
+      }
+    }
+
+    private async Task CalculateBuosAsync()
+    {
+      if (_busy)
+      {
+        return;
+      }
+
+      _busy = true;
+      _calcBuos.Enabled = false;
+      _btnUpload.Enabled = false;
+      _calcCts?.Dispose();
+      _calcCts = new CancellationTokenSource();
+      CancellationToken ct = _calcCts.Token;
+      try
+      {
+        PersistOffsets();
+        GeometryConf geo = GeometryConf.Load();
+        NetConf net = NetConf.Load();
+        AppPaths paths = AppPaths.Load();
+        if (!TryLargestBuos(paths.BuosWorkbook, out double widthM, out double lengthM, out string buosName))
+        {
+          throw new InvalidOperationException(
+            "Нет каталога БУОС (ширина×длина). Откройте «Исходные данные» → БУОС.");
+        }
+
+        BuosSearchClient.BuosSearchRequest request =
+          BuosSearchClient.BuildRequest(net, geo, widthM, lengthM);
+        string path = string.IsNullOrWhiteSpace(net.BuosSearchPath)
+          ? NetConf.DefaultBuosSearchPath
+          : net.BuosSearchPath;
+        SetStatus("Расчёт БУОС → " + net.Host + "/" + path
+          + " (datasetId=" + request.DatasetId
+          + ", " + FormatDim(widthM) + "×" + FormatDim(lengthM) + " м"
+          + (string.IsNullOrEmpty(buosName) ? string.Empty : ", «" + buosName + "»")
+          + ")…");
+
+        string body = await BuosSearchClient.SearchAsync(request, ct).ConfigureAwait(true);
+        string snippet = string.IsNullOrWhiteSpace(body)
+          ? "OK (пустое тело)"
+          : (body.Length > 180 ? body.Substring(0, 180) + "…" : body);
+        SetStatus("Расчёт БУОС завершён: " + snippet);
+      }
+      catch (OperationCanceledException)
+      {
+        SetStatus("Расчёт БУОС отменён.");
+      }
+      catch (Exception ex)
+      {
+        SetStatus("Ошибка расчёта БУОС: " + ex.Message);
+      }
+      finally
+      {
+        _busy = false;
+        _calcBuos.Enabled = true;
         _btnUpload.Enabled = true;
       }
     }

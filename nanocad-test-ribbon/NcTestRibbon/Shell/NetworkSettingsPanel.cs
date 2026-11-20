@@ -48,7 +48,7 @@ namespace NcTestRibbon.Shell
 
       _hint = new TextBlock
       {
-        Text = "Файл: " + NetConf.FilePath + "\nBaseAddress → " + NetConf.BuildBaseAddress(conf.Host),
+        Text = BuildHint(conf),
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 0, 0, 12),
         Foreground = Brushes.Gray,
@@ -58,8 +58,9 @@ namespace NcTestRibbon.Shell
 
       _host.TextChanged += (_, __) =>
       {
-        _hint.Text = "Файл: " + NetConf.FilePath
-          + "\nBaseAddress → " + NetConf.BuildBaseAddress(_host.Text);
+        NetConf preview = NetConf.Load();
+        preview.Host = _host.Text;
+        _hint.Text = BuildHint(preview);
       };
 
       root.Children.Add(new TextBlock
@@ -90,8 +91,20 @@ namespace NcTestRibbon.Shell
       NetConf.Set(c => c.Host = host);
       NetConf reloaded = NetConf.Load();
       _host.Text = reloaded.Host;
-      _hint.Text = "Файл: " + NetConf.FilePath
-        + "\nBaseAddress → " + NetConf.BuildBaseAddress(reloaded.Host);
+      _hint.Text = BuildHint(reloaded);
+    }
+
+    private static string BuildHint(NetConf conf)
+    {
+      conf ??= new NetConf();
+      string id = string.IsNullOrWhiteSpace(conf.DatasetId) ? "(пусто — загрузите DXF)" : conf.DatasetId.Trim();
+      string path = string.IsNullOrWhiteSpace(conf.BuosSearchPath)
+        ? NetConf.DefaultBuosSearchPath
+        : conf.BuosSearchPath.Trim();
+      return "Файл: " + NetConf.FilePath
+        + "\nBaseAddress → " + NetConf.BuildBaseAddress(conf.Host)
+        + "\nDatasetId → " + id
+        + "\nBuosSearchPath → " + path;
     }
 
     private void OnStatus(string message)

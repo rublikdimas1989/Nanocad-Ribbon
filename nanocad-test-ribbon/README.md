@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.62**): `nanocad-test-ribbon-v1.2.62.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.62.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.62/nanocad-test-ribbon-v1.2.62.zip  
+Актуальный **slim** zip (версия **1.2.63**): `nanocad-test-ribbon-v1.2.63.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.63.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.63/nanocad-test-ribbon-v1.2.63.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.62 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.63 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI, при успехе один запуск nanoCAD; при ошибке сборки — лог, CAD не стартует.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.62+InstallBuildSingleLaunch`; upload multipart field `dxf` only (no terrain)
+6. Stamp `NcTestRibbon 1.2.63+BuosSearchDatasetId`: DXF upload → `DatasetId` в `net.conf`; «Рассчитать слой БУОС» → POST `BuosSearchPath` (default `api/v1/buos/search`)
 
 | Команда | Что делает |
 |---------|------------|
@@ -58,12 +58,22 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestBlinkOff` | принудительно выключить мигание |
 | `NcTestEcw` | Команда ECW (кнопка ленты убрана) |
 | `NcTestCartography` | Панель «Картография»: Forest/Height/космоснимок + opacity + Открыть… |
-| `NcTestAllowableSites` | Допустимые площадки: AOI, отступы, DXF, upload |
+| `NcTestAllowableSites` | Допустимые площадки: AOI, DXF→`DatasetId` в `net.conf`, расчёт БУОС (`BuosSearchPath`) |
 | `NcTestTif` / `NcTestForest` / `NcTestHeight` | Команды (кнопки ленты перенесены в Картографию) |
 | `NcTestDemo` | маленький WinForms smoke |
 
 Сборка: `NC_TestRibbon.dll`  
 Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
+
+### `Tracing_cache\Settings\net.conf` (допустимые площадки)
+
+| Key | Role |
+| --- | --- |
+| `Host` / `BaseAddress` | Solver host (`localhost:5080` → `http://localhost:5080/`) |
+| `DatasetId` | Written after successful DXF upload (`POST api/v1/datasets`) |
+| `BuosSearchPath` | Relative POST path for «Рассчитать слой БУОС» (default `api/v1/buos/search`) |
+| `RiverLayers` / `ForbiddenLayers` / `BuosPlacementLayer` | Constraint layer names (CSV) |
+| `CenterStepM` / `TerrainSampleStepM` / `RotationAnglesDeg` | Search grid / site rotations |
 
 ---
 
