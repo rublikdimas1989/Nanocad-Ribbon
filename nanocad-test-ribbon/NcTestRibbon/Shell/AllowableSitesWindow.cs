@@ -31,6 +31,9 @@ namespace NcTestRibbon.Shell
     private readonly Button _btnUpload;
     private readonly Button _calcBuos;
     private readonly Button _cancelCalc;
+    private readonly ProgressBar _progressBar;
+    private readonly Label _progressMsg;
+    private readonly Panel _progressPanel;
     private bool _busy;
     private CancellationTokenSource _calcCts;
 
@@ -186,6 +189,38 @@ namespace NcTestRibbon.Shell
       };
       calcRow.Controls.Add(_cancelCalc);
 
+      _progressPanel = new Panel
+      {
+        Width = 600,
+        Height = 48,
+        Margin = new Padding(0, 4, 0, 4),
+        Visible = false
+      };
+      root.Controls.Add(_progressPanel);
+
+      _progressBar = new ProgressBar
+      {
+        Left = 0,
+        Top = 4,
+        Width = 360,
+        Height = 18,
+        Style = ProgressBarStyle.Marquee,
+        MarqueeAnimationSpeed = 30
+      };
+      _progressPanel.Controls.Add(_progressBar);
+
+      _progressMsg = new Label
+      {
+        Left = 0,
+        Top = 26,
+        Width = 600,
+        Height = 20,
+        AutoEllipsis = true,
+        ForeColor = Color.DimGray,
+        Text = string.Empty
+      };
+      _progressPanel.Controls.Add(_progressMsg);
+
       _btnUpload = new Button
       {
         Text = "Обновить карту на сервере",
@@ -234,7 +269,7 @@ namespace NcTestRibbon.Shell
           + "Углы БУОС — RotationAnglesDeg в net.conf (0…150°). "
           + "AOI → geometry.conf. "
           + "«Обновить карту» → POST api/v1/datasets (DXF) → DatasetId в net.conf. "
-          + "«Рассчитать слой БУОС» → POST BuosSearchPath → footprints на слой BuosCadLayer (NC_BUOS_SITES), чекбокс только On/Off."
+          + "«Рассчитать слой БУОС» → POST search-jobs (202) → poll statusUrl → resultUrl → NC_BUOS_SITES."
       });
 
       MapUploadClient.StatusChanged += OnUploadStatus;
@@ -493,6 +528,7 @@ namespace NcTestRibbon.Shell
       _calcCts?.Dispose();
       _calcCts = new CancellationTokenSource();
       CancellationToken ct = _calcCts.Token;
+      ShowProgress(indeterminate: true, message: "Запуск задачи…");
       try
       {
         PersistOffsets();
@@ -510,14 +546,17 @@ namespace NcTestRibbon.Shell
         string path = string.IsNullOrWhiteSpace(net.BuosSearchPath)
           ? NetConf.DefaultBuosSearchPath
           : net.BuosSearchPath;
-        SetStatus("Расчёт БУОС → " + net.Host + "/" + path
+        SetStatus("Расчёт БУОС (async) → " + net.Host + "/" + path
           + " (datasetId=" + request.DatasetId
           + ", " + FormatDim(widthM) + "×" + FormatDim(lengthM) + " м"
           + (string.IsNullOrEmpty(buosName) ? string.Empty : ", «" + buosName + "»")
           + ")…");
 
-        string body = await BuosSearchClient.SearchAsync(request, ct).ConfigureAwait(true);
-        BuosSearchClient.BuosSearchResponse parsed = BuosSearchClient.ParseResponse(body);
+        BuosSearchClient.BuosSearchResponse parsed = await BuosSearchClient.SearchJobAsync(
+          request,
+          onProgress: ApplyJobProgress,
+          ct).ConfigureAwait(true);
+
         int siteCount = parsed.Sites?.Count ?? 0;
         int drawn = CadBuosSitesOverlay.Redraw(parsed.Sites, visible: _showBuos.Checked);
 
@@ -535,13 +574,16 @@ namespace NcTestRibbon.Shell
         }
 
         SetStatus(status);
+        HideProgress();
       }
       catch (OperationCanceledException)
       {
+        HideProgress();
         SetStatus("Расчёт БУОС отменён.");
       }
       catch (Exception ex)
       {
+        HideProgress();
         SetStatus("Ошибка расчёта БУОС: " + ex.Message);
       }
       finally
@@ -549,6 +591,107 @@ namespace NcTestRibbon.Shell
         _busy = false;
         _calcBuos.Enabled = true;
         _btnUpload.Enabled = true;
+      }
+    }
+
+    private void ApplyJobProgress(BuosSearchClient.BuosJobStatus status)
+    {
+      if (IsDisposed)
+      {
+        return;
+      }
+
+      void Apply()
+      {
+        if (status == null)
+        {
+          return;
+        }
+
+        string msg = string.IsNullOrWhiteSpace(status.Message)
+          ? (status.Status ?? string.Empty)
+          : status.Message.Trim();
+        if (status.Total > 0)
+        {
+          ShowProgress(
+            indeterminate: false,
+            message: msg,
+            total: status.Total,
+            completed: status.Completed);
+        }
+        else
+        {
+          ShowProgress(indeterminate: true, message: msg);
+        }
+
+        if (!string.IsNullOrWhiteSpace(msg))
+        {
+          SetStatus(msg);
+        }
+      }
+
+      if (InvokeRequired)
+      {
+        BeginInvoke(new Action(Apply));
+      }
+      else
+      {
+        Apply();
+      }
+    }
+
+    private void ShowProgress(bool indeterminate, string message, int total = 0, int completed = 0)
+    {
+      _progressPanel.Visible = true;
+      _progressMsg.Text = message ?? string.Empty;
+      if (indeterminate || total <= 0)
+      {
+        if (_progressBar.Style != ProgressBarStyle.Marquee)
+        {
+          _progressBar.Style = ProgressBarStyle.Marquee;
+          _progressBar.MarqueeAnimationSpeed = 30;
+        }
+      }
+      else
+      {
+        if (_progressBar.Style != ProgressBarStyle.Continuous)
+        {
+          _progressBar.Style = ProgressBarStyle.Continuous;
+        }
+
+        int max = Math.Max(1, total);
+        int val = completed;
+        if (val < 0)
+        {
+          val = 0;
+        }
+
+        if (val > max)
+        {
+          val = max;
+        }
+
+        if (_progressBar.Maximum != max)
+        {
+          _progressBar.Maximum = max;
+        }
+
+        _progressBar.Value = val;
+      }
+    }
+
+    private void HideProgress()
+    {
+      try
+      {
+        _progressBar.Style = ProgressBarStyle.Blocks;
+        _progressBar.MarqueeAnimationSpeed = 0;
+        _progressBar.Value = 0;
+        _progressMsg.Text = string.Empty;
+        _progressPanel.Visible = false;
+      }
+      catch
+      {
       }
     }
 

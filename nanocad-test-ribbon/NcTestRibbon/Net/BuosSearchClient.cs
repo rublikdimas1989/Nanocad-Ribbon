@@ -3,6 +3,7 @@ namespace NcTestRibbon.Net
   using System;
   using System.Collections.Generic;
   using System.IO;
+  using System.Net;
   using System.Net.Http;
   using System.Text;
   using System.Text.Json;
@@ -12,11 +13,13 @@ namespace NcTestRibbon.Net
   using NcTestRibbon.Configuration;
 
   /// <summary>
-  /// POST BUOS site-search JSON to the solver (path from net.conf BuosSearchPath).
+  /// Async BUOS site-search jobs: POST BuosSearchPath → 202 job → poll statusUrl → GET resultUrl.
   /// Avoids System.Net.Http.Json under nanoCAD host.
   /// </summary>
   public static class BuosSearchClient
   {
+    public const int PollIntervalMs = 1000;
+
     private static readonly object Gate = new object();
     private static readonly JsonSerializerOptions JsonWrite = new JsonSerializerOptions
     {
@@ -100,6 +103,28 @@ namespace NcTestRibbon.Net
       public List<BuosSiteDto> Sites { get; set; }
       public BuosDiagnosticsDto Diagnostics { get; set; }
     }
+
+    /// <summary>202 Accepted body from POST search-jobs.</summary>
+    public sealed class BuosJobAccepted
+    {
+      public string JobId { get; set; }
+      public string StatusUrl { get; set; }
+      public string ResultUrl { get; set; }
+    }
+
+    /// <summary>GET statusUrl body (polled every 1s).</summary>
+    public sealed class BuosJobStatus
+    {
+      public string Status { get; set; }
+      public string Message { get; set; }
+      public string Error { get; set; }
+      public int Total { get; set; }
+      public int Completed { get; set; }
+      public string JobId { get; set; }
+      public string ResultUrl { get; set; }
+    }
+
+    public delegate void JobProgressHandler(BuosJobStatus status);
 
     public static BuosSearchResponse ParseResponse(string json)
     {
@@ -194,15 +219,72 @@ namespace NcTestRibbon.Net
     }
 
     /// <summary>
-    /// POST search JSON; returns raw response body (may be empty).
+    /// POST job → poll statusUrl every 1s → on succeeded GET resultUrl and parse sites.
     /// </summary>
-    public static async Task<string> SearchAsync(BuosSearchRequest request, CancellationToken ct = default)
+    public static async Task<BuosSearchResponse> SearchJobAsync(
+      BuosSearchRequest request,
+      JobProgressHandler onProgress,
+      CancellationToken ct = default)
     {
       if (request == null)
       {
         throw new ArgumentNullException(nameof(request));
       }
 
+      BuosJobAccepted job = await StartJobAsync(request, ct).ConfigureAwait(false);
+      onProgress?.Invoke(new BuosJobStatus
+      {
+        Status = "queued",
+        Message = "Задача создана (jobId=" + (job.JobId ?? "?") + ")",
+        JobId = job.JobId,
+        ResultUrl = job.ResultUrl
+      });
+
+      string statusUrl = RequireUrl(job.StatusUrl, "statusUrl");
+      string resultUrl = job.ResultUrl;
+      bool first = true;
+
+      while (true)
+      {
+        ct.ThrowIfCancellationRequested();
+        if (!first)
+        {
+          await Task.Delay(PollIntervalMs, ct).ConfigureAwait(false);
+          ct.ThrowIfCancellationRequested();
+        }
+
+        first = false;
+
+        BuosJobStatus status = await GetStatusAsync(statusUrl, ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(status.ResultUrl))
+        {
+          resultUrl = status.ResultUrl;
+        }
+
+        onProgress?.Invoke(status);
+
+        string st = (status.Status ?? string.Empty).Trim();
+        if (IsSucceeded(st))
+        {
+          string resolvedResult = RequireUrl(
+            string.IsNullOrWhiteSpace(resultUrl) ? status.ResultUrl : resultUrl,
+            "resultUrl");
+          string body = await GetTextAsync(resolvedResult, ct).ConfigureAwait(false);
+          return ParseResponse(body);
+        }
+
+        if (IsFailed(st))
+        {
+          string err = string.IsNullOrWhiteSpace(status.Error)
+            ? (string.IsNullOrWhiteSpace(status.Message) ? "Расчёт БУОС завершился с ошибкой." : status.Message)
+            : status.Error.Trim();
+          throw new InvalidDataException(err);
+        }
+      }
+    }
+
+    private static async Task<BuosJobAccepted> StartJobAsync(BuosSearchRequest request, CancellationToken ct)
+    {
       NetConf net = NetConf.Load();
       string path = string.IsNullOrWhiteSpace(net.BuosSearchPath)
         ? NetConf.DefaultBuosSearchPath
@@ -214,16 +296,103 @@ namespace NcTestRibbon.Net
       using HttpResponseMessage response = await client.PostAsync(path, content, ct).ConfigureAwait(false);
       string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
       ct.ThrowIfCancellationRequested();
-      if (!response.IsSuccessStatusCode)
+
+      // Prefer 202; also accept 200 with job payload.
+      if (response.StatusCode != HttpStatusCode.Accepted
+          && response.StatusCode != HttpStatusCode.OK)
       {
-        string snippet = Truncate(body, 400);
         throw new InvalidDataException(
           "HTTP " + (int)response.StatusCode + " " + response.ReasonPhrase
           + " @ " + path
-          + (string.IsNullOrWhiteSpace(snippet) ? string.Empty : (": " + snippet)));
+          + (string.IsNullOrWhiteSpace(body) ? string.Empty : (": " + Truncate(body, 400))));
+      }
+
+      BuosJobAccepted job = JsonSerializer.Deserialize<BuosJobAccepted>(body ?? string.Empty, JsonRead);
+      if (job == null
+          || string.IsNullOrWhiteSpace(job.StatusUrl)
+          || (string.IsNullOrWhiteSpace(job.ResultUrl) && string.IsNullOrWhiteSpace(job.JobId)))
+      {
+        throw new InvalidDataException(
+          "Ответ search-jobs без statusUrl/resultUrl: " + Truncate(body, 400));
+      }
+
+      return job;
+    }
+
+    private static async Task<BuosJobStatus> GetStatusAsync(string statusUrl, CancellationToken ct)
+    {
+      string body = await GetTextAsync(statusUrl, ct).ConfigureAwait(false);
+      BuosJobStatus status = JsonSerializer.Deserialize<BuosJobStatus>(body ?? string.Empty, JsonRead);
+      if (status == null)
+      {
+        throw new InvalidDataException("Пустой ответ statusUrl.");
+      }
+
+      return status;
+    }
+
+    private static async Task<string> GetTextAsync(string urlOrPath, CancellationToken ct)
+    {
+      HttpClient client = GetClient();
+      using HttpResponseMessage response = await client.GetAsync(MakeRequestUri(urlOrPath), ct).ConfigureAwait(false);
+      string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+      ct.ThrowIfCancellationRequested();
+      if (!response.IsSuccessStatusCode)
+      {
+        throw new InvalidDataException(
+          "HTTP " + (int)response.StatusCode + " " + response.ReasonPhrase
+          + " @ " + urlOrPath
+          + (string.IsNullOrWhiteSpace(body) ? string.Empty : (": " + Truncate(body, 400))));
       }
 
       return body ?? string.Empty;
+    }
+
+    private static Uri MakeRequestUri(string urlOrPath)
+    {
+      string raw = (urlOrPath ?? string.Empty).Trim();
+      if (raw.Length == 0)
+      {
+        throw new InvalidDataException("Пустой URL.");
+      }
+
+      if (Uri.TryCreate(raw, UriKind.Absolute, out Uri absolute))
+      {
+        return absolute;
+      }
+
+      while (raw.StartsWith("/", StringComparison.Ordinal))
+      {
+        raw = raw.Substring(1);
+      }
+
+      return new Uri(raw, UriKind.Relative);
+    }
+
+    private static string RequireUrl(string url, string name)
+    {
+      if (string.IsNullOrWhiteSpace(url))
+      {
+        throw new InvalidDataException("В ответе нет " + name + ".");
+      }
+
+      return url.Trim();
+    }
+
+    private static bool IsSucceeded(string status)
+    {
+      return status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("success", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("completed", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("done", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFailed(string status)
+    {
+      return status.Equals("failed", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("error", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("cancelled", StringComparison.OrdinalIgnoreCase)
+        || status.Equals("canceled", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Truncate(string text, int max)

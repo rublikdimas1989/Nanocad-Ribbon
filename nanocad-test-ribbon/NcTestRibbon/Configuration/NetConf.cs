@@ -17,8 +17,11 @@ namespace NcTestRibbon.Configuration
   {
     public const string DefaultHost = "localhost:5080";
 
-    /// <summary>Default relative path for BUOS site search (POST JSON).</summary>
-    public const string DefaultBuosSearchPath = "api/v1/buos/search";
+    /// <summary>Default relative path for async BUOS search-jobs (POST JSON → 202).</summary>
+    public const string DefaultBuosSearchPath = "api/v1/buos/sites/search-jobs";
+
+    /// <summary>Legacy sync path (migrated to DefaultBuosSearchPath on load).</summary>
+    public const string LegacyBuosSearchPath = "api/v1/buos/search";
 
     /// <summary>Editable host string, default localhost:5080 (no scheme required).</summary>
     public string Host { get; set; } = DefaultHost;
@@ -98,6 +101,11 @@ namespace NcTestRibbon.Configuration
           else if (key.Equals("BuosSearchPath", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
           {
             conf.BuosSearchPath = NormalizeRelativePath(value);
+            // Upgrade previous sync endpoint to async search-jobs.
+            if (string.Equals(conf.BuosSearchPath, LegacyBuosSearchPath, StringComparison.OrdinalIgnoreCase))
+            {
+              conf.BuosSearchPath = DefaultBuosSearchPath;
+            }
           }
           else if (key.Equals("RiverLayers", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
           {
@@ -173,8 +181,8 @@ namespace NcTestRibbon.Configuration
         "# NcTestRibbon net.conf — solver host + last DXF datasetId + BUOS search",
         "# Host / BaseAddress: upload + search base URL",
         "# DatasetId: written after successful POST api/v1/datasets (DXF upload)",
-        "# BuosSearchPath: relative POST path for «Рассчитать слой БУОС» (default "
-          + DefaultBuosSearchPath + ")",
+        "# BuosSearchPath: POST async search-jobs (202 + statusUrl/resultUrl), default "
+          + DefaultBuosSearchPath,
         "Host=" + Host.Trim(),
         "BaseAddress=" + BuildBaseAddress(Host),
         "DatasetId=" + (DatasetId ?? string.Empty).Trim(),
