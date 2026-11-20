@@ -27,6 +27,7 @@ namespace NcTestRibbon
     private static bool _wpfAppCreated;
     private static SourceDataWindow _sourceDataLive;
     private static CartographyWindow _cartographyLive;
+    private static AllowableSitesWindow _allowableSitesLive;
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -293,6 +294,15 @@ namespace NcTestRibbon
     }
 
     /// <summary>
+    /// «Рассчитать допустимые площадки» — End site-grid window (WinForms, modeless).
+    /// </summary>
+    [CommandMethod("NcTestAllowableSites")]
+    public void NcTestAllowableSites()
+    {
+      OpenAllowableSitesForm("NcTestAllowableSites");
+    }
+
+    /// <summary>
     /// GeoTIFF → ECW (NcGdalGeo translate / CreateCopy, preserve GeoTransform) then attach like ECW.
     /// Kept as command; ribbon open lives in Картография.
     /// </summary>
@@ -352,6 +362,61 @@ namespace NcTestRibbon
         }
 
         ed?.WriteMessage("\n" + label + ": Картография open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private void OpenAllowableSitesForm(string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_allowableSitesLive != null && !_allowableSitesLive.IsDisposed)
+        {
+          _allowableSitesLive.BringToFront();
+          _allowableSitesLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open.");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        AllowableSitesWindow form = new AllowableSitesWindow();
+        _allowableSitesLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_allowableSitesLive, form))
+          {
+            _allowableSitesLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Allowable sites open.");
       }
       catch (System.Exception ex)
       {

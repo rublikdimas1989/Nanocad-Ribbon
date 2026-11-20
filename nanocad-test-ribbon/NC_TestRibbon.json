@@ -53,7 +53,7 @@
     {
       "intername": "NcTestEcw",
       "displayName": "ECW/растр",
-      "tooltip": "Вставить ECW/растр с End-геопривязкой (world coords + масштаб), не plain IMAGEATTACH.",
+      "tooltip": "Команда: ECW/растр с геопривязкой (кнопка ленты убрана; растры — через Картография).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
@@ -61,6 +61,13 @@
       "intername": "NcTestCartography",
       "displayName": "Картография",
       "tooltip": "Forest / Height / космоснимок: показ + прозрачность; Открыть… (TIF→ECW / colorize). Слои NC_MAP_* locked; uncheck → layer Off.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestAllowableSites",
+      "displayName": "Рассчитать допустимые площадки",
+      "tooltip": "Площадки — допустимость и земляные работы: AOI, отступы, DXF, загрузка карты на сервер.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
@@ -123,13 +130,13 @@
       "style": "large"
     },
     {
-      "text": "ECW/растр",
-      "command": "NcTestEcw",
+      "text": "Картография",
+      "command": "NcTestCartography",
       "style": "large"
     },
     {
-      "text": "Картография",
-      "command": "NcTestCartography",
+      "text": "Рассчитать допустимые площадки",
+      "command": "NcTestAllowableSites",
       "style": "large"
     }
   ]
