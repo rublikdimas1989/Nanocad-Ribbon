@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.67**): `nanocad-test-ribbon-v1.2.67.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.67.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.67/nanocad-test-ribbon-v1.2.67.zip  
+Актуальный **slim** zip (версия **1.2.68**): `nanocad-test-ribbon-v1.2.68.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.68.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.68/nanocad-test-ribbon-v1.2.68.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.67 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.68 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI, при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.67+BuosStatusFlexibleInts` — status poll `completed`/`total` accept null/number/string.
+6. Stamp `NcTestRibbon 1.2.68+BuosConstraintsLayers` — search-jobs constraints: river valleys 1–5, empty forbidden, placement «Площадки БУОС допустимые», riverBufferM=0.
 
 | Команда | Что делает |
 |---------|------------|
@@ -72,7 +72,10 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `Host` / `BaseAddress` | Solver host (`localhost:5080` → `http://localhost:5080/`) |
 | `DatasetId` | Written after successful DXF upload (`POST api/v1/datasets`) |
 | `BuosSearchPath` | Async search-jobs POST (default `api/v1/buos/sites/search-jobs`) |
-| `RiverLayers` / `ForbiddenLayers` / `BuosPlacementLayer` | Constraint layer names (CSV) |
+| `RiverLayers` | River-valley layers 1–5 (CSV; default «Речные долины N-го порядка») |
+| `ForbiddenLayers` | Forbidden layers (CSV; default empty) |
+| `BuosPlacementLayer` | Placement constraint layer (default «Площадки БУОС допустимые») |
+| `geometry.conf` → `BuosRiverBufferM` | `constraints.riverBufferM` (default **0**) |
 | `BuosCadLayer` | CAD layer for drawn footprints (default `NC_BUOS_SITES`) |
 | `CenterStepM` / `TerrainSampleStepM` / `RotationAnglesDeg` | Search grid / site rotations |
 

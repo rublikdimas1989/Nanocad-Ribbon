@@ -35,14 +35,23 @@ namespace NcTestRibbon.Configuration
     /// </summary>
     public string BuosSearchPath { get; set; } = DefaultBuosSearchPath;
 
-    /// <summary>Comma-separated CAD layer names used as river geometry (default «Реки»).</summary>
-    public string RiverLayers { get; set; } = "Реки";
+    /// <summary>
+    /// Default river-valley CAD layers (orders 1–5) sent as constraints.riverLayers.
+    /// </summary>
+    public const string DefaultRiverLayers =
+      "Речные долины 1-го порядка,Речные долины 2-го порядка,Речные долины 3-го порядка,"
+      + "Речные долины 4-го порядка,Речные долины 5-го порядка";
 
-    /// <summary>Comma-separated forbidden-zone layer names.</summary>
-    public string ForbiddenLayers { get; set; } = "Запретные зоны";
+    public const string DefaultBuosPlacementLayer = "Площадки БУОС допустимые";
+
+    /// <summary>Comma-separated CAD layer names used as river geometry.</summary>
+    public string RiverLayers { get; set; } = DefaultRiverLayers;
+
+    /// <summary>Comma-separated forbidden-zone layer names (default empty).</summary>
+    public string ForbiddenLayers { get; set; } = string.Empty;
 
     /// <summary>Target placement layer name sent to the solver (DXF constraint name).</summary>
-    public string BuosPlacementLayer { get; set; } = "Размещение БУОС";
+    public string BuosPlacementLayer { get; set; } = DefaultBuosPlacementLayer;
 
     /// <summary>CAD layer for drawn BUOS footprints (default NC_BUOS_SITES).</summary>
     public string BuosCadLayer { get; set; } = "NC_BUOS_SITES";
@@ -107,17 +116,41 @@ namespace NcTestRibbon.Configuration
               conf.BuosSearchPath = DefaultBuosSearchPath;
             }
           }
-          else if (key.Equals("RiverLayers", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
+          else if (key.Equals("RiverLayers", StringComparison.OrdinalIgnoreCase))
           {
-            conf.RiverLayers = value;
+            // Allow empty; migrate legacy single «Реки» default.
+            if (string.Equals(value.Trim(), "Реки", StringComparison.Ordinal))
+            {
+              conf.RiverLayers = DefaultRiverLayers;
+            }
+            else if (!string.IsNullOrWhiteSpace(value))
+            {
+              conf.RiverLayers = value;
+            }
           }
-          else if (key.Equals("ForbiddenLayers", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
+          else if (key.Equals("ForbiddenLayers", StringComparison.OrdinalIgnoreCase))
           {
-            conf.ForbiddenLayers = value;
+            // Empty CSV → []; migrate legacy «Запретные зоны».
+            if (string.Equals(value.Trim(), "Запретные зоны", StringComparison.Ordinal))
+            {
+              conf.ForbiddenLayers = string.Empty;
+            }
+            else
+            {
+              conf.ForbiddenLayers = value ?? string.Empty;
+            }
           }
-          else if (key.Equals("BuosPlacementLayer", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
+          else if (key.Equals("BuosPlacementLayer", StringComparison.OrdinalIgnoreCase))
           {
-            conf.BuosPlacementLayer = value;
+            if (string.IsNullOrWhiteSpace(value)
+                || string.Equals(value.Trim(), "Размещение БУОС", StringComparison.Ordinal))
+            {
+              conf.BuosPlacementLayer = DefaultBuosPlacementLayer;
+            }
+            else
+            {
+              conf.BuosPlacementLayer = value;
+            }
           }
           else if (key.Equals("BuosCadLayer", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
           {
@@ -154,6 +187,16 @@ namespace NcTestRibbon.Configuration
       if (string.IsNullOrWhiteSpace(conf.BuosSearchPath))
       {
         conf.BuosSearchPath = DefaultBuosSearchPath;
+      }
+
+      if (string.IsNullOrWhiteSpace(conf.RiverLayers))
+      {
+        conf.RiverLayers = DefaultRiverLayers;
+      }
+
+      if (string.IsNullOrWhiteSpace(conf.BuosPlacementLayer))
+      {
+        conf.BuosPlacementLayer = DefaultBuosPlacementLayer;
       }
 
       return conf;

@@ -302,11 +302,14 @@ namespace NcTestRibbon.Net
         },
         Constraints = new ConstraintsDto
         {
-          RiverBufferM = geo.BuosRiverBufferM,
-          RiverLayers = net.ParseLayerList(net.RiverLayers),
-          ForbiddenLayers = net.ParseLayerList(net.ForbiddenLayers),
+          RiverBufferM = geo.BuosRiverBufferM >= 0 && double.IsFinite(geo.BuosRiverBufferM)
+            ? geo.BuosRiverBufferM
+            : 0,
+          RiverLayers = net.ParseLayerList(
+            string.IsNullOrWhiteSpace(net.RiverLayers) ? NetConf.DefaultRiverLayers : net.RiverLayers),
+          ForbiddenLayers = net.ParseLayerList(net.ForbiddenLayers ?? string.Empty),
           PlacementLayer = string.IsNullOrWhiteSpace(net.BuosPlacementLayer)
-            ? "Размещение БУОС"
+            ? NetConf.DefaultBuosPlacementLayer
             : net.BuosPlacementLayer.Trim()
         }
       };

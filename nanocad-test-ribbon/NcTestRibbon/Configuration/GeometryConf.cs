@@ -23,8 +23,8 @@ namespace NcTestRibbon.Configuration
 
     public double MaxY { get; set; }
 
-    /// <summary>БУОС: от контура площадки до линии реки, м (End default 100).</summary>
-    public double BuosRiverBufferM { get; set; } = 100;
+    /// <summary>БУОС: от контура площадки до линии реки, м (search-jobs default 0).</summary>
+    public double BuosRiverBufferM { get; set; } = 0;
 
     /// <summary>БУОС: от контура до дорог и существующих труб, м (End default 30).</summary>
     public double BuosInfraBufferM { get; set; } = 30;
