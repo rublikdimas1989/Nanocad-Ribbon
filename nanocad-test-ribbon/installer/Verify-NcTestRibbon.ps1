@@ -3,7 +3,12 @@
 
 $ErrorActionPreference = 'Stop'
 
-$required = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestCartography', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
+$required = @(
+    'NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings',
+    'NcTestSourceData', 'NcTestInterface', 'NcTestBlink',
+    'NcTestEcw', 'NcTestCartography', 'NcTestAllowableSites',
+    'NcTestTif', 'NcTestForest', 'NcTestHeight'
+)
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'
 $loadEpplus = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\EPPlus.dll'

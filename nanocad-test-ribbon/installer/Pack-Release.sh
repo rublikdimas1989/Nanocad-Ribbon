@@ -41,7 +41,7 @@ Or install natives once:
   https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1
 
 INSTALL.bat copies plugin deps + refreshes tools\\NcGdalGeo; reuses existing gdal\\ if package has none.
-Then: dotnet build → installer\\INSTALL.bat
+Then: installer\\INSTALL.bat (builds plugin, pre-writes ribbon UI, starts nanoCAD once on success).
 EOF
 
 rm -f "$SLIM_OUT"

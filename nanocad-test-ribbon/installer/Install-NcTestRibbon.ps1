@@ -1,6 +1,11 @@
 # Install NcBootstrap + NC_TestRibbon for local nanoCAD testing.
 # Run with nanoCAD closed. Admin rights are not required.
 # ASCII-only script (safe across Windows code pages).
+#
+# Flow (TCON-70):
+#   1) dotnet build the plugin (failure => show log, exit, do NOT start nanoCAD)
+#   2) deploy files + pre-write NC_Tools.cfg/.cuix + nanoCAD.cfg #include
+#   3) start nanoCAD once (ribbon already wired; no ProposeRestart / second launch)
 
 $ErrorActionPreference = 'Stop'
 
@@ -9,6 +14,8 @@ $pkgRoot = Split-Path -Parent $src
 $dest = Join-Path $env:LOCALAPPDATA 'ASDC\NcBootstrap'
 $syncFolder = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD'
 $nanosoftRoot = Join-Path $env:APPDATA 'Nanosoft'
+
+. (Join-Path $src 'Write-NcToolsUi.ps1')
 
 function Get-NanoCadProfiles {
     $result = @()
@@ -329,7 +336,97 @@ function Copy-RibbonDependencies {
     }
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt', 'NcTestBlink', 'NcTestEcw', 'NcTestCartography', 'NcTestTif', 'NcTestForest', 'NcTestHeight')
+$requiredCommands = @(
+    'NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings',
+    'NcTestSourceData', 'NcTestInterface', 'NcTestBlink',
+    'NcTestEcw', 'NcTestCartography', 'NcTestAllowableSites',
+    'NcTestTif', 'NcTestForest', 'NcTestHeight'
+)
+
+function Invoke-PluginBuild {
+    $proj = Join-Path $pkgRoot 'NcTestRibbon\NcTestRibbon.csproj'
+    if (-not (Test-Path -LiteralPath $proj)) {
+        throw "Missing project: $proj"
+    }
+
+    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+    if (-not $dotnet) {
+        throw 'dotnet SDK not found on PATH. Install .NET 6+ SDK, then re-run INSTALL.bat. nanoCAD was NOT started.'
+    }
+
+    $log = Join-Path $env:TEMP 'NcTestRibbon-build.log'
+    Write-Host ''
+    Write-Host '=== Building NC_TestRibbon (Release) ==='
+    Write-Host ("Project: {0}" -f $proj)
+    Write-Host ("Log:     {0}" -f $log)
+
+    $output = & dotnet build $proj -c Release --nologo 2>&1
+    $exit = $LASTEXITCODE
+    $output | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ }
+
+    if ($exit -ne 0) {
+        Write-Host ''
+        Write-Host 'BUILD FAILED — nanoCAD will NOT be started.' -ForegroundColor Red
+        Write-Host ("Full log: {0}" -f $log)
+        Write-Host '--- last 60 log lines ---'
+        Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+        throw ("dotnet build failed (exit {0}). Fix compile errors and re-run INSTALL.bat." -f $exit)
+    }
+
+    $builtDll = Join-Path $pkgRoot 'NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll'
+    if (-not (Test-Path -LiteralPath $builtDll)) {
+        throw "Build reported success but DLL missing: $builtDll"
+    }
+
+    Write-Host 'Build OK.'
+    Write-DllInfo -Label 'Built DLL' -Path $builtDll
+}
+
+function Find-NanoCadExe {
+    param([object[]]$Profiles)
+
+    $candidates = New-Object System.Collections.Generic.List[string]
+    foreach ($pf in @(${env:ProgramFiles}, ${env:ProgramFiles(x86)}, $env:ProgramW6432)) {
+        if ([string]::IsNullOrWhiteSpace($pf)) { continue }
+        $ns = Join-Path $pf 'Nanosoft'
+        if (-not (Test-Path -LiteralPath $ns)) { continue }
+        Get-ChildItem -Path $ns -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $exe = Join-Path $_.FullName 'nCad.exe'
+            if (Test-Path -LiteralPath $exe) {
+                $candidates.Add($exe)
+            }
+        }
+    }
+
+    if ($candidates.Count -eq 0) { return $null }
+
+    foreach ($profile in @($Profiles)) {
+        $name = [string]$profile.Name
+        foreach ($exe in $candidates) {
+            $parent = Split-Path -Parent $exe
+            if ([string]::Equals((Split-Path -Leaf $parent), $name, [StringComparison]::OrdinalIgnoreCase)) {
+                return $exe
+            }
+        }
+    }
+
+    return ($candidates | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1)
+}
+
+function Start-NanoCadOnce {
+    param([object[]]$Profiles)
+
+    $exe = Find-NanoCadExe -Profiles $Profiles
+    if (-not $exe) {
+        Write-Host 'WARNING: nCad.exe not found under Program Files\Nanosoft. Start nanoCAD manually.' -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host ''
+    Write-Host ("Starting nanoCAD once: {0}" -f $exe)
+    Start-Process -FilePath $exe | Out-Null
+    return $true
+}
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -377,13 +474,14 @@ if (-not (Test-Path $loadIconSrc)) {
     throw "Missing icon $loadIconSrc"
 }
 
+# Compile first. Failure exits before any nanoCAD launch.
+Invoke-PluginBuild
+
 $ribbon = Resolve-TestRibbonFiles
 if ($null -eq $ribbon) {
     throw @"
-NC_TestRibbon.dll / NC_TestRibbon.json not found.
-Build first:
-  cd ..\NcTestRibbon
-  dotnet build NcTestRibbon.csproj -c Release
+NC_TestRibbon.dll / NC_TestRibbon.json not found after build.
+Expected: NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll
 Or place files into installer\payload\
 "@
 }
@@ -578,8 +676,7 @@ foreach ($profile in $profiles) {
 
     foreach ($f in @(
         'NC_RibbonExecDoc.cfg', 'NC_RibbonExecDoc.cuix',
-        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix',
-        'NC_Tools.cfg', 'NC_Tools.cuix'
+        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix'
     )) {
         $p = Join-Path $profile.ConfigDir $f
         if (Test-Path $p) {
@@ -612,16 +709,30 @@ foreach ($profile in $profiles) {
     else {
         Write-Host 'Startup: NC_TestRibbon already present.'
     }
+
+    # Pre-generate ribbon UI so the first nanoCAD start already shows the tab.
+    # (Previously INSTALL deleted NC_Tools.* and relied on Initialize + restart.)
+    $pluginIconsDir = Join-Path $pkgRoot 'NcTestRibbon\icons'
+    Write-NcToolsUi `
+        -ConfigDir $profile.ConfigDir `
+        -ManifestJsonPath $ribbon.Json `
+        -SyncFolder $syncFolder `
+        -LoadIconSource $loadIconSrc `
+        -PluginIconsDir $pluginIconsDir
 }
 
 Write-Host ''
 Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
-Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt / NcTestBlink'
+Write-Host 'Ribbon UI (NC_Tools.cfg/.cuix + nanoCAD.cfg include) was written before launch.'
 Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
-Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''
-Write-Host 'After reinstalling nanoCAD:'
-Write-Host '1. Start nanoCAD once, then close it (creates Config\Cfg.ini).'
-Write-Host '2. Rebuild Release, then run installer\INSTALL.bat again.'
+
+$started = Start-NanoCadOnce -Profiles $profiles
+if ($started) {
+    Write-Host 'nanoCAD started once with ribbon pre-installed. No second launch required.'
+}
+else {
+    Write-Host 'Install OK, but nanoCAD was not auto-started (nCad.exe not found). Start it manually once.'
+}
