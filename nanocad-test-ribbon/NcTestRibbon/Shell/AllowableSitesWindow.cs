@@ -192,17 +192,18 @@ namespace NcTestRibbon.Shell
       _progressPanel = new Panel
       {
         Width = 600,
-        Height = 48,
+        Height = 28,
         Margin = new Padding(0, 4, 0, 4),
         Visible = false
       };
       root.Controls.Add(_progressPanel);
 
+      // ProgressBar + message side-by-side (message next to bar).
       _progressBar = new ProgressBar
       {
         Left = 0,
         Top = 4,
-        Width = 360,
+        Width = 220,
         Height = 18,
         Style = ProgressBarStyle.Marquee,
         MarqueeAnimationSpeed = 30
@@ -211,9 +212,9 @@ namespace NcTestRibbon.Shell
 
       _progressMsg = new Label
       {
-        Left = 0,
-        Top = 26,
-        Width = 600,
+        Left = 230,
+        Top = 4,
+        Width = 360,
         Height = 20,
         AutoEllipsis = true,
         ForeColor = Color.DimGray,

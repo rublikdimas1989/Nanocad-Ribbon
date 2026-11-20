@@ -112,15 +112,23 @@ namespace NcTestRibbon.Net
       public string ResultUrl { get; set; }
     }
 
-    /// <summary>GET statusUrl body (polled every 1s).</summary>
+    /// <summary>
+    /// GET statusUrl body (polled every 1s). Fields match server 1:1:
+    /// status, stage, message, completed, total, error.
+    /// </summary>
     public sealed class BuosJobStatus
     {
       public string Status { get; set; }
+      public string Stage { get; set; }
       public string Message { get; set; }
-      public string Error { get; set; }
-      public int Total { get; set; }
       public int Completed { get; set; }
+      public int Total { get; set; }
+      public string Error { get; set; }
+
+      /// <summary>Optional; may appear on job create / some status payloads.</summary>
       public string JobId { get; set; }
+
+      /// <summary>Optional override; otherwise use resultUrl from 202 Accepted.</summary>
       public string ResultUrl { get; set; }
     }
 
@@ -381,18 +389,14 @@ namespace NcTestRibbon.Net
 
     private static bool IsSucceeded(string status)
     {
-      return status.Equals("succeeded", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("success", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("completed", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("done", StringComparison.OrdinalIgnoreCase);
+      // Terminal per API: status == "succeeded"
+      return status.Equals("succeeded", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsFailed(string status)
     {
-      return status.Equals("failed", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("error", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("cancelled", StringComparison.OrdinalIgnoreCase)
-        || status.Equals("canceled", StringComparison.OrdinalIgnoreCase);
+      // Terminal per API: status == "failed"
+      return status.Equals("failed", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Truncate(string text, int max)
