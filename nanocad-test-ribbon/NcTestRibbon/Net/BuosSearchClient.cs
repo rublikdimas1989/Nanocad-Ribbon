@@ -30,8 +30,89 @@ namespace NcTestRibbon.Net
 
     private static readonly JsonSerializerOptions JsonRead = new JsonSerializerOptions
     {
-      PropertyNameCaseInsensitive = true
+      PropertyNameCaseInsensitive = true,
+      Converters = { new FlexibleInt32JsonConverter() }
     };
+
+    /// <summary>
+    /// Accepts JSON null, number, or string for int fields (completed/total).
+    /// Missing/null/unparseable → 0 (UI treats total less than or equal to 0 as Marquee).
+    /// </summary>
+    internal sealed class FlexibleInt32JsonConverter : JsonConverter<int>
+    {
+      public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+      {
+        switch (reader.TokenType)
+        {
+          case JsonTokenType.Null:
+            return 0;
+          case JsonTokenType.Number:
+            if (reader.TryGetInt32(out int i32))
+            {
+              return i32;
+            }
+
+            // Consume token; clamp out-of-range / fractional values.
+            double dbl = reader.GetDouble();
+            if (double.IsNaN(dbl) || double.IsInfinity(dbl))
+            {
+              return 0;
+            }
+
+            if (dbl > int.MaxValue)
+            {
+              return int.MaxValue;
+            }
+
+            if (dbl < int.MinValue)
+            {
+              return int.MinValue;
+            }
+
+            return (int)Math.Round(dbl);
+          case JsonTokenType.String:
+            string s = reader.GetString();
+            if (string.IsNullOrWhiteSpace(s))
+            {
+              return 0;
+            }
+
+            if (int.TryParse(s.Trim(), System.Globalization.NumberStyles.Integer,
+                  System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+            {
+              return parsed;
+            }
+
+            if (double.TryParse(s.Trim(), System.Globalization.NumberStyles.Float,
+                  System.Globalization.CultureInfo.InvariantCulture, out double dParsed)
+                && !double.IsNaN(dParsed) && !double.IsInfinity(dParsed))
+            {
+              if (dParsed > int.MaxValue)
+              {
+                return int.MaxValue;
+              }
+
+              if (dParsed < int.MinValue)
+              {
+                return int.MinValue;
+              }
+
+              return (int)Math.Round(dParsed);
+            }
+
+            return 0;
+          default:
+            // Skip unexpected token shapes without failing the whole status poll.
+            reader.Skip();
+            return 0;
+        }
+      }
+
+      public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options)
+      {
+        writer.WriteNumberValue(value);
+      }
+    }
 
     private static HttpClient _client;
     private static string _clientBase;
@@ -121,8 +202,13 @@ namespace NcTestRibbon.Net
       public string Status { get; set; }
       public string Stage { get; set; }
       public string Message { get; set; }
+
+      [JsonConverter(typeof(FlexibleInt32JsonConverter))]
       public int Completed { get; set; }
+
+      [JsonConverter(typeof(FlexibleInt32JsonConverter))]
       public int Total { get; set; }
+
       public string Error { get; set; }
 
       /// <summary>Optional; may appear on job create / some status payloads.</summary>
