@@ -50,6 +50,27 @@ namespace NcTestRibbon.Cad
         EnsureLayer(tr, db, unlockForWrite: true);
         EraseLayerEntities(tr, model);
         AddRectangle(tr, model, db, aoi.MinX, aoi.MinY, aoi.MaxX, aoi.MaxY);
+        SetLayerOff(tr, db, off: false);
+        LockLayer(tr, db);
+      });
+      TryRegen(doc);
+    }
+
+    /// <summary>
+    /// Hide AOI frame (layer Off). Does not erase entities or geometry.conf.
+    /// </summary>
+    public static void Hide()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      RunWrite(doc, (tr, model, db) =>
+      {
+        UnlockLayer(tr, db);
+        SetLayerOff(tr, db, off: true);
         LockLayer(tr, db);
       });
       TryRegen(doc);
@@ -168,6 +189,24 @@ namespace NcTestRibbon.Cad
       if (unlockForWrite)
       {
         rec.IsLocked = false;
+      }
+    }
+
+    private static void SetLayerOff(Transaction tr, Database db, bool off)
+    {
+      try
+      {
+        LayerTable lt = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+        if (!lt.Has(LayerName))
+        {
+          return;
+        }
+
+        LayerTableRecord rec = (LayerTableRecord)tr.GetObject(lt[LayerName], OpenMode.ForWrite);
+        rec.IsOff = off;
+      }
+      catch
+      {
       }
     }
 

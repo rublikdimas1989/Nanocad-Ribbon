@@ -171,20 +171,11 @@ namespace NcTestRibbon.Shell
       cancelCalc.Click += (_, __) => SetStatus("Нет активного расчёта.");
       calcRow.Controls.Add(cancelCalc);
 
-      var saveDxf = new Button
-      {
-        Text = "Сохранить карту DXF",
-        AutoSize = true,
-        Margin = new Padding(0, 4, 8, 4)
-      };
-      saveDxf.Click += (_, __) => SaveDxfOnly();
-      root.Controls.Add(saveDxf);
-
       _btnUpload = new Button
       {
         Text = "Обновить карту на сервере",
         AutoSize = true,
-        Margin = new Padding(0, 4, 8, 8),
+        Margin = new Padding(0, 8, 8, 8),
         Font = new Font(Font, FontStyle.Bold)
       };
       _btnUpload.Click += async (_, __) => await UploadMapAsync().ConfigureAwait(true);
@@ -226,7 +217,7 @@ namespace NcTestRibbon.Shell
         Margin = new Padding(0, 8, 0, 4),
         Text = "Центры перебираются с шагом 50 м. Для БУОС проверяются 0°, 30°, 60°, 90°, 120°, 150°. "
           + "Расчёт слоёв в этой сборке ещё не перенесён — кнопки расчёта показывают статус. "
-          + "Общая прямоугольная область интереса сохраняется в geometry.conf и подсвечивается на чертеже. "
+          + "Общая прямоугольная область интереса сохраняется в geometry.conf и подсвечивается, пока окно открыто. "
           + "«Обновить карту на сервере» пишет DXF рядом с чертежом и загружает DXF+terrain на хост из net.conf."
       });
 
@@ -235,6 +226,9 @@ namespace NcTestRibbon.Shell
       {
         MapUploadClient.StatusChanged -= OnUploadStatus;
         try { PersistOffsets(); }
+        catch { }
+        // Hide AOI frame; keep geometry.conf coords for next open.
+        try { CadAoiOverlay.Hide(); }
         catch { }
       };
 
@@ -252,7 +246,7 @@ namespace NcTestRibbon.Shell
       }
       else
       {
-        SetStatus("Слои выключены. Выделите область; расчёт слоёв — позже. Можно сохранить DXF / обновить карту на сервере.");
+        SetStatus("Слои выключены. Выделите область; расчёт слоёв — позже. Можно обновить карту на сервере.");
       }
     }
 
@@ -429,20 +423,6 @@ namespace NcTestRibbon.Shell
       catch (Exception ex)
       {
         SetStatus("Ошибка сброса области: " + ex.Message);
-      }
-    }
-
-    private void SaveDxfOnly()
-    {
-      try
-      {
-        PersistOffsets();
-        string path = CadDxfExport.SaveMapSidecar();
-        SetStatus("DXF сохранён: " + path);
-      }
-      catch (Exception ex)
-      {
-        SetStatus("Ошибка сохранения DXF: " + ex.Message);
       }
     }
 
