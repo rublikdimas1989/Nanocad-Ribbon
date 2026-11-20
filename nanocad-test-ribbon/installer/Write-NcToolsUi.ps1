@@ -95,19 +95,20 @@ function Write-NcToolsUi {
     $serverIcons = Join-Path $ConfigDir 'server-icons'
     New-Item -ItemType Directory -Force -Path $serverIcons | Out-Null
 
-    # --- NC_Tools.cfg (single backslashes — match NcBootstrap.UiGenerator) ---
+    # --- NC_Tools.cfg (single backslashes - match NcBootstrap.UiGenerator) ---
     $cfg = New-Object System.Text.StringBuilder
     [void]$cfg.AppendLine('[\configman]')
     [void]$cfg.AppendLine('[\configman\commands]')
     [void]$cfg.AppendLine()
-    [void]$cfg.AppendLine('[\menu\NcTools]                          |name=sИнструменты ЦРПР')
-    [void]$cfg.AppendLine('[\menu\NcTools\NcLoad]                   |name=sЗагрузить инструменты |intername=sNCLOAD')
-    [void]$cfg.AppendLine('[\menu\NcTools\NcUnload]                 |name=sВыгрузить инструменты |intername=sNCUNLOAD')
+    # ASCII-only labels in .ps1 (Windows PowerShell 5 / code-page safe).
+    [void]$cfg.AppendLine('[\menu\NcTools]                          |name=sNC Tools')
+    [void]$cfg.AppendLine('[\menu\NcTools\NcLoad]                   |name=sLoad instruments |intername=sNCLOAD')
+    [void]$cfg.AppendLine('[\menu\NcTools\NcUnload]                 |name=sUnload instruments |intername=sNCUNLOAD')
     [void]$cfg.AppendLine()
-    [void]$cfg.AppendLine('[\toolbars\NcTools]                      |name=sИнструменты ЦРПР |InitialVisible=f1')
-    [void]$cfg.AppendLine('[\toolbars\NcTools\NcLoad]               |intername=sNCLOAD |ToolTipText=sСкачать и загрузить инструменты с сервера')
+    [void]$cfg.AppendLine('[\toolbars\NcTools]                      |name=sNC Tools |InitialVisible=f1')
+    [void]$cfg.AppendLine('[\toolbars\NcTools\NcLoad]               |intername=sNCLOAD |ToolTipText=sDownload and load instruments from server')
     [void]$cfg.AppendLine('[\toolbars\NcTools\sep0]')
-    [void]$cfg.AppendLine('[\toolbars\NcTools\NcUnload]             |intername=sNCUNLOAD |ToolTipText=sУбрать загруженные инструменты')
+    [void]$cfg.AppendLine('[\toolbars\NcTools\NcUnload]             |intername=sNCUNLOAD |ToolTipText=sRemove loaded instruments')
     [void]$cfg.AppendLine()
     [void]$cfg.AppendLine('[\toolbarspos\NcTools]                   |DockPosition=sTop |row=i5 |pos=i0')
     [void]$cfg.AppendLine()
@@ -137,9 +138,9 @@ function Write-NcToolsUi {
         [void]$Builder.AppendLine()
     }
 
-    Append-NcCommand $cfg 'NCLOAD' 'Загрузить инструменты' 'Скачать и загрузить инструменты с сервера' $loadIconRel
-    Append-NcCommand $cfg 'NCUNLOAD' 'Выгрузить инструменты' 'Убрать загруженные инструменты (появится после перезапуска)' $null
-    Append-NcCommand $cfg 'NCDIAG' 'Диагностика NcBootstrap' 'Сведения о настройке NcBootstrap' $null
+    Append-NcCommand $cfg 'NCLOAD' 'Load instruments' 'Download and load instruments from server' $loadIconRel
+    Append-NcCommand $cfg 'NCUNLOAD' 'Unload instruments' 'Remove loaded instruments (after restart)' $null
+    Append-NcCommand $cfg 'NCDIAG' 'NcBootstrap diagnostics' 'NcBootstrap setup info' $null
 
     $commands = @($manifest.commands)
     foreach ($cmd in $commands) {
@@ -167,16 +168,17 @@ function Write-NcToolsUi {
     $panels = New-Object System.Text.StringBuilder
     $refs = New-Object System.Text.StringBuilder
 
-    [void]$panels.Append("    <RibbonPanelSource UID=`"RBNU_NCTOOLS_CTRL`" Text=`"Управление`" HiddenInEditor=`"false`">`n")
+    [void]$panels.Append("    <RibbonPanelSource UID=`"RBNU_NCTOOLS_CTRL`" Text=`"Control`" HiddenInEditor=`"false`">`n")
     [void]$panels.Append("      <RibbonRowPanel UID=`"RBNURP_NCTOOLS_CTRL`" ResizeStyle=`"None`" ResizePriority=`"100`" TopJustify=`"True`">`n")
     [void]$panels.Append("        <RibbonRow UID=`"RBNURR_NCTOOLS_CTRL`">`n")
-    [void]$panels.Append((Get-NcRibbonButtonXml -Uid 'RBNU_NCLOAD' -Text 'Загрузить' -Command 'NCLOAD' -Style 'large' -Tooltip 'Скачать и загрузить инструменты с сервера'))
+    [void]$panels.Append((Get-NcRibbonButtonXml -Uid 'RBNU_NCLOAD' -Text 'Load' -Command 'NCLOAD' -Style 'large' -Tooltip 'Download and load instruments from server'))
     [void]$panels.Append("`n")
     [void]$panels.Append("        </RibbonRow>`n")
     [void]$panels.Append("      </RibbonRowPanel>`n")
     [void]$panels.Append("    </RibbonPanelSource>`n")
     [void]$refs.Append("      <RibbonPanelSourceReference UID=`"RBNU_NCTOOLS_CTRL_Ref`" PanelId=`"RBNU_NCTOOLS_CTRL`" ResizeStyle=`"Default`" />`n")
 
+    # Panel/button captions come from NC_TestRibbon.json (UTF-8 file), not from this .ps1 source.
     $panelText = [string]$manifest.panel
     $panelUid = 'RBNU_NCTOOLS_P1_' + (Get-NcSanitizeId $panelText)
     [void]$panels.Append("    <RibbonPanelSource UID=`"$panelUid`" Text=`"$(Get-NcXmlEscape $panelText)`" HiddenInEditor=`"false`">`n")
@@ -204,7 +206,7 @@ function Write-NcToolsUi {
         $panels.ToString().TrimEnd("`r", "`n")
         '  </RibbonPanelSourceCollection>'
         '  <RibbonTabSourceCollection>'
-        '    <RibbonTabSource Text="Инструменты ЦРПР" UID="ID_NCTOOLS_TAB">'
+        '    <RibbonTabSource Text="NC Tools" UID="ID_NCTOOLS_TAB">'
         $refs.ToString().TrimEnd("`r", "`n")
         '    </RibbonTabSource>'
         '  </RibbonTabSourceCollection>'

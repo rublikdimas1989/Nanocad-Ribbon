@@ -366,7 +366,7 @@ function Invoke-PluginBuild {
 
     if ($exit -ne 0) {
         Write-Host ''
-        Write-Host 'BUILD FAILED — nanoCAD will NOT be started.' -ForegroundColor Red
+        Write-Host 'BUILD FAILED - nanoCAD will NOT be started.' -ForegroundColor Red
         Write-Host ("Full log: {0}" -f $log)
         Write-Host '--- last 60 log lines ---'
         Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
@@ -429,7 +429,7 @@ function Start-NanoCadOnce {
 }
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
-# Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
+# Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs - purge the rest.
 $shellDir = Join-Path $pkgRoot 'NcTestRibbon\Shell'
 foreach ($legacy in @(
         'SettingsWindow.xaml',
