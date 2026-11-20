@@ -3,18 +3,18 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.60**): `nanocad-test-ribbon-v1.2.60.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.60.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.60/nanocad-test-ribbon-v1.2.60.zip  
+Актуальный **slim** zip (версия **1.2.61**): `nanocad-test-ribbon-v1.2.61.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.61.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.61/nanocad-test-ribbon-v1.2.61.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
 **Картография** (`NcTestCartography`): Forest / Height / космоснимок — показ + прозрачность; Открыть… в панели.  
 Maps `Forest_geo` / `Height_geo` / `Screen_ESRI` → insert; иначе file dialog. Слои `NC_MAP_*` locked; uncheck → Off.
 
-Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.60/Topology_Inserts.xlsx)  
-Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.60/Topology_Buos.xlsx)  
-Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.60/Topology_Nodes.xlsx)  
+Sample врезки: [`Topology_Inserts.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.61/Topology_Inserts.xlsx)  
+Sample БУОС: [`Topology_Buos.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.61/Topology_Buos.xlsx)  
+Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.61/Topology_Nodes.xlsx)  
 
 
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.60 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.61 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `cd NcTestRibbon` → `dotnet build NcTestRibbon.csproj -c Release`
 5. `..\installer\INSTALL.bat` → `..\installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.60+AoiHideNoDxfBtn`; Http.Json fix + AOI hide on close + no «Сохранить карту DXF»
+6. Stamp `NcTestRibbon 1.2.61+UploadDxfOnly`; upload multipart field `dxf` only (no terrain)
 
 | Команда | Что делает |
 |---------|------------|

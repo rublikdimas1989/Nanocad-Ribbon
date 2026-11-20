@@ -218,7 +218,7 @@ namespace NcTestRibbon.Shell
         Text = "Центры перебираются с шагом 50 м. Для БУОС проверяются 0°, 30°, 60°, 90°, 120°, 150°. "
           + "Расчёт слоёв в этой сборке ещё не перенесён — кнопки расчёта показывают статус. "
           + "Общая прямоугольная область интереса сохраняется в geometry.conf и подсвечивается, пока окно открыто. "
-          + "«Обновить карту на сервере» пишет DXF рядом с чертежом и загружает DXF+terrain на хост из net.conf."
+          + "«Обновить карту на сервере» пишет DXF рядом с чертежом и загружает только DXF (multipart field dxf) на хост из net.conf."
       });
 
       MapUploadClient.StatusChanged += OnUploadStatus;
@@ -438,18 +438,10 @@ namespace NcTestRibbon.Shell
       try
       {
         PersistOffsets();
-        if (!MapUploadClient.TryResolveTerrainPath(out string terrain, out string terrErr))
-        {
-          string fail = MapUploadClient.StatusFail + ": " + terrErr;
-          MapUploadClient.PublishStatus(fail);
-          SetStatus(fail);
-          return;
-        }
-
         SetStatus("Сохранение DXF…");
         string dxf = CadDxfExport.SaveMapSidecar();
-        SetStatus("Передача DXF + terrain на " + NetConf.Load().Host + "…");
-        string datasetId = await MapUploadClient.UploadMapAsync(dxf, terrain).ConfigureAwait(true);
+        SetStatus("Передача DXF на " + NetConf.Load().Host + "…");
+        string datasetId = await MapUploadClient.UploadMapAsync(dxf).ConfigureAwait(true);
         string ok = MapUploadClient.StatusOk + " (datasetId=" + datasetId + ")";
         MapUploadClient.PublishStatus(MapUploadClient.StatusOk);
         SetStatus(ok);
