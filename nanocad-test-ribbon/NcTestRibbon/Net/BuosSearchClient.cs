@@ -282,7 +282,7 @@ namespace NcTestRibbon.Net
       if (widthM <= 0 || lengthM <= 0 || !double.IsFinite(widthM) || !double.IsFinite(lengthM))
       {
         throw new InvalidOperationException(
-          "Нет размеров БУОС. Откройте «Исходные данные» → БУОС и загрузите каталог.");
+          "Нет размеров БУОС. Откройте «Настройки» → БУОС и загрузите каталог.");
       }
 
       return new BuosSearchRequest

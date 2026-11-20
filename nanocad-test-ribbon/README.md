@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.70**): `nanocad-test-ribbon-v1.2.70.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.70.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.70/nanocad-test-ribbon-v1.2.70.zip  
+Актуальный **slim** zip (версия **1.2.71**): `nanocad-test-ribbon-v1.2.71.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.71.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.71/nanocad-test-ribbon-v1.2.71.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,21 +37,21 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.70 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.71 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI, при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.70+RemoveNodesUi` — AllowableSites without nodes show/calc UI; slim zip excludes `.xlsx` samples.
+6. Stamp `NcTestRibbon 1.2.71+SourcePlacementBuosNodes` — «Исходные данные»: placement БУОС/Узлы; каталог в «Настройки» после трассировки; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» |
 | `NcTestHttp` | WinForms HTTP GET |
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
-| `NcTestSettings` | **WPF** «Настройки» (трассировка + траншея/дорога + сеть) |
+| `NcTestSettings` | **WPF** «Настройки» (трассировка → каталог БУОС/Узлы → траншея/дорога → сеть) |
 | `NcTestInitialData` | alias → `NcTestSourceData` |
-| `NcTestSourceData` | Лента: «Исходные данные» — вкладки Кустовые / Врезки / БУОС / Узлы |
+| `NcTestSourceData` | Лента: «Исходные данные» — Кустовые / Врезки / **размещение** БУОС / Узлы |
 | `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` | Только командой (без кнопок ленты) → нужная вкладка |
 | `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |
@@ -157,27 +157,25 @@ NcTestBlink
 - `LabelFontHeightM` — подписи КП и врезок
 - `InsertCircleDiameterM` — диаметр круга врезки
 
-### Исходные данные (v1.2.37)
+### Исходные данные (v1.2.71)
 
-Одно WinForms-окно **«Исходные данные»** (`NcTestSourceData`) с вкладками. На ленте только эта кнопка; `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` остаются командами для отладки.
+Окно **«Исходные данные»**: Кустовые / Врезки / **размещение БУОС** / **размещение Узлы**.  
+Каталоги размеров/стоимостей — в **«Настройки»** (после «Настройки трассировки»).
 
-При закрытии окна, если есть жёлтые строки (несохранённые X/Y КП или врезок): вопрос **«Применить новые координаты?»** — Да = запись в Excel как «Сохранить положения», Нет = откат сетки и чертежа к последним Excel.
+Размещение БУОС/Узлы (как Врезка + КП):
 
-### Варианты БУОС (v1.2.33 / TCON-51)
+- Excel лист **«Размещение БУОС»** / **«Размещение Узлы»**: Имя, X, Y, Угол, Ширина, Длина
+- CAD: «Показывать на чертеже», «Задать положение вручную», «Повернуть вручную» (zoom-before); слои `NC_BUOS_PLACED` / `NC_NODES_PLACED`
+- Жёлтые строки = несохранённые X/Y/угол; при закрытии — «Применить новые координаты?»
+- `paths.json`: `buosPlacementWorkbook` / `nodesPlacementWorkbook`, `showBuosOnDrawing` / `showNodesOnDrawing`
 
-Вкладка **БУОС** — каталог типов (End `TopologyBuosType`), **без** координат и «в подборе»:
+### Каталог БУОС / Узлы в Настройках (v1.2.71)
 
-- Лист Excel **«БУОС»**: Имя, производительность жидкость/ПНГ, длина/ширина площадки
-- Стоимость — из `Price.xlsx` лист **«Элементы топологии»** (A=имя, B=цена); нет цены → красный «введите в Price стоимость»
-- Sample: `Topology_Buos.xlsx`; `paths.json` → `buosWorkbook`
+Вкладки **Настройки → БУОС** / **Узлы** (бывшие каталоги из «Исходные данные»):
 
-### Узлы (v1.2.34)
-
-Вкладка **Узлы** — типы «Узел 3 соединения» / «Узел 4 соединения»:
-
-- Лист Excel **«Узлы»**: Имя, длина/ширина площадки (без производительности)
-- Стоимость — тот же Price lookup, что у БУОС
-- Sample: `Topology_Nodes.xlsx`; `paths.json` → `nodesWorkbook`
+- Лист **«БУОС»**: Имя, жидкость/ПНГ, длина/ширина; цена из Price «Элементы топологии»
+- Лист **«Узлы»**: Имя, длина/ширина; цена из Price
+- `paths.json` → `buosWorkbook` / `nodesWorkbook` (AllowableSites берёт размеры отсюда)
 
 ### Мигание сегмента (v1.2.13+)
 

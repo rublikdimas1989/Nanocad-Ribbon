@@ -306,7 +306,7 @@ namespace NcTestRibbon.Shell
         }
         else
         {
-          _buosSize.Text = "Площадка БУОС ширина х длина - — (откройте каталог во «Исходные данные» → БУОС)";
+          _buosSize.Text = "Площадка БУОС ширина х длина - — (откройте каталог в «Настройки» → БУОС)";
           _buosSize.ForeColor = Color.DarkRed;
         }
       }
@@ -465,7 +465,7 @@ namespace NcTestRibbon.Shell
         if (!TryLargestBuos(paths.BuosWorkbook, out double widthM, out double lengthM, out string buosName))
         {
           throw new InvalidOperationException(
-            "Нет каталога БУОС (ширина×длина). Откройте «Исходные данные» → БУОС.");
+            "Нет каталога БУОС (ширина×длина). Откройте «Настройки» → БУОС.");
         }
 
         BuosSearchClient.BuosSearchRequest request =

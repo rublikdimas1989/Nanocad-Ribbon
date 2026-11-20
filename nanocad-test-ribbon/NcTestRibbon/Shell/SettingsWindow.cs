@@ -4,16 +4,19 @@ namespace NcTestRibbon.Shell
   using System.IO;
   using System.Windows;
   using System.Windows.Controls;
+  using System.Windows.Forms.Integration;
 
   /// <summary>
   /// Unified settings shell (code-built — no XAML pack URI).
-  /// Tabs: tracing settings + trench/road. Ensures Tracing_cache on open.
+  /// Tabs: tracing → catalog БУОС/Узлы → trench/road → network.
   /// </summary>
   public sealed class SettingsWindow : Window
   {
     private readonly TrenchRoadSettingsPanel _trenchPanel = new TrenchRoadSettingsPanel();
     private readonly TracingSettingsPanel _tracingPanel;
     private readonly NetworkSettingsPanel _networkPanel = new NetworkSettingsPanel();
+    private readonly BuosVariantsWindow _buosCatalog = new BuosVariantsWindow();
+    private readonly NodeVariantsWindow _nodesCatalog = new NodeVariantsWindow();
     private readonly TextBlock _cacheInfo = new TextBlock
     {
       Margin = new Thickness(0, 6, 0, 0),
@@ -78,6 +81,16 @@ namespace NcTestRibbon.Shell
       {
         Header = "Настройки трассировки",
         Content = _tracingPanel
+      });
+      tabs.Items.Add(new TabItem
+      {
+        Header = "БУОС",
+        Content = new WindowsFormsHost { Child = _buosCatalog }
+      });
+      tabs.Items.Add(new TabItem
+      {
+        Header = "Узлы",
+        Content = new WindowsFormsHost { Child = _nodesCatalog }
       });
       tabs.Items.Add(new TabItem
       {

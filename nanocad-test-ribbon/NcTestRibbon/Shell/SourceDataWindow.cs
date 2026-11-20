@@ -13,15 +13,16 @@ namespace NcTestRibbon.Shell
   }
 
   /// <summary>
-  /// Single modeless host: Кустовые / Врезки / БУОС / Узлы as WinForms TabControl pages.
+  /// Modeless host: Кустовые / Врезки / placement БУОС / placement Узлы.
+  /// Catalog variants live in Settings (after tracing tab).
   /// </summary>
   public sealed class SourceDataWindow : Form
   {
     private readonly TabControl _tabs;
     private readonly PadOptimizationWindow _pads;
     private readonly InsertPointsWindow _inserts;
-    private readonly BuosVariantsWindow _buos;
-    private readonly NodeVariantsWindow _nodes;
+    private readonly SitePlacementWindow _buos;
+    private readonly SitePlacementWindow _nodes;
 
     public SourceDataWindow(SourceDataTab initialTab = SourceDataTab.Pads)
     {
@@ -42,8 +43,8 @@ namespace NcTestRibbon.Shell
 
       _pads = new PadOptimizationWindow();
       _inserts = new InsertPointsWindow();
-      _buos = new BuosVariantsWindow();
-      _nodes = new NodeVariantsWindow();
+      _buos = new SitePlacementWindow(SitePlacementKind.Buos);
+      _nodes = new SitePlacementWindow(SitePlacementKind.Nodes);
 
       _tabs.TabPages.Add(MakePage("Кустовые площадки", _pads));
       _tabs.TabPages.Add(MakePage("Врезки", _inserts));
@@ -56,6 +57,12 @@ namespace NcTestRibbon.Shell
         catch { }
 
         try { _inserts.NotifyHostClosing(); }
+        catch { }
+
+        try { _buos.NotifyHostClosing(); }
+        catch { }
+
+        try { _nodes.NotifyHostClosing(); }
         catch { }
       };
 

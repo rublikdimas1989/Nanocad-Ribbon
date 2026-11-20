@@ -27,6 +27,12 @@ namespace NcTestRibbon.Configuration
     /// <summary>Last opened junction/node types workbook (xlsx, sheet «Узлы»).</summary>
     public string NodesWorkbook { get; set; } = string.Empty;
 
+    /// <summary>Placement Excel for source-data БУОС (sheet «Размещение БУОС»).</summary>
+    public string BuosPlacementWorkbook { get; set; } = string.Empty;
+
+    /// <summary>Placement Excel for source-data Узлы (sheet «Размещение Узлы»).</summary>
+    public string NodesPlacementWorkbook { get; set; } = string.Empty;
+
     /// <summary>Last rates workbook (Price.xlsx / .xlsm or custom path).</summary>
     public string PriceWorkbook { get; set; } = string.Empty;
 
@@ -44,6 +50,12 @@ namespace NcTestRibbon.Configuration
 
     /// <summary>Remember «Показывать на чертеже» for insert points.</summary>
     public bool ShowInsertsOnDrawing { get; set; }
+
+    /// <summary>Remember «Показывать на чертеже» for placement БУОС.</summary>
+    public bool ShowBuosOnDrawing { get; set; }
+
+    /// <summary>Remember «Показывать на чертеже» for placement Узлы.</summary>
+    public bool ShowNodesOnDrawing { get; set; }
 
     /// <summary>Cartography: Forest / Height / Screen_ESRI visibility + opacity %.</summary>
     public bool ShowForestMap { get; set; }
@@ -93,6 +105,8 @@ namespace NcTestRibbon.Configuration
           data.InsertsWorkbook,
           data.BuosWorkbook,
           data.NodesWorkbook,
+          data.BuosPlacementWorkbook,
+          data.NodesPlacementWorkbook,
           data.PriceWorkbook,
           data.FluidProperties,
           data.Background,
@@ -145,6 +159,8 @@ namespace NcTestRibbon.Configuration
       InsertsWorkbook = ExpandPath(InsertsWorkbook);
       BuosWorkbook = ExpandPath(BuosWorkbook);
       NodesWorkbook = ExpandPath(NodesWorkbook);
+      BuosPlacementWorkbook = ExpandPath(BuosPlacementWorkbook);
+      NodesPlacementWorkbook = ExpandPath(NodesPlacementWorkbook);
       PriceWorkbook = ExpandPath(PriceWorkbook);
       FluidProperties = ExpandPath(FluidProperties);
       Background = ExpandPath(Background);
@@ -158,6 +174,8 @@ namespace NcTestRibbon.Configuration
       InsertsWorkbook = CompactPath(InsertsWorkbook);
       BuosWorkbook = CompactPath(BuosWorkbook);
       NodesWorkbook = CompactPath(NodesWorkbook);
+      BuosPlacementWorkbook = CompactPath(BuosPlacementWorkbook);
+      NodesPlacementWorkbook = CompactPath(NodesPlacementWorkbook);
       PriceWorkbook = CompactPath(PriceWorkbook);
       FluidProperties = CompactPath(FluidProperties);
       Background = CompactPath(Background);

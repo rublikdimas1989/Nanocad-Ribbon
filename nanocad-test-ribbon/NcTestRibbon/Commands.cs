@@ -104,7 +104,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// «Исходные данные» — Кустовые / Врезки / БУОС / Узлы tabs (default: pads).
+    /// «Исходные данные» — Кустовые / Врезки / placement БУОС / Узлы (default: pads).
     /// </summary>
     [CommandMethod("NcTestSourceData")]
     public void NcTestSourceData()
