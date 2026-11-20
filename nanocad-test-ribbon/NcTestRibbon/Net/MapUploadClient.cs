@@ -3,7 +3,7 @@ namespace NcTestRibbon.Net
   using System;
   using System.IO;
   using System.Net.Http;
-  using System.Net.Http.Json;
+  using System.Text.Json;
   using System.Threading;
   using System.Threading.Tasks;
   using NcTestRibbon.Cad;
@@ -12,6 +12,7 @@ namespace NcTestRibbon.Net
 
   /// <summary>
   /// Multipart upload of DXF + terrain DEM to solver api/v1/datasets.
+  /// Avoids System.Net.Http.Json (MissingMethodException under nanoCAD host).
   /// </summary>
   public static class MapUploadClient
   {
@@ -19,6 +20,11 @@ namespace NcTestRibbon.Net
     public const string StatusFail = "Ошибка передачи данных";
 
     private static readonly object Gate = new object();
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+    {
+      PropertyNameCaseInsensitive = true
+    };
+
     private static HttpClient _client;
     private static string _clientBase;
 
@@ -33,7 +39,10 @@ namespace NcTestRibbon.Net
       catch { }
     }
 
-    private sealed record DatasetResponse(string DatasetId);
+    private sealed class DatasetResponse
+    {
+      public string DatasetId { get; set; }
+    }
 
     public static async Task<string> UploadMapAsync(string dxfPath, string terrainPath, CancellationToken ct = default)
     {
@@ -54,8 +63,16 @@ namespace NcTestRibbon.Net
 
       using HttpResponseMessage response = await client.PostAsync("api/v1/datasets", form, ct).ConfigureAwait(false);
       response.EnsureSuccessStatusCode();
-      DatasetResponse dataset = await response.Content.ReadFromJsonAsync<DatasetResponse>(cancellationToken: ct).ConfigureAwait(false);
-      return dataset?.DatasetId ?? throw new InvalidDataException("Решатель не вернул datasetId.");
+      string json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+      ct.ThrowIfCancellationRequested();
+      DatasetResponse dataset = JsonSerializer.Deserialize<DatasetResponse>(json ?? string.Empty, JsonOptions);
+      string id = dataset?.DatasetId;
+      if (string.IsNullOrWhiteSpace(id))
+      {
+        throw new InvalidDataException("Решатель не вернул datasetId.");
+      }
+
+      return id.Trim();
     }
 
     /// <summary>
