@@ -1,6 +1,11 @@
 # Install NcBootstrap + NC_TestRibbon for local nanoCAD testing.
 # Run with nanoCAD closed. Admin rights are not required.
 # ASCII-only script (safe across Windows code pages).
+#
+# Flow (TCON-70):
+#   1) dotnet build the plugin (failure => show log, exit, do NOT start nanoCAD)
+#   2) deploy files + pre-write NC_Tools.cfg/.cuix + nanoCAD.cfg #include
+#   3) start nanoCAD once (ribbon already wired; no ProposeRestart / second launch)
 
 $ErrorActionPreference = 'Stop'
 
@@ -9,6 +14,8 @@ $pkgRoot = Split-Path -Parent $src
 $dest = Join-Path $env:LOCALAPPDATA 'ASDC\NcBootstrap'
 $syncFolder = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD'
 $nanosoftRoot = Join-Path $env:APPDATA 'Nanosoft'
+
+. (Join-Path $src 'Write-NcToolsUi.ps1')
 
 function Get-NanoCadProfiles {
     $result = @()
@@ -249,7 +256,177 @@ function Resolve-TestRibbonFiles {
     return $null
 }
 
-$requiredCommands = @('NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings', 'NcTestInitialData', 'NcTestPadOpt')
+function Get-RibbonDependencyDlls {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath
+    )
+
+    $skip = @{
+        'NC_TestRibbon.dll' = $true
+        'hostmgd.dll'       = $true
+        'hostdbmgd.dll'     = $true
+        'NcBootstrap.dll'   = $true
+    }
+
+    $byName = @{}
+
+    $depsDir = Join-Path $src 'deps'
+    if (Test-Path $depsDir) {
+        Get-ChildItem -Path $depsDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $ribbonDir = Split-Path -Parent $RibbonDllPath
+    if (Test-Path $ribbonDir) {
+        Get-ChildItem -Path $ribbonDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object { $byName[$_.Name] = $_.FullName }
+    }
+
+    $payloadDeps = Join-Path $src 'payload'
+    if (Test-Path $payloadDeps) {
+        Get-ChildItem -Path $payloadDeps -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { -not $skip.ContainsKey($_.Name) } |
+            ForEach-Object {
+                if (-not $byName.ContainsKey($_.Name)) {
+                    $byName[$_.Name] = $_.FullName
+                }
+            }
+    }
+
+    return @(
+        $byName.GetEnumerator() |
+            Sort-Object Name |
+            ForEach-Object {
+                [PSCustomObject]@{ Name = $_.Key; Path = $_.Value }
+            }
+    )
+}
+
+function Copy-RibbonDependencies {
+    param(
+        [Parameter(Mandatory = $true)][string]$RibbonDllPath,
+        [Parameter(Mandatory = $true)][string]$DestFolder
+    )
+
+    $deps = @(Get-RibbonDependencyDlls -RibbonDllPath $RibbonDllPath)
+    if ($deps.Count -eq 0) {
+        Write-Host 'WARNING: no plugin dependency DLLs found (installer\deps or build output).' -ForegroundColor Yellow
+        Write-Host 'EPPlus.dll must sit next to NC_TestRibbon.dll for Price.xlsx rates.'
+        return
+    }
+
+    $copied = 0
+    foreach ($dep in $deps) {
+        $destPath = Join-Path $DestFolder $dep.Name
+        if (Test-Path $destPath) {
+            Remove-Item $destPath -Force
+        }
+        Copy-Item $dep.Path $destPath -Force
+        $copied++
+    }
+
+    Write-Host ("Copied {0} dependency DLL(s) to: {1}" -f $copied, $DestFolder)
+    $epplus = Join-Path $DestFolder 'EPPlus.dll'
+    if (Test-Path $epplus) {
+        Write-DllInfo -Label 'Installed EPPlus' -Path $epplus
+    }
+    else {
+        Write-Host 'WARNING: EPPlus.dll was not installed. Rates tab will fail to load.' -ForegroundColor Yellow
+    }
+}
+
+$requiredCommands = @(
+    'NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings',
+    'NcTestSourceData', 'NcTestInterface', 'NcTestBlink',
+    'NcTestEcw', 'NcTestCartography', 'NcTestAllowableSites',
+    'NcTestTif', 'NcTestForest', 'NcTestHeight'
+)
+
+function Invoke-PluginBuild {
+    $proj = Join-Path $pkgRoot 'NcTestRibbon\NcTestRibbon.csproj'
+    if (-not (Test-Path -LiteralPath $proj)) {
+        throw "Missing project: $proj"
+    }
+
+    $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+    if (-not $dotnet) {
+        throw 'dotnet SDK not found on PATH. Install .NET 6+ SDK, then re-run INSTALL.bat. nanoCAD was NOT started.'
+    }
+
+    $log = Join-Path $env:TEMP 'NcTestRibbon-build.log'
+    Write-Host ''
+    Write-Host '=== Building NC_TestRibbon (Release) ==='
+    Write-Host ("Project: {0}" -f $proj)
+    Write-Host ("Log:     {0}" -f $log)
+
+    $output = & dotnet build $proj -c Release --nologo 2>&1
+    $exit = $LASTEXITCODE
+    $output | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ }
+
+    if ($exit -ne 0) {
+        Write-Host ''
+        Write-Host 'BUILD FAILED — nanoCAD will NOT be started.' -ForegroundColor Red
+        Write-Host ("Full log: {0}" -f $log)
+        Write-Host '--- last 60 log lines ---'
+        Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+        throw ("dotnet build failed (exit {0}). Fix compile errors and re-run INSTALL.bat." -f $exit)
+    }
+
+    $builtDll = Join-Path $pkgRoot 'NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll'
+    if (-not (Test-Path -LiteralPath $builtDll)) {
+        throw "Build reported success but DLL missing: $builtDll"
+    }
+
+    Write-Host 'Build OK.'
+    Write-DllInfo -Label 'Built DLL' -Path $builtDll
+}
+
+function Find-NanoCadExe {
+    param([object[]]$Profiles)
+
+    $candidates = New-Object System.Collections.Generic.List[string]
+    foreach ($pf in @(${env:ProgramFiles}, ${env:ProgramFiles(x86)}, $env:ProgramW6432)) {
+        if ([string]::IsNullOrWhiteSpace($pf)) { continue }
+        $ns = Join-Path $pf 'Nanosoft'
+        if (-not (Test-Path -LiteralPath $ns)) { continue }
+        Get-ChildItem -Path $ns -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $exe = Join-Path $_.FullName 'nCad.exe'
+            if (Test-Path -LiteralPath $exe) {
+                $candidates.Add($exe)
+            }
+        }
+    }
+
+    if ($candidates.Count -eq 0) { return $null }
+
+    foreach ($profile in @($Profiles)) {
+        $name = [string]$profile.Name
+        foreach ($exe in $candidates) {
+            $parent = Split-Path -Parent $exe
+            if ([string]::Equals((Split-Path -Leaf $parent), $name, [StringComparison]::OrdinalIgnoreCase)) {
+                return $exe
+            }
+        }
+    }
+
+    return ($candidates | Sort-Object { (Get-Item $_).LastWriteTime } -Descending | Select-Object -First 1)
+}
+
+function Start-NanoCadOnce {
+    param([object[]]$Profiles)
+
+    $exe = Find-NanoCadExe -Profiles $Profiles
+    if (-not $exe) {
+        Write-Host 'WARNING: nCad.exe not found under Program Files\Nanosoft. Start nanoCAD manually.' -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host ''
+    Write-Host ("Starting nanoCAD once: {0}" -f $exe)
+    Start-Process -FilePath $exe | Out-Null
+    return $true
+}
 
 # Leftovers from unzip-over-old-folder cause CS0101/CS0111 (duplicate classes).
 # Keep Page pairs MainWindow/ProfileControl/RatesPanel *.xaml.cs — purge the rest.
@@ -297,13 +474,14 @@ if (-not (Test-Path $loadIconSrc)) {
     throw "Missing icon $loadIconSrc"
 }
 
+# Compile first. Failure exits before any nanoCAD launch.
+Invoke-PluginBuild
+
 $ribbon = Resolve-TestRibbonFiles
 if ($null -eq $ribbon) {
     throw @"
-NC_TestRibbon.dll / NC_TestRibbon.json not found.
-Build first:
-  cd ..\NcTestRibbon
-  dotnet build NcTestRibbon.csproj -c Release
+NC_TestRibbon.dll / NC_TestRibbon.json not found after build.
+Expected: NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll
 Or place files into installer\payload\
 "@
 }
@@ -376,6 +554,85 @@ Assert-DllHasCommands -DllPath $ribbonDllDest -Commands $requiredCommands
 Write-Host "Copied NC_TestRibbon to: $syncFolder"
 Write-DllInfo -Label 'Installed DLL' -Path $ribbonDllDest
 
+# EPPlus + transitive NuGet deps must sit next to the plugin in LoadFile.
+Copy-RibbonDependencies -RibbonDllPath $ribbon.Dll -DestFolder $syncFolder
+
+# GDAL runtime (natives + NcGdalGeo): optional in slim plugin zips.
+# Prefer package copy when present; else reuse existing LoadFile from v1.2.48 / gdal-runtime zip.
+$gdalSrc = Join-Path $src 'gdal'
+if (-not (Test-Path (Join-Path $gdalSrc 'x64\gdal_wrap.dll'))) {
+    $gdalSrc = Join-Path $pkgRoot 'installer\gdal'
+}
+$gdalDest = Join-Path $syncFolder 'gdal'
+$wrap = Join-Path $gdalDest 'x64\gdal_wrap.dll'
+$ecw = Join-Path $gdalDest 'x64\plugins\gdal_ECW_JP2ECW.dll'
+$ncs = Join-Path $gdalDest 'x64\plugins\NCSEcw.dll'
+$csharp = Join-Path $syncFolder 'gdal_csharp.dll'
+
+if (Test-Path (Join-Path $gdalSrc 'x64\gdal_wrap.dll')) {
+    Write-Host ("GDAL source: {0}" -f $gdalSrc)
+    if (Test-Path $gdalDest) {
+        Remove-Item $gdalDest -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $gdalDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $gdalSrc '*') -Destination $gdalDest -Recurse -Force
+    Write-Host "Copied bundled GDAL+ECW to: $gdalDest"
+}
+elseif ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs)) {
+    Write-Host ("Reusing existing LoadFile GDAL: {0}" -f $gdalDest)
+}
+else {
+    Write-Host 'ERROR: GDAL runtime missing in package AND LoadFile.' -ForegroundColor Yellow
+    Write-Host 'Install once: nanocad-gdal-runtime-3.12.1.zip (or keep LoadFile\gdal from v1.2.48).'
+    Write-Host '  Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1'
+    throw 'GDAL runtime not found. Slim plugin zip reuses LoadFile\gdal from 1.2.48 / gdal-runtime asset.'
+}
+
+Write-Host ("  wrap:   {0}  exists={1}" -f $wrap, (Test-Path $wrap))
+Write-Host ("  ECW:    {0}  exists={1}" -f $ecw, (Test-Path $ecw))
+Write-Host ("  NCSEcw: {0}  exists={1}" -f $ncs, (Test-Path $ncs))
+Write-Host ("  csharp: {0}  exists={1}" -f $csharp, (Test-Path $csharp))
+if (-not ((Test-Path $wrap) -and (Test-Path $ecw) -and (Test-Path $ncs))) {
+    throw 'GDAL incomplete (need wrap + ECW plugins).'
+}
+
+$toolSrc = Join-Path $src 'tools\NcGdalGeo'
+if (-not (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe'))) {
+    $toolSrc = Join-Path $pkgRoot 'installer\tools\NcGdalGeo'
+}
+$toolDest = Join-Path $syncFolder 'tools\NcGdalGeo'
+$toolExe = Join-Path $toolDest 'NcGdalGeo.exe'
+if (Test-Path (Join-Path $toolSrc 'NcGdalGeo.exe')) {
+    if (Test-Path $toolDest) {
+        Remove-Item $toolDest -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $toolDest -Force | Out-Null
+    Copy-Item -Path (Join-Path $toolSrc '*') -Destination $toolDest -Recurse -Force
+    Write-Host ("NcGdalGeo copied: {0}" -f $toolExe)
+}
+elseif (Test-Path $toolExe) {
+    Write-Host ("Reusing existing NcGdalGeo: {0}" -f $toolExe)
+}
+else {
+    Write-Host 'ERROR: NcGdalGeo missing in package AND LoadFile.' -ForegroundColor Yellow
+    Write-Host 'Install nanocad-gdal-runtime-3.12.1.zip (includes tools\NcGdalGeo) once.'
+    throw 'NcGdalGeo.exe not found. Slim plugin zip reuses LoadFile tools from 1.2.48 / gdal-runtime.'
+}
+
+# Seed ECW OEM encode example (optional; without it NcTestTif uses free Maps\*.tif).
+$encodeExampleSrc = Join-Path $src 'ecw_encode.conf.example'
+if (-not (Test-Path $encodeExampleSrc)) {
+    $encodeExampleSrc = Join-Path $pkgRoot 'installer\ecw_encode.conf.example'
+}
+$settingsDir = Join-Path $syncFolder 'Tracing_cache\Settings'
+if (Test-Path $encodeExampleSrc) {
+    New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
+    $encodeExampleDest = Join-Path $settingsDir 'ecw_encode.conf.example'
+    Copy-Item $encodeExampleSrc $encodeExampleDest -Force
+    Write-Host ("ECW encode example: {0}" -f $encodeExampleDest)
+}
+
+
 $profiles = @(Get-NanoCadProfiles)
 if ($profiles.Count -eq 0) {
     Write-Host ''
@@ -419,8 +676,7 @@ foreach ($profile in $profiles) {
 
     foreach ($f in @(
         'NC_RibbonExecDoc.cfg', 'NC_RibbonExecDoc.cuix',
-        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix',
-        'NC_Tools.cfg', 'NC_Tools.cuix'
+        'RibbonExecDoc.cfg', 'RibbonExecDoc.cuix'
     )) {
         $p = Join-Path $profile.ConfigDir $f
         if (Test-Path $p) {
@@ -453,16 +709,30 @@ foreach ($profile in $profiles) {
     else {
         Write-Host 'Startup: NC_TestRibbon already present.'
     }
+
+    # Pre-generate ribbon UI so the first nanoCAD start already shows the tab.
+    # (Previously INSTALL deleted NC_Tools.* and relied on Initialize + restart.)
+    $pluginIconsDir = Join-Path $pkgRoot 'NcTestRibbon\icons'
+    Write-NcToolsUi `
+        -ConfigDir $profile.ConfigDir `
+        -ManifestJsonPath $ribbon.Json `
+        -SyncFolder $syncFolder `
+        -LoadIconSource $loadIconSrc `
+        -PluginIconsDir $pluginIconsDir
 }
 
 Write-Host ''
 Write-Host 'Install complete.'
 Write-Host 'Only NC_TestRibbon (panel "Test") is installed. Ramki / NC_RibbonExecDoc is not deployed.'
 Write-Host 'NcBootstrap.json has empty serverUrl (local-only; no ASDC sync of Ramki).'
-Write-Host 'Start nanoCAD and run: NcTestHello / NcTestHttp / NcTestWpf / NcTestSettings / NcTestPadOpt'
+Write-Host 'Ribbon UI (NC_Tools.cfg/.cuix + nanoCAD.cfg include) was written before launch.'
 Write-Host 'Optional check: installer\VERIFY.bat (DLL path / FileVersion / command names).'
-Write-Host 'If a command is unknown: rebuild Release, re-run INSTALL.bat, or NETLOAD the LoadFile DLL.'
 Write-Host ''
-Write-Host 'After reinstalling nanoCAD:'
-Write-Host '1. Start nanoCAD once, then close it (creates Config\Cfg.ini).'
-Write-Host '2. Rebuild Release, then run installer\INSTALL.bat again.'
+
+$started = Start-NanoCadOnce -Profiles $profiles
+if ($started) {
+    Write-Host 'nanoCAD started once with ribbon pre-installed. No second launch required.'
+}
+else {
+    Write-Host 'Install OK, but nanoCAD was not auto-started (nCad.exe not found). Start it manually once.'
+}
