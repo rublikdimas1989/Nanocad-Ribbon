@@ -1,0 +1,10 @@
+# Hexagon ECW OEM encode license (required for TIF→ECW CreateCopy).
+# Copy to: %LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\Tracing_cache\Settings\ecw_encode.conf
+# Or:      %LOCALAPPDATA%\ASDC\LoadFile\NANOCAD\gdal\ecw_encode.conf
+# Or set env ECW_ENCODE_COMPANY / ECW_ENCODE_KEY (End-style).
+#
+# Without this file NcTestTif uses free encode: Tracing_cache\Maps\<name>.tif
+# (same idea as End Forest.tif) and attaches with GeoTransform preserved.
+
+ECW_ENCODE_COMPANY=YourCompany
+ECW_ENCODE_KEY=paste_hex_oem_key_here
