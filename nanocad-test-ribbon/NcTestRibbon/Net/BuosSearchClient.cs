@@ -140,9 +140,15 @@ namespace NcTestRibbon.Net
 
     public sealed class ConstraintsDto
     {
+      /// <summary>DXF text encoding for layer-name matching (default UTF-8).</summary>
+      public string DxfEncoding { get; set; } = "UTF-8";
+
       public double RiverBufferM { get; set; }
+
       public string[] RiverLayers { get; set; }
+
       public string[] ForbiddenLayers { get; set; }
+
       public string PlacementLayer { get; set; }
     }
 
@@ -302,6 +308,7 @@ namespace NcTestRibbon.Net
         },
         Constraints = new ConstraintsDto
         {
+          DxfEncoding = "UTF-8",
           RiverBufferM = geo.BuosRiverBufferM >= 0 && double.IsFinite(geo.BuosRiverBufferM)
             ? geo.BuosRiverBufferM
             : 0,
