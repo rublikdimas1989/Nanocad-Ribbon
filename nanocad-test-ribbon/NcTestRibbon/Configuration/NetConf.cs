@@ -38,8 +38,11 @@ namespace NcTestRibbon.Configuration
     /// <summary>Comma-separated forbidden-zone layer names.</summary>
     public string ForbiddenLayers { get; set; } = "Запретные зоны";
 
-    /// <summary>Target placement layer name written by the solver / for future CAD draw.</summary>
+    /// <summary>Target placement layer name sent to the solver (DXF constraint name).</summary>
     public string BuosPlacementLayer { get; set; } = "Размещение БУОС";
+
+    /// <summary>CAD layer for drawn BUOS footprints (default NC_BUOS_SITES).</summary>
+    public string BuosCadLayer { get; set; } = "NC_BUOS_SITES";
 
     public double CenterStepM { get; set; } = 50;
 
@@ -108,6 +111,10 @@ namespace NcTestRibbon.Configuration
           {
             conf.BuosPlacementLayer = value;
           }
+          else if (key.Equals("BuosCadLayer", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(value))
+          {
+            conf.BuosCadLayer = value;
+          }
           else if (key.Equals("CenterStepM", StringComparison.OrdinalIgnoreCase)
               && double.TryParse(value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out double cs)
               && cs > 0 && double.IsFinite(cs))
@@ -175,6 +182,7 @@ namespace NcTestRibbon.Configuration
         "RiverLayers=" + (RiverLayers ?? string.Empty).Trim(),
         "ForbiddenLayers=" + (ForbiddenLayers ?? string.Empty).Trim(),
         "BuosPlacementLayer=" + (BuosPlacementLayer ?? string.Empty).Trim(),
+        "BuosCadLayer=" + (string.IsNullOrWhiteSpace(BuosCadLayer) ? "NC_BUOS_SITES" : BuosCadLayer.Trim()),
         "CenterStepM=" + CenterStepM.ToString("0.###", CultureInfo.InvariantCulture),
         "TerrainSampleStepM=" + TerrainSampleStepM.ToString("0.###", CultureInfo.InvariantCulture),
         "RotationAnglesDeg=" + (RotationAnglesDeg ?? string.Empty).Trim()

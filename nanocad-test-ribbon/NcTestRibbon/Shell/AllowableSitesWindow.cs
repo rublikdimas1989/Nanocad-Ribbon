@@ -234,7 +234,7 @@ namespace NcTestRibbon.Shell
           + "Углы БУОС — RotationAnglesDeg в net.conf (0…150°). "
           + "AOI → geometry.conf. "
           + "«Обновить карту» → POST api/v1/datasets (DXF) → DatasetId в net.conf. "
-          + "«Рассчитать слой БУОС» → POST BuosSearchPath (по умолчанию api/v1/buos/search) с datasetId, AOI, размером крупнейшего БУОС и riverBufferM."
+          + "«Рассчитать слой БУОС» → POST BuosSearchPath → footprints на слой BuosCadLayer (NC_BUOS_SITES), чекбокс только On/Off."
       });
 
       MapUploadClient.StatusChanged += OnUploadStatus;
@@ -258,13 +258,16 @@ namespace NcTestRibbon.Shell
         catch (Exception ex) { SetStatus("AOI: " + ex.Message); }
       }
 
+      try { CadBuosSitesOverlay.SetVisible(_showBuos.Checked); }
+      catch { }
+
       if (!string.IsNullOrEmpty(MapUploadClient.LastStatus))
       {
         SetStatus(MapUploadClient.LastStatus);
       }
       else
       {
-        SetStatus("Слои выключены. Выделите область; расчёт слоёв — позже. Можно обновить карту на сервере.");
+        SetStatus("Выделите AOI → обновите карту (DatasetId) → «Рассчитать слой БУОС».");
       }
     }
 
@@ -514,10 +517,24 @@ namespace NcTestRibbon.Shell
           + ")…");
 
         string body = await BuosSearchClient.SearchAsync(request, ct).ConfigureAwait(true);
-        string snippet = string.IsNullOrWhiteSpace(body)
-          ? "OK (пустое тело)"
-          : (body.Length > 180 ? body.Substring(0, 180) + "…" : body);
-        SetStatus("Расчёт БУОС завершён: " + snippet);
+        BuosSearchClient.BuosSearchResponse parsed = BuosSearchClient.ParseResponse(body);
+        int siteCount = parsed.Sites?.Count ?? 0;
+        int drawn = CadBuosSitesOverlay.Redraw(parsed.Sites, visible: _showBuos.Checked);
+
+        string diag = BuosSearchClient.FormatDiagnostics(parsed.Diagnostics);
+        string status = "БУОС: sites=" + siteCount + ", начерчено=" + drawn
+          + " → " + CadBuosSitesOverlay.ResolveLayerName(net);
+        if (!string.IsNullOrWhiteSpace(diag))
+        {
+          status += " | " + diag;
+        }
+
+        if (!_showBuos.Checked)
+        {
+          status += " (слой Off — включите «Показать слой БУОС»)";
+        }
+
+        SetStatus(status);
       }
       catch (OperationCanceledException)
       {
@@ -554,10 +571,16 @@ namespace NcTestRibbon.Shell
           c.ShowBuosLayer = _showBuos.Checked;
           c.ShowNodesLayer = _showNodes.Checked;
         });
-        if (_showBuos.Checked || _showNodes.Checked)
+        try { CadBuosSitesOverlay.SetVisible(_showBuos.Checked); }
+        catch (Exception ex)
         {
-          SetStatus("Показ слоёв запомнен; расчёт слоёв пока не реализован — на чертеже только AOI.");
+          SetStatus("Слой БУОС: " + ex.Message);
+          return;
         }
+
+        SetStatus(_showBuos.Checked
+          ? "Слой БУОС On (" + CadBuosSitesOverlay.ResolveLayerName() + ")."
+          : "Слой БУОС Off (геометрия сохранена).");
       }
       catch
       {

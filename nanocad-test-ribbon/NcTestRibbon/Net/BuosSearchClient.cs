@@ -1,6 +1,7 @@
 namespace NcTestRibbon.Net
 {
   using System;
+  using System.Collections.Generic;
   using System.IO;
   using System.Net.Http;
   using System.Text;
@@ -22,6 +23,11 @@ namespace NcTestRibbon.Net
       PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
       DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
       WriteIndented = false
+    };
+
+    private static readonly JsonSerializerOptions JsonRead = new JsonSerializerOptions
+    {
+      PropertyNameCaseInsensitive = true
     };
 
     private static HttpClient _client;
@@ -63,6 +69,68 @@ namespace NcTestRibbon.Net
       public SiteDto Site { get; set; }
       public SearchDto Search { get; set; }
       public ConstraintsDto Constraints { get; set; }
+    }
+
+    public sealed class BuosSiteDto
+    {
+      public string Id { get; set; }
+      public double X { get; set; }
+      public double Y { get; set; }
+      public double GroundElevationM { get; set; }
+      public double ElevationRangeM { get; set; }
+      public double RotationDeg { get; set; }
+
+      /// <summary>Polygon ring as [x,y] pairs (closed or open).</summary>
+      public List<double[]> Footprint { get; set; }
+    }
+
+    public sealed class BuosDiagnosticsDto
+    {
+      public int Centers { get; set; }
+      public int ValidRotations { get; set; }
+      public int RiverFeatures { get; set; }
+      public int ForbiddenFeatures { get; set; }
+      public int PlacementPoints { get; set; }
+      public int PlacementAreas { get; set; }
+      public string[] DxfLayers { get; set; }
+    }
+
+    public sealed class BuosSearchResponse
+    {
+      public List<BuosSiteDto> Sites { get; set; }
+      public BuosDiagnosticsDto Diagnostics { get; set; }
+    }
+
+    public static BuosSearchResponse ParseResponse(string json)
+    {
+      if (string.IsNullOrWhiteSpace(json))
+      {
+        return new BuosSearchResponse { Sites = new List<BuosSiteDto>() };
+      }
+
+      BuosSearchResponse parsed = JsonSerializer.Deserialize<BuosSearchResponse>(json, JsonRead);
+      if (parsed == null)
+      {
+        return new BuosSearchResponse { Sites = new List<BuosSiteDto>() };
+      }
+
+      parsed.Sites ??= new List<BuosSiteDto>();
+      return parsed;
+    }
+
+    public static string FormatDiagnostics(BuosDiagnosticsDto d)
+    {
+      if (d == null)
+      {
+        return string.Empty;
+      }
+
+      return "centers=" + d.Centers
+        + ", validRot=" + d.ValidRotations
+        + ", rivers=" + d.RiverFeatures
+        + ", forbidden=" + d.ForbiddenFeatures
+        + ", placePts=" + d.PlacementPoints
+        + ", placeAreas=" + d.PlacementAreas;
     }
 
     /// <summary>
