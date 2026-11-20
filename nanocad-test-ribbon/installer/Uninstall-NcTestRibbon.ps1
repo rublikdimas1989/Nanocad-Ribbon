@@ -160,5 +160,18 @@ foreach ($name in @(
     }
 }
 
+# Remove NuGet deps previously installed next to the plugin (EPPlus etc.).
+$depsDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'deps'
+if (Test-Path $depsDir) {
+    Get-ChildItem -Path $depsDir -Filter '*.dll' -File -ErrorAction SilentlyContinue |
+        ForEach-Object {
+            $p = Join-Path $syncFolder $_.Name
+            if (Test-Path $p) {
+                Remove-Item $p -Force
+                Write-Host "Removed: $p"
+            }
+        }
+}
+
 Write-Host ''
 Write-Host 'Uninstall complete.'
