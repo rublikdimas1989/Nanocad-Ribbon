@@ -11,7 +11,7 @@ namespace NcTestRibbon.Cad
   /// <summary>
   /// Cartography rasters on locked layers (KP-style): Forest / Height / Screen_ESRI.
   /// Uncheck → layer IsOff (lightbulb). While «Картография» is open layers stay unlocked
-  /// so RasterImage.Transparency writes stick (Properties shows 0–90, not ByLayer).
+  /// so RasterImage.Transparency writes stick (Properties shows alpha, not ByLayer).
   /// </summary>
   public static class CadMapRaster
   {
@@ -175,7 +175,7 @@ namespace NcTestRibbon.Cad
 
     public static void SetOpacity(Kind kind, int opacityPercent)
     {
-      // Always unlock → set entity Transparency (0–90) → leave unlocked if editing.
+      // Always unlock → set entity Transparency → leave unlocked if editing.
       CadRasterAttach.SetOpacityOnLayer(
         LayerName(kind),
         opacityPercent,

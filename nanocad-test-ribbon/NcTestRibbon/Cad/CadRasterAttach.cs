@@ -190,7 +190,8 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Opacity % (100=opaque) → entity Transparency (0..90). Never ByLayer / Fade.
+    /// Opacity % (100=opaque) → Teigha Transparency byte: (100-clamp)*255/100.
+    /// Never ByLayer / Fade.
     /// </summary>
     public static int ClampOpacity(int percent)
     {
@@ -201,11 +202,8 @@ namespace NcTestRibbon.Cad
 
     public static byte OpacityToTransparencyValue(int opacityPercent)
     {
-      int opacity = ClampOpacity(opacityPercent);
-      int transparent = 100 - opacity;
-      if (transparent < 0) transparent = 0;
-      if (transparent > 90) transparent = 90; // CAD alpha transparency max
-      return (byte)transparent;
+      int opacity = 100 - ClampOpacity(opacityPercent);
+      return (byte)(opacity * 255 / 100);
     }
 
     public static void ApplyEntityTransparency(Entity entity, int opacityPercent)
@@ -216,7 +214,7 @@ namespace NcTestRibbon.Cad
       }
 
       byte value = OpacityToTransparencyValue(opacityPercent);
-      // Explicit ByAlpha 0–90 — Properties must show the number, not ByLayer.
+      // Explicit ByAlpha — Properties must show the number, not ByLayer.
       entity.Transparency = new Transparency(value);
       try
       {
@@ -232,7 +230,7 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Unlock layer, set RasterImage.Transparency (0–90), optionally re-lock.
+    /// Unlock layer, set RasterImage.Transparency ((100-opacity%)*255/100), optionally re-lock.
     /// Locked layers often swallow Transparency writes without throwing (stays ByLayer).
     /// </summary>
     public static void SetOpacityOnLayer(string layerName, int opacityPercent, bool relockAfter = false)

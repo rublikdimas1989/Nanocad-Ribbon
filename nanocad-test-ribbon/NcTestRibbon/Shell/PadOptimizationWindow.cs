@@ -107,7 +107,9 @@ namespace NcTestRibbon.Shell
           Margin = new Padding(3),
           Padding = new Padding(6, 3, 6, 3)
         };
-        button.Click += (_, __) =>
+        // Local before wiring (avoid any out-param capture risk; CS1628).
+        Button buttonLocal = button;
+        buttonLocal.Click += (_, __) =>
         {
           try
           {
@@ -120,9 +122,9 @@ namespace NcTestRibbon.Shell
             Log(ex.Message);
           }
         };
-        parent.Controls.Add(button);
-        created = button;
-        return button;
+        parent.Controls.Add(buttonLocal);
+        created = buttonLocal;
+        return buttonLocal;
       }
 
       var fluidRow = Row();
