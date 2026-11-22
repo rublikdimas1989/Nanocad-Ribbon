@@ -26,6 +26,8 @@ cp -a "$ROOT/." "$TMP/plugin/"
 rm -rf \
   "$TMP/plugin/NcTestRibbon/bin" \
   "$TMP/plugin/NcTestRibbon/obj" \
+  "$TMP/plugin/NcBootstrap/bin" \
+  "$TMP/plugin/NcBootstrap/obj" \
   "$TMP/plugin/tools/NcGdalGeo/bin" \
   "$TMP/plugin/tools/NcGdalGeo/obj" \
   "$TMP/plugin/installer/gdal"

@@ -338,10 +338,39 @@ function Copy-RibbonDependencies {
 
 $requiredCommands = @(
     'NcTestHello', 'NcTestHttp', 'NcTestWpf', 'NcTestSettings',
-    'NcTestSourceData', 'NcTestInterface', 'NcTestBlink',
+    'NcTestSourceData', 'NcTestAddPad', 'NcTestAddBuos', 'NcTestAddNode',
+    'NcTestSaveSources', 'NcTestLoadSources',
+    'NcTestRouteLine', 'NcTestRoad', 'NcTestSendToServer',
+    'NcTestInterface', 'NcTestBlink',
     'NcTestEcw', 'NcTestCartography', 'NcTestAllowableSites',
     'NcTestTif', 'NcTestForest', 'NcTestHeight'
 )
+
+function Invoke-DotNetBuild {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectPath,
+        [Parameter(Mandatory = $true)][string]$LogPath,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    Write-Host ''
+    Write-Host ("=== Building {0} (Release) ===" -f $Label)
+    Write-Host ("Project: {0}" -f $ProjectPath)
+    Write-Host ("Log:     {0}" -f $LogPath)
+
+    $output = & dotnet build $ProjectPath -c Release --nologo 2>&1
+    $exit = $LASTEXITCODE
+    $output | Tee-Object -FilePath $LogPath | ForEach-Object { Write-Host $_ }
+
+    if ($exit -ne 0) {
+        Write-Host ''
+        Write-Host 'BUILD FAILED - nanoCAD will NOT be started.' -ForegroundColor Red
+        Write-Host ("Full log: {0}" -f $LogPath)
+        Write-Host '--- last 60 log lines ---'
+        Get-Content -LiteralPath $LogPath -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+        throw ("dotnet build failed for {0} (exit {1}). Fix compile errors and re-run INSTALL.bat." -f $Label, $exit)
+    }
+}
 
 function Invoke-PluginBuild {
     $proj = Join-Path $pkgRoot 'NcTestRibbon\NcTestRibbon.csproj'
@@ -354,24 +383,28 @@ function Invoke-PluginBuild {
         throw 'dotnet SDK not found on PATH. Install .NET 6+ SDK, then re-run INSTALL.bat. nanoCAD was NOT started.'
     }
 
-    $log = Join-Path $env:TEMP 'NcTestRibbon-build.log'
-    Write-Host ''
-    Write-Host '=== Building NC_TestRibbon (Release) ==='
-    Write-Host ("Project: {0}" -f $proj)
-    Write-Host ("Log:     {0}" -f $log)
-
-    $output = & dotnet build $proj -c Release --nologo 2>&1
-    $exit = $LASTEXITCODE
-    $output | Tee-Object -FilePath $log | ForEach-Object { Write-Host $_ }
-
-    if ($exit -ne 0) {
-        Write-Host ''
-        Write-Host 'BUILD FAILED - nanoCAD will NOT be started.' -ForegroundColor Red
-        Write-Host ("Full log: {0}" -f $log)
-        Write-Host '--- last 60 log lines ---'
-        Get-Content -LiteralPath $log -Tail 60 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
-        throw ("dotnet build failed (exit {0}). Fix compile errors and re-run INSTALL.bat." -f $exit)
+    $bootstrapProj = Join-Path $pkgRoot 'NcBootstrap\NcBootstrap.csproj'
+    if (Test-Path -LiteralPath $bootstrapProj) {
+        $bootLog = Join-Path $env:TEMP 'NcBootstrap-build.log'
+        Invoke-DotNetBuild -ProjectPath $bootstrapProj -LogPath $bootLog -Label 'NcBootstrap'
+        $bootDll = Join-Path $pkgRoot 'NcBootstrap\bin\Release\net6.0-windows\NcBootstrap.dll'
+        if (-not (Test-Path -LiteralPath $bootDll)) {
+            throw "Build reported success but DLL missing: $bootDll"
+        }
+        Copy-Item -LiteralPath $bootDll -Destination (Join-Path $src 'NcBootstrap.dll') -Force
+        $bootDeps = Join-Path $pkgRoot 'NcBootstrap\bin\Release\net6.0-windows\NcBootstrap.deps.json'
+        if (Test-Path -LiteralPath $bootDeps) {
+            Copy-Item -LiteralPath $bootDeps -Destination (Join-Path $src 'NcBootstrap.deps.json') -Force
+        }
+        Write-Host 'NcBootstrap DLL copied into installer\.'
+        Write-DllInfo -Label 'Built NcBootstrap' -Path $bootDll
     }
+    else {
+        Write-Host 'WARNING: NcBootstrap.csproj missing; using prebuilt installer\NcBootstrap.dll' -ForegroundColor Yellow
+    }
+
+    $log = Join-Path $env:TEMP 'NcTestRibbon-build.log'
+    Invoke-DotNetBuild -ProjectPath $proj -LogPath $log -Label 'NC_TestRibbon'
 
     $builtDll = Join-Path $pkgRoot 'NcTestRibbon\bin\Release\net6.0-windows\NC_TestRibbon.dll'
     if (-not (Test-Path -LiteralPath $builtDll)) {

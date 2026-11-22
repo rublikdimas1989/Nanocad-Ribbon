@@ -70,8 +70,10 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestTif` / `NcTestForest` / `NcTestHeight` | Команды (кнопки ленты перенесены в Картографию) |
 | `NcTestDemo` | маленький WinForms smoke |
 
-Сборка: `NC_TestRibbon.dll`  
-Манифест ленты: `NC_TestRibbon.json` (панель «Тест»; «Рамки» в пакет не входит)
+Сборка: `NC_TestRibbon.dll` + `NcBootstrap.dll`  
+Манифест ленты: `NC_TestRibbon.json` (`panels[]`: Исходные / Коридоры / Расчёт + flyout; «Рамки» в пакет не входит)
+
+**Лента после перезапуска:** `NcBootstrap` на каждом старте пересобирает `NC_Tools.cuix` из JSON. С v1.2.81 он читает `panels[]` и flyout (`type: flyout`), а не только legacy `panel`/`buttons` — иначе оставалась одна кнопка «Загрузить».
 
 ### `Tracing_cache\Settings\net.conf` (допустимые площадки)
 

@@ -50,15 +50,20 @@ function Get-NcRibbonFlyoutXml {
         [string]$Uid,
         [string]$Text,
         [string]$Style,
-        [object[]]$Items
+        [object[]]$Items,
+        [string]$Command = ''
     )
 
     $buttonStyle = if ($Style -eq 'small') { 'SmallWithText' } else { 'LargeWithText' }
     $t = Get-NcXmlEscape $Text
+    $macroAttr = ''
+    if (-not [string]::IsNullOrWhiteSpace($Command)) {
+        $macroAttr = " MenuMacroID=`"$(Get-NcXmlEscape $Command)`""
+    }
     $lines = New-Object System.Collections.Generic.List[string]
     [void]$lines.Add(
         ("          <RibbonSplitButton UID=`"$Uid`" Id=`"AcRibbonSplitButton`" Text=`"$t`" " +
-         "Behavior=`"DropDown`" ListStyle=`"IconText`" ButtonStyle=`"$buttonStyle`" Grouping=`"false`" KeyTip=`"`">")
+         "Behavior=`"DropDown`" ListStyle=`"IconText`" ButtonStyle=`"$buttonStyle`" Grouping=`"false`" KeyTip=`"`"$macroAttr>")
     )
     [void]$lines.Add("            <TooltipTitle xlate=`"true`" UID=`"XLS_$Uid`">$t</TooltipTitle>")
 
@@ -152,6 +157,7 @@ function Write-NcToolsUi {
     [void]$cfg.AppendLine('[\configman\commands]')
     [void]$cfg.AppendLine()
     # ASCII-only labels in .ps1 (Windows PowerShell 5 / code-page safe).
+    # Russian chrome (Инструменты ЦРПР / Управление / Загрузить) is written by NcBootstrap.UiGenerator on start.
     [void]$cfg.AppendLine('[\menu\NcTools]                          |name=sNC Tools')
     [void]$cfg.AppendLine('[\menu\NcTools\NcLoad]                   |name=sLoad instruments |intername=sNCLOAD')
     [void]$cfg.AppendLine('[\menu\NcTools\NcUnload]                 |name=sUnload instruments |intername=sNCUNLOAD')
@@ -255,7 +261,8 @@ function Write-NcToolsUi {
             if ($btnType -eq 'flyout' -or $btnType -eq 'split' -or $btnType -eq 'dropdown') {
                 $uid = 'RBNU_FLY_' + $panelIndex + '_' + $btnIndex + '_' + (Get-NcSanitizeId $text)
                 $items = @($btn.items)
-                [void]$panels.Append((Get-NcRibbonFlyoutXml -Uid $uid -Text $text -Style $style -Items $items))
+                $flyCmd = [string]$btn.command
+                [void]$panels.Append((Get-NcRibbonFlyoutXml -Uid $uid -Text $text -Style $style -Items $items -Command $flyCmd))
                 [void]$panels.Append("`n")
                 continue
             }
@@ -286,6 +293,7 @@ function Write-NcToolsUi {
         '</RibbonRoot>'
         ''
     ) -join "`n"
+    # Tab title above is ASCII; NcBootstrap.UiGenerator rewrites Russian chrome on start.
 
     $menuPackage = @(
         '<?xml version="1.0" encoding="utf-8"?>'
