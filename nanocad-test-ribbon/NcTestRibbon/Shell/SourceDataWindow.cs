@@ -160,8 +160,45 @@ namespace NcTestRibbon.Shell
         return;
       }
 
+      if (tab == SourceDataTab.Nodes)
+      {
+        _nodes.BeginPlaceSelected();
+        return;
+      }
+
       throw new InvalidOperationException(
-        "Размещение с ленты поддерживается для вкладок Кустовые и БУОС.");
+        "Размещение с ленты поддерживается для вкладок Кустовые, БУОС и Узлы.");
+    }
+
+    /// <summary>
+    /// Ribbon «Добавить …»: pick Excel → select row → load tab → place (zoom to existing X/Y).
+    /// </summary>
+    public void BeginPlaceFromExcelPick(SourceDataTab tab)
+    {
+      SelectTab(tab);
+      try { System.Windows.Forms.Application.DoEvents(); }
+      catch { }
+
+      if (tab == SourceDataTab.Pads)
+      {
+        _pads.BeginPlaceFromExcelPick(this);
+        return;
+      }
+
+      if (tab == SourceDataTab.Buos)
+      {
+        _buos.BeginPlaceFromExcelPick(this);
+        return;
+      }
+
+      if (tab == SourceDataTab.Nodes)
+      {
+        _nodes.BeginPlaceFromExcelPick(this);
+        return;
+      }
+
+      throw new InvalidOperationException(
+        "Выбор из файла поддерживается для Кустовые / БУОС / Узлы.");
     }
 
     /// <summary>Save dirty coords for all tabs (+ flush CAD pending pads). Optional confirm.</summary>

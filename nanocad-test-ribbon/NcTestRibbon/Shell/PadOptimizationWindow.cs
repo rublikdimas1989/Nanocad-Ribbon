@@ -315,6 +315,68 @@ namespace NcTestRibbon.Shell
       PlaceSelectedPad();
     }
 
+    /// <summary>
+    /// Ribbon «Добавить Кустовую»: выбрать Excel → список КП → разместить (zoom к X/Y если есть).
+    /// </summary>
+    public void BeginPlaceFromExcelPick(System.Windows.Forms.IWin32Window owner)
+    {
+      string initial = _book?.Path;
+      if (string.IsNullOrWhiteSpace(initial) || !File.Exists(initial))
+      {
+        initial = AppPaths.Load().PadsWorkbook;
+      }
+
+      PickFromExcelItem picked = PickFromExcelDialog.ShowPick(
+        owner,
+        "Добавить Кустовую",
+        initial,
+        "выбрать из файла",
+        path =>
+        {
+          PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+          return book.Pads.Select(p =>
+          {
+            bool has = Math.Abs(p.X) > 1e-9 || Math.Abs(p.Y) > 1e-9;
+            return new PickFromExcelItem
+            {
+              Name = p.Name,
+              HasCoords = has,
+              Detail = has
+                ? "X=" + p.X.ToString("0.###", CultureInfo.CurrentCulture)
+                  + "; Y=" + p.Y.ToString("0.###", CultureInfo.CurrentCulture)
+                  + "; угол=" + p.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
+                : "координаты не заданы",
+              Tag = p.Name
+            };
+          }).ToList();
+        },
+        out string path);
+
+      if (picked == null || string.IsNullOrWhiteSpace(path))
+      {
+        return;
+      }
+
+      LoadPadsWorkbook(path, remember: true);
+      string name = picked.Tag as string ?? picked.Name;
+      if (!TrySelectPadByName(name))
+      {
+        throw new InvalidOperationException("КП «" + name + "» не найдена после загрузки.");
+      }
+
+      // Ensure overlay so ZoomToPad can find entities when X/Y already exist.
+      if (!_showOnDrawing.Checked)
+      {
+        _showOnDrawing.Checked = true;
+      }
+      else
+      {
+        RefreshDrawingOverlay(force: true);
+      }
+
+      PlaceSelectedPad();
+    }
+
     /// <summary>Select KP row by name (CAD double-click).</summary>
     public bool TrySelectPadByName(string name)
     {

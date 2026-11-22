@@ -9,7 +9,8 @@ $required = @(
     'NcTestEcw', 'NcTestCartography', 'NcTestAllowableSites',
     'NcTestTif', 'NcTestForest', 'NcTestHeight',
     'NcTestSaveSources', 'NcTestLoadSources',
-    'NcTestPadSyncExcel', 'NcTestAddPad', 'NcTestAddBuos'
+    'NcTestPadSyncExcel', 'NcTestAddPad', 'NcTestAddBuos', 'NcTestAddNode',
+    'NcTestRouteLine', 'NcTestRoad', 'NcTestSendToServer'
 )
 $loadDll = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.dll'
 $loadJson = Join-Path $env:LOCALAPPDATA 'ASDC\LoadFile\NANOCAD\NC_TestRibbon.json'

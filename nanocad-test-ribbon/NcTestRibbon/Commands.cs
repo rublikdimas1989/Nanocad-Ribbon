@@ -13,6 +13,7 @@ namespace NcTestRibbon
   using HostMgd.EditorInput;
   using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
+  using NcTestRibbon.Net;
   using NcTestRibbon.Rates;
   using NcTestRibbon.Shell;
   using Teigha.DatabaseServices;
@@ -431,12 +432,12 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую.
+    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую (Excel pick → list → place/zoom).
     /// </summary>
     [CommandMethod("NcTestAddPad")]
     public void NcTestAddPad()
     {
-      OpenSourceDataAndPlace(SourceDataTab.Pads, "NcTestAddPad");
+      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Pads, "NcTestAddPad");
     }
 
     /// <summary>
@@ -445,23 +446,109 @@ namespace NcTestRibbon
     [CommandMethod("NcTestAddBuos")]
     public void NcTestAddBuos()
     {
-      OpenSourceDataAndPlace(SourceDataTab.Buos, "NcTestAddBuos");
+      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Buos, "NcTestAddBuos");
     }
 
-    private void OpenSourceDataAndPlace(SourceDataTab tab, string label)
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Добавить Узел.
+    /// </summary>
+    [CommandMethod("NcTestAddNode")]
+    public void NcTestAddNode()
+    {
+      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Nodes, "NcTestAddNode");
+    }
+
+    /// <summary>Ribbon «Коридоры» → Линия трассы (слой NC_ROUTE_LINE).</summary>
+    [CommandMethod("NcTestRouteLine")]
+    public void NcTestRouteLine()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        int n = CadCorridorOverlay.DrawPolyline(CadCorridorOverlay.Kind.RouteLine);
+        ed?.WriteMessage("\nNcTestRouteLine: vertices=" + n + ".");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestRouteLine", ex);
+      }
+    }
+
+    /// <summary>Ribbon «Коридоры» → Дорога (слой NC_ROAD).</summary>
+    [CommandMethod("NcTestRoad")]
+    public void NcTestRoad()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        int n = CadCorridorOverlay.DrawPolyline(CadCorridorOverlay.Kind.Road);
+        ed?.WriteMessage("\nNcTestRoad: vertices=" + n + ".");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestRoad", ex);
+      }
+    }
+
+    /// <summary>
+    /// Ribbon «Расчёт» → Отправить на сервер (DXF upload → DatasetId in net.conf).
+    /// </summary>
+    [CommandMethod("NcTestSendToServer")]
+    public async void NcTestSendToServer()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        ed?.WriteMessage("\nNcTestSendToServer: сохранение DXF…");
+        string dxf = CadDxfExport.SaveMapSidecar();
+        ed?.WriteMessage("\nNcTestSendToServer: передача на " + NetConf.Load().Host + "…");
+        string datasetId = await MapUploadClient.UploadMapAsync(dxf).ConfigureAwait(true);
+        NetConf.Set(c => c.DatasetId = datasetId);
+        MapUploadClient.PublishStatus(MapUploadClient.StatusOk);
+        string msg = MapUploadClient.StatusOk + " (DatasetId=" + datasetId + ")";
+        ed?.WriteMessage("\nNcTestSendToServer: " + msg);
+        try { CadApp.ShowAlertDialog(msg); }
+        catch { }
+      }
+      catch (System.Exception ex)
+      {
+        try { MapUploadClient.PublishStatus(MapUploadClient.StatusFail); }
+        catch { }
+
+        WriteException(ed, "NcTestSendToServer", ex);
+        try
+        {
+          CadApp.ShowAlertDialog(MapUploadClient.StatusFail + ":\n" + ex.Message);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private void OpenSourceDataAndPlaceFromExcel(SourceDataTab tab, string label)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
       try
       {
         OpenSourceDataForm(tab, label);
-        if (_sourceDataLive == null || _sourceDataLive.IsDisposed)
+        SourceDataWindow live;
+        lock (SourceDataGate)
+        {
+          live = _sourceDataLive;
+        }
+
+        if (live == null || live.IsDisposed)
         {
           return;
         }
 
-        _sourceDataLive.BeginPlaceForTab(tab);
-        ed?.WriteMessage("\n" + label + ": place jig started (" + tab + ").");
+        live.BeginPlaceFromExcelPick(tab);
+        ed?.WriteMessage("\n" + label + ": Excel pick → place (" + tab + ").");
       }
       catch (System.Exception ex)
       {

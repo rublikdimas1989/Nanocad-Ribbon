@@ -1,6 +1,82 @@
 {
-  "panel": "Тест",
   "commands": [
+    {
+      "intername": "NcTestSourceData",
+      "displayName": "Исходные данные",
+      "tooltip": "Кустовые / Врезки / размещение БУОС / Узлы — одно окно с вкладками.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.source_data.ico"
+    },
+    {
+      "intername": "NcTestAddPad",
+      "displayName": "Добавить Кустовую",
+      "tooltip": "Исходные данные → Кустовые: CAD place jig для выбранной/первой КП.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.add_pad.ico"
+    },
+    {
+      "intername": "NcTestAddBuos",
+      "displayName": "Добавить БУОС",
+      "tooltip": "Исходные данные → БУОС: CAD place jig для выбранной/первой площадки.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.add_buos.ico"
+    },
+    {
+      "intername": "NcTestAddNode",
+      "displayName": "Добавить Узел",
+      "tooltip": "Исходные данные → Узлы: CAD place jig для выбранного/первого узла.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.add_node.ico"
+    },
+    {
+      "intername": "NcTestSaveSources",
+      "displayName": "Сохранить в исходные",
+      "tooltip": "Записать изменённые X/Y/угол в исходные Excel (с подтверждением).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.save_sources.ico"
+    },
+    {
+      "intername": "NcTestLoadSources",
+      "displayName": "Загрузить из исходных",
+      "tooltip": "Перечитать положения из исходных Excel (с подтверждением).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.load_sources.ico"
+    },
+    {
+      "intername": "NcTestPadSyncExcel",
+      "displayName": "Сохранить в исходные",
+      "tooltip": "Alias → NcTestSaveSources.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.save_sources.ico"
+    },
+    {
+      "intername": "NcTestAreaObjects",
+      "displayName": "Площадные объекты",
+      "tooltip": "Flyout: добавить КП/БУОС/Узел, сохранить/загрузить исходные.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.area_objects.ico"
+    },
+    {
+      "intername": "NcTestRouteLine",
+      "displayName": "Линия трассы",
+      "tooltip": "Нарисовать полилинию трассы на слое NC_ROUTE_LINE.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.route_line.ico"
+    },
+    {
+      "intername": "NcTestRoad",
+      "displayName": "Дорога",
+      "tooltip": "Нарисовать полилинию дороги на слое NC_ROAD.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.road.ico"
+    },
+    {
+      "intername": "NcTestSendToServer",
+      "displayName": "Отправить на сервер",
+      "tooltip": "Экспорт DXF и загрузка на solver (api/v1/datasets) → DatasetId в net.conf.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.send_server.ico"
+    },
     {
       "intername": "NcTestHello",
       "displayName": "Hello",
@@ -18,184 +94,136 @@
     {
       "intername": "NcTestWpf",
       "displayName": "Трассировка",
-      "tooltip": "UI-оболочка MainWindow (WPF) из End-варианта. Логика расчёта — на сервере позже.",
+      "tooltip": "UI-оболочка MainWindow (WPF) из End-варианта.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings (Price.xlsx|xlsm, conf).",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.http.ico"
-    },
-    {
-      "intername": "NcTestSourceData",
-      "displayName": "Исходные данные",
-      "tooltip": "Кустовые / Врезки / размещение БУОС / Узлы — одно окно с вкладками.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestAddPad",
-      "displayName": "Добавить Кустовую",
-      "tooltip": "Открыть «Исходные данные» → Кустовые и запустить «Задать положение вручную» для выбранной/первой КП.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestAddBuos",
-      "displayName": "Добавить БУОС",
-      "tooltip": "Открыть «Исходные данные» → БУОС (размещение) и запустить «Задать положение вручную» для выбранной/первой площадки.",
+      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
     {
       "intername": "NcTestInterface",
       "displayName": "Оформление",
-      "tooltip": "Размер шрифта подписей и диаметр круга врезки → Tracing_cache\\Settings\\interface.conf",
+      "tooltip": "Размер шрифта подписей и диаметр круга врезки → interface.conf",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
     },
     {
       "intername": "NcTestBlink",
       "displayName": "Мигание",
-      "tooltip": "Выберите полилинию → нажмите: мигает (Highlight 200 мс, как в End). Нажмите ещё раз — отжать / выключить.",
+      "tooltip": "Выберите полилинию → мигание Highlight.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
-      "intername": "NcTestEcw",
-      "displayName": "ECW/растр",
-      "tooltip": "Команда: ECW/растр с геопривязкой (кнопка ленты убрана; растры — через Картография).",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.http.ico"
-    },
-    {
       "intername": "NcTestCartography",
       "displayName": "Картография",
-      "tooltip": "Forest / Height / космоснимок: показ + прозрачность; Открыть… (TIF→ECW / colorize). Слои NC_MAP_* locked; uncheck → layer Off.",
+      "tooltip": "Forest / Height / космоснимок: показ + прозрачность.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestAllowableSites",
       "displayName": "Рассчитать допустимые площадки",
-      "tooltip": "Площадки — допустимость и земляные работы: AOI, отступы, DXF, загрузка карты на сервер.",
+      "tooltip": "AOI, отступы, DXF upload, слой БУОС.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
+      "intername": "NcTestEcw",
+      "displayName": "ECW/растр",
+      "tooltip": "ECW/растр с геопривязкой (через Картография).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
+    },
+    {
       "intername": "NcTestTif",
       "displayName": "TIF→ECW",
-      "tooltip": "Команда: GeoTIFF → Maps\\*_geo (лента — в Картография).",
+      "tooltip": "GeoTIFF → Maps\\*_geo.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestForest",
       "displayName": "Forest",
-      "tooltip": "Команда: Forest colorize (лента — в Картография).",
+      "tooltip": "Forest colorize.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
     },
     {
       "intername": "NcTestHeight",
       "displayName": "Height",
-      "tooltip": "Команда: Height colorize (лента — в Картография).",
+      "tooltip": "Height colorize.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
-    },
-    {
-      "intername": "NcTestSaveSources",
-      "displayName": "Сохранить в исходные",
-      "tooltip": "Записать изменённые X/Y/угол в исходные Excel (с подтверждением). Краснеет при ожидании после MOVE/ROTATE/grip.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.excel_sync_red.ico"
-    },
-    {
-      "intername": "NcTestLoadSources",
-      "displayName": "Загрузить из исходных",
-      "tooltip": "Перечитать положения из исходных Excel и сбросить изменения на чертеже (с подтверждением).",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.wpf.ico"
-    },
-    {
-      "intername": "NcTestPadSyncExcel",
-      "displayName": "Сохранить в исходные",
-      "tooltip": "Alias → NcTestSaveSources.",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.excel_sync_red.ico"
     }
   ],
-  "buttons": [
+  "panels": [
     {
-      "text": "Hello",
-      "command": "NcTestHello",
-      "style": "large"
-    },
-    {
-      "text": "HTTP GET",
-      "command": "NcTestHttp",
-      "style": "large"
-    },
-    {
-      "text": "Трассировка",
-      "command": "NcTestWpf",
-      "style": "large"
-    },
-    {
-      "text": "Настройки",
-      "command": "NcTestSettings",
-      "style": "large"
-    },
-    {
-      "text": "Исходные данные",
-      "command": "NcTestSourceData",
-      "style": "large"
-    },
-    {
-      "type": "flyout",
-      "text": "Площадные объекты",
-      "style": "large",
-      "items": [
+      "name": "Исходные",
+      "buttons": [
         {
-          "text": "Добавить Кустовую",
-          "command": "NcTestAddPad"
+          "text": "Исходные данные",
+          "command": "NcTestSourceData",
+          "style": "large"
         },
         {
-          "text": "Добавить БУОС",
-          "command": "NcTestAddBuos"
-        },
-        {
-          "text": "Сохранить в исходные",
-          "command": "NcTestSaveSources"
-        },
-        {
-          "text": "Загрузить из исходных",
-          "command": "NcTestLoadSources"
+          "type": "flyout",
+          "text": "Площадные объекты",
+          "style": "large",
+          "items": [
+            {
+              "text": "Добавить Кустовую",
+              "command": "NcTestAddPad"
+            },
+            {
+              "text": "Добавить БУОС",
+              "command": "NcTestAddBuos"
+            },
+            {
+              "text": "Добавить Узел",
+              "command": "NcTestAddNode"
+            },
+            {
+              "text": "Сохранить в исходные",
+              "command": "NcTestSaveSources"
+            },
+            {
+              "text": "Загрузить из исходных",
+              "command": "NcTestLoadSources"
+            }
+          ]
         }
       ]
     },
     {
-      "text": "Оформление",
-      "command": "NcTestInterface",
-      "style": "large"
+      "name": "Коридоры",
+      "buttons": [
+        {
+          "text": "Линия трассы",
+          "command": "NcTestRouteLine",
+          "style": "large"
+        },
+        {
+          "text": "Дорога",
+          "command": "NcTestRoad",
+          "style": "large"
+        }
+      ]
     },
     {
-      "text": "Мигание",
-      "command": "NcTestBlink",
-      "style": "large"
-    },
-    {
-      "text": "Картография",
-      "command": "NcTestCartography",
-      "style": "large"
-    },
-    {
-      "text": "Рассчитать допустимые площадки",
-      "command": "NcTestAllowableSites",
-      "style": "large"
+      "name": "Расчёт",
+      "buttons": [
+        {
+          "text": "Отправить на сервер",
+          "command": "NcTestSendToServer",
+          "style": "large"
+        }
+      ]
     }
   ]
 }

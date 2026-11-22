@@ -120,8 +120,19 @@ function Write-NcToolsUi {
     }
 
     $manifest = Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if (-not $manifest -or [string]::IsNullOrWhiteSpace([string]$manifest.panel)) {
-        throw "Invalid ribbon manifest (missing panel): $ManifestJsonPath"
+    # Prefer panels[] (multi-group ribbon). Legacy: single panel + buttons.
+    $panelList = @()
+    if ($null -ne $manifest.panels) {
+        $panelList = @($manifest.panels)
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$manifest.panel)) {
+        $panelList = @(@{
+                name    = [string]$manifest.panel
+                buttons = @($manifest.buttons)
+            })
+    }
+    if ($panelList.Count -eq 0) {
+        throw "Invalid ribbon manifest (missing panels[] or panel): $ManifestJsonPath"
     }
 
     New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
@@ -219,36 +230,47 @@ function Write-NcToolsUi {
     [void]$refs.Append("      <RibbonPanelSourceReference UID=`"RBNU_NCTOOLS_CTRL_Ref`" PanelId=`"RBNU_NCTOOLS_CTRL`" ResizeStyle=`"Default`" />`n")
 
     # Panel/button captions come from NC_TestRibbon.json (UTF-8 file), not from this .ps1 source.
-    $panelText = [string]$manifest.panel
-    $panelUid = 'RBNU_NCTOOLS_P1_' + (Get-NcSanitizeId $panelText)
-    [void]$panels.Append("    <RibbonPanelSource UID=`"$panelUid`" Text=`"$(Get-NcXmlEscape $panelText)`" HiddenInEditor=`"false`">`n")
-    [void]$panels.Append("      <RibbonRowPanel UID=`"RBNURP_$panelUid`" ResizeStyle=`"None`" ResizePriority=`"100`" TopJustify=`"True`">`n")
-    [void]$panels.Append("        <RibbonRow UID=`"RBNURR_$panelUid`">`n")
-
-    $btnIndex = 0
-    foreach ($btn in @($manifest.buttons)) {
-        $btnIndex++
-        $style = if ([string]$btn.style -eq 'small') { 'small' } else { 'large' }
-        $text = [string]$btn.text
-        $btnType = [string]$btn.type
-        if ($btnType -eq 'flyout' -or $btnType -eq 'split' -or $btnType -eq 'dropdown') {
-            $uid = 'RBNU_FLY_1_' + $btnIndex + '_' + (Get-NcSanitizeId $text)
-            $items = @($btn.items)
-            [void]$panels.Append((Get-NcRibbonFlyoutXml -Uid $uid -Text $text -Style $style -Items $items))
-            [void]$panels.Append("`n")
-            continue
+    $panelIndex = 0
+    foreach ($panelDef in $panelList) {
+        $panelIndex++
+        $panelText = [string]$panelDef.name
+        if ([string]::IsNullOrWhiteSpace($panelText)) {
+            $panelText = [string]$panelDef.panel
+        }
+        if ([string]::IsNullOrWhiteSpace($panelText)) {
+            throw ("Ribbon panel[$panelIndex] missing name")
         }
 
-        $cmdName = [string]$btn.command
-        $uid = 'RBNU_BTN_1_' + (Get-NcSanitizeId $cmdName)
-        [void]$panels.Append((Get-NcRibbonButtonXml -Uid $uid -Text $text -Command $cmdName -Style $style -Tooltip $text))
-        [void]$panels.Append("`n")
-    }
+        $panelUid = 'RBNU_NCTOOLS_P' + $panelIndex + '_' + (Get-NcSanitizeId $panelText)
+        [void]$panels.Append("    <RibbonPanelSource UID=`"$panelUid`" Text=`"$(Get-NcXmlEscape $panelText)`" HiddenInEditor=`"false`">`n")
+        [void]$panels.Append("      <RibbonRowPanel UID=`"RBNURP_$panelUid`" ResizeStyle=`"None`" ResizePriority=`"100`" TopJustify=`"True`">`n")
+        [void]$panels.Append("        <RibbonRow UID=`"RBNURR_$panelUid`">`n")
 
-    [void]$panels.Append("        </RibbonRow>`n")
-    [void]$panels.Append("      </RibbonRowPanel>`n")
-    [void]$panels.Append("    </RibbonPanelSource>`n")
-    [void]$refs.Append("      <RibbonPanelSourceReference UID=`"${panelUid}_Ref`" PanelId=`"$panelUid`" ResizeStyle=`"Default`" />`n")
+        $btnIndex = 0
+        foreach ($btn in @($panelDef.buttons)) {
+            $btnIndex++
+            $style = if ([string]$btn.style -eq 'small') { 'small' } else { 'large' }
+            $text = [string]$btn.text
+            $btnType = [string]$btn.type
+            if ($btnType -eq 'flyout' -or $btnType -eq 'split' -or $btnType -eq 'dropdown') {
+                $uid = 'RBNU_FLY_' + $panelIndex + '_' + $btnIndex + '_' + (Get-NcSanitizeId $text)
+                $items = @($btn.items)
+                [void]$panels.Append((Get-NcRibbonFlyoutXml -Uid $uid -Text $text -Style $style -Items $items))
+                [void]$panels.Append("`n")
+                continue
+            }
+
+            $cmdName = [string]$btn.command
+            $uid = 'RBNU_BTN_' + $panelIndex + '_' + (Get-NcSanitizeId $cmdName)
+            [void]$panels.Append((Get-NcRibbonButtonXml -Uid $uid -Text $text -Command $cmdName -Style $style -Tooltip $text))
+            [void]$panels.Append("`n")
+        }
+
+        [void]$panels.Append("        </RibbonRow>`n")
+        [void]$panels.Append("      </RibbonRowPanel>`n")
+        [void]$panels.Append("    </RibbonPanelSource>`n")
+        [void]$refs.Append("      <RibbonPanelSourceReference UID=`"${panelUid}_Ref`" PanelId=`"$panelUid`" ResizeStyle=`"Default`" />`n")
+    }
 
     $ribbonRoot = @(
         '<?xml version="1.0" encoding="utf-8"?>'
