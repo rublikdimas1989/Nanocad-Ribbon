@@ -10,17 +10,18 @@ namespace NcTestRibbon.Shell
   using System.Windows.Controls;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
+  // AppPaths remembers Price / workbook locations in Tracing_cache\Settings\paths.json.
 
   /// <summary>
   /// Tab «Настройки трассировки»: local End-variant logic —
-  /// Price.xlsx rates + PipeMedium transitions saved to tracing.conf.
+  /// Price.xlsx / Price.xlsm rates + PipeMedium transitions saved to tracing.conf.
   /// </summary>
   public class TracingSettingsPanel : UserControl
   {
     private readonly FrameworkElement _root;
     private readonly DataGrid _dgRates;
     private readonly TextBlock _statusText;
-    private readonly TextBlock _ratesPath;
+    private readonly TextBox _ratesPath;
     private readonly TextBlock _catalogStatus;
     private readonly TextBlock _emptyHint;
     private readonly ObservableCollection<RateItem> _rates = new ObservableCollection<RateItem>();
@@ -37,7 +38,7 @@ namespace NcTestRibbon.Shell
       Content = _root;
 
       _statusText = Find<TextBlock>("StatusText");
-      _ratesPath = Find<TextBlock>("TxtRatesFilePath");
+      _ratesPath = Find<TextBox>("TxtRatesFilePath");
       _catalogStatus = Find<TextBlock>("TxtPipeCatalogStatus");
       _emptyHint = Find<TextBlock>("TblEmptyHint");
       _dgRates = Find<DataGrid>("DgRates");
@@ -48,7 +49,8 @@ namespace NcTestRibbon.Shell
 
       if (_ratesPath != null)
       {
-        _ratesPath.Text = TracingCache.PriceXlsx;
+        PathTextDisplay.SetPath(_ratesPath, TracingCache.ResolveRatesFilePath());
+        _ratesPath.Loaded += (_, __) => PathTextDisplay.ShowEnd(_ratesPath);
       }
 
       Wire(Find<ComboBox>("DownsampleFactor"), (_, __) => { });
@@ -71,13 +73,14 @@ namespace NcTestRibbon.Shell
         AppSettings.Initialize();
         LoadGeneralFromConfig();
         InitializeMediumEditors();
-        if (File.Exists(TracingCache.PriceXlsx) && new FileInfo(TracingCache.PriceXlsx).Length > 0)
+        if (TracingCache.RatesFileExists())
         {
           ApplyRates(showErrors: false);
         }
         else if (_statusText != null)
         {
-          _statusText.Text = "Положите Price.xlsx в Tracing_cache\\Settings\\ и нажмите «Применить расценки».";
+          _statusText.Text =
+            "Положите Price.xlsx или Price.xlsm в Tracing_cache\\Settings\\ и нажмите «Применить расценки».";
         }
       }
       catch (Exception ex)
@@ -101,7 +104,7 @@ namespace NcTestRibbon.Shell
       }
 
       using SettingsSection section = AppSettings.OpenSection(AppSettings.General);
-      section.SetValue("RatesFilePath", TracingCache.PriceXlsx);
+      section.SetValue("RatesFilePath", TracingCache.ResolveRatesFilePath());
       section.SetValue("BlockX", TextOf("BlockX"));
       section.SetValue("BlockY", TextOf("BlockY"));
       section.SetValue("BlockW", TextOf("BlockW"));
@@ -278,14 +281,14 @@ namespace NcTestRibbon.Shell
       try
       {
         UpdatePipeCatalogSelection();
-        if (File.Exists(TracingCache.PriceXlsx) && new FileInfo(TracingCache.PriceXlsx).Length > 0)
+        if (TracingCache.RatesFileExists())
         {
           ApplyRates(showErrors: false);
         }
       }
       catch (Exception ex)
       {
-        MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
+        System.Windows.MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
           ex.Message, "Номенклатура труб", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
     }
@@ -300,9 +303,20 @@ namespace NcTestRibbon.Shell
           ? _mediumOptions[pipeMedium]
           : PipeMediumSettings.TextDefaults;
 
+        string ratesPath = TracingCache.ResolveRatesFilePath();
+        if (_ratesPath != null)
+        {
+          PathTextDisplay.SetPath(_ratesPath, ratesPath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ratesPath) && System.IO.File.Exists(ratesPath))
+        {
+          AppPaths.Set(p => p.PriceWorkbook = ratesPath);
+        }
+
         var request = new TracingRatesLoader.Request
         {
-          RatesFilePath = TracingCache.PriceXlsx,
+          RatesFilePath = ratesPath,
           EnvironmentLabel = ComboText("CmbEnvironment"),
           DiameterText = ComboText("CmbDiameter"),
           ThicknessText = ComboText("CmbThickness"),
@@ -348,7 +362,9 @@ namespace NcTestRibbon.Shell
 
         if (_statusText != null)
         {
-          _statusText.Text = "Расценки загружены локально из Price.xlsx (" + _rates.Count + ").";
+          _statusText.Text =
+            "Расценки загружены локально из " + Path.GetFileName(ratesPath)
+            + " (" + _rates.Count + ").";
         }
       }
       catch (Exception ex)
@@ -360,7 +376,7 @@ namespace NcTestRibbon.Shell
 
         if (showErrors)
         {
-          MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
+          System.Windows.MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
             ex.Message, "Расценки", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
       }
