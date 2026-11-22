@@ -432,30 +432,58 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую (Excel pick → list → place/zoom).
+    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую
+    /// (Excel pick → place ONLY selected KP; no SourceData / no full redraw).
     /// </summary>
     [CommandMethod("NcTestAddPad")]
     public void NcTestAddPad()
     {
-      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Pads, "NcTestAddPad");
+      PlaceSingleFromExcel("NcTestAddPad", () => CadPlaceFromExcel.PlacePad());
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить БУОС.
+    /// Ribbon flyout «Площадные объекты» → Добавить БУОС (single object only).
     /// </summary>
     [CommandMethod("NcTestAddBuos")]
     public void NcTestAddBuos()
     {
-      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Buos, "NcTestAddBuos");
+      PlaceSingleFromExcel("NcTestAddBuos", () => CadPlaceFromExcel.PlaceBuos());
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Узел.
+    /// Ribbon flyout «Площадные объекты» → Добавить Узел (single object only).
     /// </summary>
     [CommandMethod("NcTestAddNode")]
     public void NcTestAddNode()
     {
-      OpenSourceDataAndPlaceFromExcel(SourceDataTab.Nodes, "NcTestAddNode");
+      PlaceSingleFromExcel("NcTestAddNode", () => CadPlaceFromExcel.PlaceNode());
+    }
+
+    private void PlaceSingleFromExcel(string label, Action place)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        place();
+        ed?.WriteMessage("\n" + label + ": placed selected object only (no SourceData).");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     /// <summary>Ribbon «Коридоры» → Линия трассы (слой NC_ROUTE_LINE).</summary>
@@ -529,44 +557,6 @@ namespace NcTestRibbon
       }
     }
 
-    private void OpenSourceDataAndPlaceFromExcel(SourceDataTab tab, string label)
-    {
-      Document doc = CadApp.DocumentManager.MdiActiveDocument;
-      Editor ed = doc?.Editor;
-      try
-      {
-        OpenSourceDataForm(tab, label);
-        SourceDataWindow live;
-        lock (SourceDataGate)
-        {
-          live = _sourceDataLive;
-        }
-
-        if (live == null || live.IsDisposed)
-        {
-          return;
-        }
-
-        live.BeginPlaceFromExcelPick(tab);
-        ed?.WriteMessage("\n" + label + ": Excel pick → place (" + tab + ").");
-      }
-      catch (System.Exception ex)
-      {
-        WriteException(ed, label, ex);
-        try
-        {
-          MessageBox.Show(
-            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
-            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
-            label,
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Warning);
-        }
-        catch
-        {
-        }
-      }
-    }
 
     private void OpenSourceDataForm(SourceDataTab tab, string label)
     {
