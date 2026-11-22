@@ -43,6 +43,8 @@ function Get-NcRibbonButtonXml {
 }
 
 # nanoCAD / AutoCAD-style ribbon drop-down (like Dimensions flyout): icon+label rows.
+# Build XML via expansion (same as Get-NcRibbonButtonXml) — never -f / String.Format,
+# so literal braces in CUI markup cannot throw FormatError.
 function Get-NcRibbonFlyoutXml {
     param(
         [string]$Uid,
@@ -55,10 +57,10 @@ function Get-NcRibbonFlyoutXml {
     $t = Get-NcXmlEscape $Text
     $lines = New-Object System.Collections.Generic.List[string]
     [void]$lines.Add(
-        ("          <RibbonSplitButton UID=`"{0}`" Id=`"AcRibbonSplitButton`" Text=`"{1}`" " +
-         "Behavior=`"DropDown`" ListStyle=`"IconText`" ButtonStyle=`"{2}`" Grouping=`"false`" KeyTip=`"`">") -f $Uid, $t, $buttonStyle
+        ("          <RibbonSplitButton UID=`"$Uid`" Id=`"AcRibbonSplitButton`" Text=`"$t`" " +
+         "Behavior=`"DropDown`" ListStyle=`"IconText`" ButtonStyle=`"$buttonStyle`" Grouping=`"false`" KeyTip=`"`">")
     )
-    [void]$lines.Add(("            <TooltipTitle xlate=`"true`" UID=`"XLS_{0}`">{1}</TooltipTitle>" -f $Uid, $t))
+    [void]$lines.Add("            <TooltipTitle xlate=`"true`" UID=`"XLS_$Uid`">$t</TooltipTitle>")
 
     $i = 0
     foreach ($item in @($Items)) {
@@ -69,10 +71,10 @@ function Get-NcRibbonFlyoutXml {
         $childUid = $Uid + '_I' + $i + '_' + (Get-NcSanitizeId $cmd)
         $et = Get-NcXmlEscape $itemText
         [void]$lines.Add(
-            ("            <RibbonCommandButton UID=`"{0}`" Id=`"AcRibbonCommandButton`" Text=`"{1}`" " +
-             "ButtonStyle=`"SmallWithText`" MenuMacroID=`"{2}`" KeyTip=`"`">") -f $childUid, $et, $cmd
+            ("            <RibbonCommandButton UID=`"$childUid`" Id=`"AcRibbonCommandButton`" Text=`"$et`" " +
+             "ButtonStyle=`"SmallWithText`" MenuMacroID=`"$cmd`" KeyTip=`"`">")
         )
-        [void]$lines.Add(("              <TooltipTitle xlate=`"true`" UID=`"XLS_{0}`">{1}</TooltipTitle>" -f $childUid, $et))
+        [void]$lines.Add("              <TooltipTitle xlate=`"true`" UID=`"XLS_$childUid`">$et</TooltipTitle>")
         [void]$lines.Add('            </RibbonCommandButton>')
     }
 
