@@ -82,6 +82,31 @@ namespace NcTestRibbon.Shell
       Activate();
     }
 
+    /// <summary>
+    /// Ribbon «Добавить Кустовую» / «Добавить БУОС»: open tab and start CAD place jig.
+    /// </summary>
+    public void BeginPlaceForTab(SourceDataTab tab)
+    {
+      SelectTab(tab);
+      try { Application.DoEvents(); }
+      catch { }
+
+      if (tab == SourceDataTab.Pads)
+      {
+        _pads.BeginPlaceSelected();
+        return;
+      }
+
+      if (tab == SourceDataTab.Buos)
+      {
+        _buos.BeginPlaceSelected();
+        return;
+      }
+
+      throw new InvalidOperationException(
+        "Размещение с ленты поддерживается для вкладок Кустовые и БУОС.");
+    }
+
     private static TabPage MakePage(string title, Control content)
     {
       var page = new TabPage(title) { Padding = new Padding(0), UseVisualStyleBackColor = true };

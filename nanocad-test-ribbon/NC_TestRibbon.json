@@ -32,9 +32,23 @@
     {
       "intername": "NcTestSourceData",
       "displayName": "Исходные данные",
-      "tooltip": "Кустовые / Врезки / БУОС / Узлы — одно окно с вкладками.",
+      "tooltip": "Кустовые / Врезки / размещение БУОС / Узлы — одно окно с вкладками.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestAddPad",
+      "displayName": "Добавить Кустовую",
+      "tooltip": "Открыть «Исходные данные» → Кустовые и запустить «Задать положение вручную» для выбранной/первой КП.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
+      "intername": "NcTestAddBuos",
+      "displayName": "Добавить БУОС",
+      "tooltip": "Открыть «Исходные данные» → БУОС (размещение) и запустить «Задать положение вручную» для выбранной/первой площадки.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.http.ico"
     },
     {
       "intername": "NcTestInterface",
@@ -118,6 +132,21 @@
       "text": "Исходные данные",
       "command": "NcTestSourceData",
       "style": "large"
+    },
+    {
+      "type": "flyout",
+      "text": "Площадные объекты",
+      "style": "large",
+      "items": [
+        {
+          "text": "Добавить Кустовую",
+          "command": "NcTestAddPad"
+        },
+        {
+          "text": "Добавить БУОС",
+          "command": "NcTestAddBuos"
+        }
+      ]
     },
     {
       "text": "Оформление",

@@ -298,6 +298,27 @@ namespace NcTestRibbon.Shell
       Load += (_, __) => BindPadsGrid();
     }
 
+    /// <summary>
+    /// Ribbon «Добавить Кустовую»: select first row if needed, then CAD place jig.
+    /// </summary>
+    public void BeginPlaceSelected()
+    {
+      if (_pads.Count == 0)
+      {
+        throw new InvalidOperationException(
+          "Нет КП в таблице. Откройте таблицы КП (xlsx) во «Исходные данные» → Кустовые.");
+      }
+
+      if (SelectedPad()?.Record == null)
+      {
+        _grid.ClearSelection();
+        _grid.Rows[0].Selected = true;
+        _grid.CurrentCell = _grid.Rows[0].Cells[0];
+      }
+
+      PlaceSelectedPad();
+    }
+
     public void NotifyHostClosing()
     {
       try

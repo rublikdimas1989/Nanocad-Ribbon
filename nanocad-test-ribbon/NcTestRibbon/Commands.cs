@@ -131,7 +131,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// BUOS type catalogue tab — Excel, no site coordinates.
+    /// Placement БУОС tab inside «Исходные данные».
     /// </summary>
     [CommandMethod("NcTestBuos")]
     public void NcTestBuos()
@@ -140,12 +140,63 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Junction / node types tab — sizes + Price lookup.
+    /// Placement Узлы tab inside «Исходные данные».
     /// </summary>
     [CommandMethod("NcTestNodes")]
     public void NcTestNodes()
     {
       OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую.
+    /// </summary>
+    [CommandMethod("NcTestAddPad")]
+    public void NcTestAddPad()
+    {
+      OpenSourceDataAndPlace(SourceDataTab.Pads, "NcTestAddPad");
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Добавить БУОС.
+    /// </summary>
+    [CommandMethod("NcTestAddBuos")]
+    public void NcTestAddBuos()
+    {
+      OpenSourceDataAndPlace(SourceDataTab.Buos, "NcTestAddBuos");
+    }
+
+    private void OpenSourceDataAndPlace(SourceDataTab tab, string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        OpenSourceDataForm(tab, label);
+        if (_sourceDataLive == null || _sourceDataLive.IsDisposed)
+        {
+          return;
+        }
+
+        _sourceDataLive.BeginPlaceForTab(tab);
+        ed?.WriteMessage("\n" + label + ": place jig started (" + tab + ").");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     private void OpenSourceDataForm(SourceDataTab tab, string label)

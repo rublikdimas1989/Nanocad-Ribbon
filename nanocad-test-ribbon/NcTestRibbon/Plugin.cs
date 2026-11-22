@@ -18,6 +18,8 @@ namespace NcTestRibbon
     {
       // nanoCAD LoadFile probing often misses NuGet deps next to the plugin DLL.
       AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+      try { CadSiteContextMenus.TryAttach(); }
+      catch { }
     }
 
     public void Terminate()
@@ -25,6 +27,14 @@ namespace NcTestRibbon
       try
       {
         CadSegmentBlinker.Stop();
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        CadSiteContextMenus.TryDetach();
       }
       catch
       {

@@ -227,6 +227,27 @@ namespace NcTestRibbon.Shell
       UpdateButtons();
     }
 
+    /// <summary>
+    /// Ribbon «Добавить БУОС» / similar: select first row if needed, then CAD place jig.
+    /// </summary>
+    public void BeginPlaceSelected()
+    {
+      if (_rows.Count == 0)
+      {
+        throw new InvalidOperationException(
+          "Нет строк размещения. Откройте xlsx с листом «" + _sheetName + "».");
+      }
+
+      if (SelectedRow()?.Record == null)
+      {
+        _grid.ClearSelection();
+        _grid.Rows[0].Selected = true;
+        _grid.CurrentCell = _grid.Rows[0].Cells[0];
+      }
+
+      PlaceSelected();
+    }
+
     public void NotifyHostClosing()
     {
       try { PersistShowFlag(_showOnDrawing.Checked); }

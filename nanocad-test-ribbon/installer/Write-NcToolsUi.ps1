@@ -42,6 +42,44 @@ function Get-NcRibbonButtonXml {
     ) -join "`n"
 }
 
+# nanoCAD / AutoCAD-style ribbon drop-down (like Dimensions flyout): icon+label rows.
+function Get-NcRibbonFlyoutXml {
+    param(
+        [string]$Uid,
+        [string]$Text,
+        [string]$Style,
+        [object[]]$Items
+    )
+
+    $buttonStyle = if ($Style -eq 'small') { 'SmallWithText' } else { 'LargeWithText' }
+    $t = Get-NcXmlEscape $Text
+    $lines = New-Object System.Collections.Generic.List[string]
+    [void]$lines.Add(
+        ("          <RibbonSplitButton UID=`"{0}`" Id=`"AcRibbonSplitButton`" Text=`"{1}`" " +
+         "Behavior=`"DropDown`" ListStyle=`"IconText`" ButtonStyle=`"{2}`" Grouping=`"false`" KeyTip=`"`">") -f $Uid, $t, $buttonStyle
+    )
+    [void]$lines.Add(("            <TooltipTitle xlate=`"true`" UID=`"XLS_{0}`">{1}</TooltipTitle>" -f $Uid, $t))
+
+    $i = 0
+    foreach ($item in @($Items)) {
+        $i++
+        $cmd = [string]$item.command
+        $itemText = [string]$item.text
+        if ([string]::IsNullOrWhiteSpace($cmd) -or [string]::IsNullOrWhiteSpace($itemText)) { continue }
+        $childUid = $Uid + '_I' + $i + '_' + (Get-NcSanitizeId $cmd)
+        $et = Get-NcXmlEscape $itemText
+        [void]$lines.Add(
+            ("            <RibbonCommandButton UID=`"{0}`" Id=`"AcRibbonCommandButton`" Text=`"{1}`" " +
+             "ButtonStyle=`"SmallWithText`" MenuMacroID=`"{2}`" KeyTip=`"`">") -f $childUid, $et, $cmd
+        )
+        [void]$lines.Add(("              <TooltipTitle xlate=`"true`" UID=`"XLS_{0}`">{1}</TooltipTitle>" -f $childUid, $et))
+        [void]$lines.Add('            </RibbonCommandButton>')
+    }
+
+    [void]$lines.Add('          </RibbonSplitButton>')
+    return ($lines -join "`n")
+}
+
 function Resolve-NcIconSourceFile {
     param(
         [Parameter(Mandatory = $true)][string]$IconResource,
@@ -185,11 +223,22 @@ function Write-NcToolsUi {
     [void]$panels.Append("      <RibbonRowPanel UID=`"RBNURP_$panelUid`" ResizeStyle=`"None`" ResizePriority=`"100`" TopJustify=`"True`">`n")
     [void]$panels.Append("        <RibbonRow UID=`"RBNURR_$panelUid`">`n")
 
+    $btnIndex = 0
     foreach ($btn in @($manifest.buttons)) {
+        $btnIndex++
         $style = if ([string]$btn.style -eq 'small') { 'small' } else { 'large' }
+        $text = [string]$btn.text
+        $btnType = [string]$btn.type
+        if ($btnType -eq 'flyout' -or $btnType -eq 'split' -or $btnType -eq 'dropdown') {
+            $uid = 'RBNU_FLY_1_' + $btnIndex + '_' + (Get-NcSanitizeId $text)
+            $items = @($btn.items)
+            [void]$panels.Append((Get-NcRibbonFlyoutXml -Uid $uid -Text $text -Style $style -Items $items))
+            [void]$panels.Append("`n")
+            continue
+        }
+
         $cmdName = [string]$btn.command
         $uid = 'RBNU_BTN_1_' + (Get-NcSanitizeId $cmdName)
-        $text = [string]$btn.text
         [void]$panels.Append((Get-NcRibbonButtonXml -Uid $uid -Text $text -Command $cmdName -Style $style -Tooltip $text))
         [void]$panels.Append("`n")
     }
