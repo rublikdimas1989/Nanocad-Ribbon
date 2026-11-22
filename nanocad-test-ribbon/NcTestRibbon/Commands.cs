@@ -12,7 +12,9 @@ namespace NcTestRibbon
   using HostMgd.EditorInput;
   using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
   using NcTestRibbon.Shell;
+  using Teigha.DatabaseServices;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
   using WinFormsApp = System.Windows.Forms.Application;
@@ -28,6 +30,139 @@ namespace NcTestRibbon
     private static SourceDataWindow _sourceDataLive;
     private static CartographyWindow _cartographyLive;
     private static AllowableSitesWindow _allowableSitesLive;
+    private static bool _bridgeWired;
+
+    static TestCommands()
+    {
+      WireCadBridge();
+    }
+
+    /// <summary>CAD double-click / MOVE sync → UI + Excel.</summary>
+    internal static void WireCadBridge()
+    {
+      if (_bridgeWired)
+      {
+        return;
+      }
+
+      TestCommandsBridge.OpenPadsWindow = OpenPadsWindowStatic;
+      TestCommandsBridge.ApplyPadCadPose = ApplyPadCadPoseStatic;
+      _bridgeWired = true;
+    }
+
+    private static void OpenPadsWindowStatic(string padName)
+    {
+      var cmd = new TestCommands();
+      cmd.OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadDblClick");
+      if (_sourceDataLive != null && !_sourceDataLive.IsDisposed && !string.IsNullOrWhiteSpace(padName))
+      {
+        _sourceDataLive.SelectPadByName(padName);
+      }
+    }
+
+    private static void ApplyPadCadPoseStatic(
+      string name, double x, double y, double rotationDeg, bool saveExcel)
+    {
+      if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+      {
+        try
+        {
+          _sourceDataLive.ApplyPadCadPose(name, x, y, rotationDeg, saveExcel);
+          return;
+        }
+        catch
+        {
+          // Fall through to Excel-only path when KP not loaded in the open window.
+        }
+      }
+
+      if (!saveExcel)
+      {
+        return;
+      }
+
+      string path = AppPaths.Load().PadsWorkbook;
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException(
+          "Нет пути к таблицам КП (paths.json → padsWorkbook). Откройте КП во «Исходные данные».");
+      }
+
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
+        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (pad == null)
+      {
+        throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
+      }
+
+      pad.X = x;
+      pad.Y = y;
+      pad.RotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
+      PadWorkbookLoader.SavePadCoordinates(path, new[] { pad });
+
+      // Redraw label + rectangle at committed pose.
+      CadPadOverlay.UpdatePad(new CadPadOverlay.PadGeom
+      {
+        Name = pad.Name,
+        X = pad.X,
+        Y = pad.Y,
+        WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
+        LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
+        RotationDeg = pad.RotationDeg
+      });
+    }
+
+    /// <summary>Manual: open pads window for implied/selected pad (fallback without BeginDoubleClick).</summary>
+    [CommandMethod("NcTestPadOpen")]
+    public void NcTestPadOpen()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        string name = null;
+        PromptSelectionResult sel = ed?.SelectImplied();
+        if (sel != null && sel.Status == PromptStatus.OK && sel.Value != null)
+        {
+          ObjectId[] ids = sel.Value.GetObjectIds();
+          using (doc.LockDocument())
+          using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+          {
+            foreach (ObjectId id in ids ?? Array.Empty<ObjectId>())
+            {
+              var ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+              if (ent == null
+                  || !string.Equals(ent.Layer, CadPadOverlay.LayerName, StringComparison.OrdinalIgnoreCase))
+              {
+                continue;
+              }
+
+              name = CadPadOverlay.ReadPadNamePublic(ent);
+              if (string.IsNullOrWhiteSpace(name) && ent is DBText text)
+              {
+                name = text.TextString;
+              }
+
+              if (!string.IsNullOrWhiteSpace(name))
+              {
+                break;
+              }
+            }
+
+            tr.Commit();
+          }
+        }
+
+        OpenPadsWindowStatic(name);
+        ed?.WriteMessage("\nNcTestPadOpen: Исходные данные → Кустовые"
+          + (string.IsNullOrWhiteSpace(name) ? "." : " («" + name + "»)."));
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestPadOpen", ex);
+      }
+    }
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()

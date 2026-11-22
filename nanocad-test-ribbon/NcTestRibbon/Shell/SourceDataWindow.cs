@@ -82,6 +82,28 @@ namespace NcTestRibbon.Shell
       Activate();
     }
 
+    /// <summary>Open Кустовые tab and select KP by CAD XData name.</summary>
+    public void SelectPadByName(string name)
+    {
+      SelectTab(SourceDataTab.Pads);
+      try { System.Windows.Forms.Application.DoEvents(); }
+      catch { }
+
+      _pads.TrySelectPadByName(name);
+    }
+
+    public void ApplyPadCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
+    {
+      SelectTab(SourceDataTab.Pads);
+      try { System.Windows.Forms.Application.DoEvents(); }
+      catch { }
+
+      _pads.TrySelectPadByName(name);
+      _pads.ApplyCadPose(name, x, y, rotationDeg, saveExcel);
+    }
+
+    public PadOptimizationWindow PadsPanel => _pads;
+
     /// <summary>
     /// Ribbon «Добавить Кустовую» / «Добавить БУОС»: open tab and start CAD place jig.
     /// </summary>

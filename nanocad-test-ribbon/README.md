@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.74**): `nanocad-test-ribbon-v1.2.74.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.74.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.74/nanocad-test-ribbon-v1.2.74.zip  
+Актуальный **slim** zip (версия **1.2.75**): `nanocad-test-ribbon-v1.2.75.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.75.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.75/nanocad-test-ribbon-v1.2.75.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.74 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.75 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (incl. flyout «Площадные объекты»), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.74+WriteNcToolsUiFlyoutFix` — flyout CUI without PowerShell `-f` FormatError; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.75+PadDblClickCadSync` — double-click КП → Исходные данные; MOVE/ROTATE/grip → prompt Excel X/Y/angle; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
@@ -53,6 +53,8 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestInitialData` | alias → `NcTestSourceData` |
 | `NcTestSourceData` | Лента: «Исходные данные» — Кустовые / Врезки / **размещение** БУОС / Узлы |
 | Flyout **Площадные объекты** | `NcTestAddPad` / `NcTestAddBuos` — открыть вкладку + CAD place jig |
+| Double-click КП (слой `NC_KP_PADS`) | Открыть «Исходные данные» → Кустовые (fallback cmd `NcTestPadOpen`) |
+| MOVE / ROTATE / grip КП | Запрос «Обновить данные в Excel / конфигурации?» → X/Y/`angle` |
 | `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` | Только командой (без кнопок ленты) → нужная вкладка |
 | `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |

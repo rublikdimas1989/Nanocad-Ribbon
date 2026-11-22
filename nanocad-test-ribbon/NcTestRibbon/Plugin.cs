@@ -20,6 +20,15 @@ namespace NcTestRibbon
       AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
       try { CadSiteContextMenus.TryAttach(); }
       catch { }
+
+      try
+      {
+        TestCommands.WireCadBridge();
+        CadPadInteraction.TryAttach();
+      }
+      catch
+      {
+      }
     }
 
     public void Terminate()
@@ -27,6 +36,14 @@ namespace NcTestRibbon
       try
       {
         CadSegmentBlinker.Stop();
+      }
+      catch
+      {
+      }
+
+      try
+      {
+        CadPadInteraction.TryDetach();
       }
       catch
       {

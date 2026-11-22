@@ -28,12 +28,16 @@ namespace NcTestRibbon.Cad
         return;
       }
 
-      RunWrite(doc, (tr, model, db) =>
+      using (CadPadInteraction.SuppressNotifications())
       {
-        UnlockLayer(tr, db);
-        EraseLayerEntities(tr, model);
-        LockLayer(tr, db);
-      });
+        RunWrite(doc, (tr, model, db) =>
+        {
+          UnlockLayer(tr, db);
+          EraseLayerEntities(tr, model);
+          // Leave unlocked so grips / MOVE / ROTATE work for CAD→Excel sync.
+        });
+      }
+
       TryRegen(doc);
     }
 
@@ -49,19 +53,23 @@ namespace NcTestRibbon.Cad
         .ToArray();
 
       int drawn = 0;
-      RunWrite(doc, (tr, model, db) =>
+      using (CadPadInteraction.SuppressNotifications())
       {
-        EnsureLayer(tr, db, unlockForWrite: true);
-        EraseLayerEntities(tr, model);
-        foreach (PadGeom pad in list)
+        RunWrite(doc, (tr, model, db) =>
         {
-          AddRectangle(tr, model, db, pad);
-          AddLabel(tr, model, db, pad);
-          drawn++;
-        }
+          EnsureLayer(tr, db, unlockForWrite: true);
+          EraseLayerEntities(tr, model);
+          foreach (PadGeom pad in list)
+          {
+            AddRectangle(tr, model, db, pad);
+            AddLabel(tr, model, db, pad);
+            drawn++;
+          }
 
-        LockLayer(tr, db);
-      });
+          // Keep unlocked for grip/MOVE/ROTATE → Excel sync.
+        });
+      }
+
       TryRegen(doc);
       TryUpdateScreen(doc);
       return drawn;
@@ -77,16 +85,25 @@ namespace NcTestRibbon.Cad
       Document doc = CadApp.DocumentManager.MdiActiveDocument
         ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
 
-      RunWrite(doc, (tr, model, db) =>
+      using (CadPadInteraction.SuppressNotifications())
       {
-        EnsureLayer(tr, db, unlockForWrite: true);
-        EraseNamedPad(tr, model, pad.Name);
-        AddRectangle(tr, model, db, pad);
-        AddLabel(tr, model, db, pad);
-        LockLayer(tr, db);
-      });
+        RunWrite(doc, (tr, model, db) =>
+        {
+          EnsureLayer(tr, db, unlockForWrite: true);
+          EraseNamedPad(tr, model, pad.Name);
+          AddRectangle(tr, model, db, pad);
+          AddLabel(tr, model, db, pad);
+        });
+      }
+
       TryRegen(doc);
       TryUpdateScreen(doc);
+    }
+
+    /// <summary>Public XData name reader for CAD interaction hooks.</summary>
+    public static string ReadPadNamePublic(Entity entity)
+    {
+      return ReadPadName(entity);
     }
 
     public static bool TryPlace(PadGeom pad, out double x, out double y)
@@ -184,12 +201,11 @@ namespace NcTestRibbon.Cad
       // Always rotate about KP rectangle center (no free base-point pick).
       if (!RotateAboutCenter(ed, doc, ids, center))
       {
-        RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
         return false;
       }
 
       poseUpdated = TryReadPadPose(padName, out x, out y, out rotationDeg);
-      RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
+      // Leave layer unlocked for subsequent grip / MOVE edits.
       TryRegen(doc);
       TryUpdateScreen(doc);
       return true;

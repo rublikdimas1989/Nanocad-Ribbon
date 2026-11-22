@@ -191,7 +191,7 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Таблица только для просмотра (все поля из Excel). Положение/угол — только «Задать положение вручную» / «Повернуть вручную» на чертеже.",
+        Text = "Таблица только для просмотра (поля из Excel). Положение/угол: кнопки CAD, либо MOVE/ROTATE/grip на чертеже (с запросом записи в Excel). Double-click КП открывает это окно.",
         AutoSize = true,
         MaximumSize = new Size(1080, 0),
         ForeColor = Color.DimGray,
@@ -317,6 +317,70 @@ namespace NcTestRibbon.Shell
       }
 
       PlaceSelectedPad();
+    }
+
+    /// <summary>Select KP row by name (CAD double-click).</summary>
+    public bool TrySelectPadByName(string name)
+    {
+      if (string.IsNullOrWhiteSpace(name) || _pads.Count == 0)
+      {
+        return false;
+      }
+
+      for (int i = 0; i < _pads.Count; i++)
+      {
+        if (!string.Equals(_pads[i].Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        _grid.ClearSelection();
+        if (i < _grid.Rows.Count)
+        {
+          _grid.Rows[i].Selected = true;
+          _grid.CurrentCell = _grid.Rows[i].Cells[0];
+          try { _grid.FirstDisplayedScrollingRowIndex = i; }
+          catch { }
+        }
+
+        return true;
+      }
+
+      return false;
+    }
+
+    /// <summary>
+    /// Apply pose read from CAD after MOVE/ROTATE/grip. Optionally write Excel immediately.
+    /// </summary>
+    public void ApplyCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
+    {
+      PadRow row = _pads.FirstOrDefault(p =>
+        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (row?.Record == null)
+      {
+        // Window open but this KP not loaded — still allow Excel-only path via caller.
+        throw new InvalidOperationException("КП «" + name + "» нет в открытой таблице.");
+      }
+
+      row.ApplyPreviewPose(x, y, rotationDeg);
+      if (!_showOnDrawing.Checked)
+      {
+        _showOnDrawing.Checked = true;
+      }
+      else
+      {
+        CadPadOverlay.UpdatePad(ToGeom(row));
+      }
+
+      RefreshPadRow(row);
+      UpdateActionButtons();
+      Log("С чертежа «" + name + "»: X=" + row.X + "; Y=" + row.Y
+        + "; угол=" + row.RotationText + "°");
+
+      if (saveExcel)
+      {
+        SaveCoordinates(confirmOverwrite: false);
+      }
     }
 
     public void NotifyHostClosing()
@@ -775,6 +839,14 @@ namespace NcTestRibbon.Shell
         }
       }
 
+      foreach (PadRow row in _pads)
+      {
+        if (row.CoordsDirty && row.Record != null)
+        {
+          row.Record.RotationDeg = row.RotationDeg;
+        }
+      }
+
       int updated = PadWorkbookLoader.SavePadCoordinates(_book.Path, dirty);
       foreach (PadRow row in _pads)
       {
@@ -913,10 +985,10 @@ namespace NcTestRibbon.Shell
           Gas = pad.ActiveGas,
           FirstLaunch = "1",
           Record = pad,
-          RotationDeg = 0,
-          RotationText = "0"
+          RotationDeg = pad.RotationDeg,
+          RotationText = pad.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture)
         };
-        row.CaptureCommittedFromExcel(pad.X, pad.Y, rotationDeg: 0);
+        row.CaptureCommittedFromExcel(pad.X, pad.Y, pad.RotationDeg);
         _pads.Add(row);
       }
 
@@ -1099,6 +1171,7 @@ namespace NcTestRibbon.Shell
         {
           Record.X = CommittedX;
           Record.Y = CommittedY;
+          Record.RotationDeg = CommittedRotationDeg;
         }
 
         X = CommittedX.ToString("G17", CultureInfo.CurrentCulture);
@@ -1113,6 +1186,11 @@ namespace NcTestRibbon.Shell
         CommittedX = Record?.X ?? 0;
         CommittedY = Record?.Y ?? 0;
         CommittedRotationDeg = CadPadOverlay.NormalizeDegrees(RotationDeg);
+        if (Record != null)
+        {
+          Record.RotationDeg = CommittedRotationDeg;
+        }
+
         CoordsDirty = false;
       }
 
@@ -1122,6 +1200,7 @@ namespace NcTestRibbon.Shell
         {
           Record.X = x;
           Record.Y = y;
+          Record.RotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
         }
 
         X = x.ToString("G17", CultureInfo.CurrentCulture);
@@ -1137,6 +1216,7 @@ namespace NcTestRibbon.Shell
         {
           Record.X = CommittedX;
           Record.Y = CommittedY;
+          Record.RotationDeg = CommittedRotationDeg;
         }
 
         X = CommittedX.ToString("G17", CultureInfo.CurrentCulture);

@@ -18,6 +18,8 @@ namespace NcTestRibbon.Rates
       public string Name { get; set; } = string.Empty;
       public double X { get; set; }
       public double Y { get; set; }
+      /// <summary>Optional sheet column angle / угол / rotation (degrees).</summary>
+      public double RotationDeg { get; set; }
       public double PressureBar { get; set; }
       public string SeparationMode { get; set; } = "none";
       public bool ActiveOil { get; set; } = true;
@@ -78,7 +80,8 @@ namespace NcTestRibbon.Rates
     }
 
     /// <summary>
-    /// Writes updated X/Y for named pads into sheet «КП» (сернистая среда is Excel-only).
+    /// Writes updated X/Y/(optional angle) for named pads into sheet «КП».
+    /// Creates an <c>angle</c> column when missing so CAD rotation can persist.
     /// </summary>
     public static int SavePadCoordinates(string workbookPath, IEnumerable<PadRecord> pads)
     {
@@ -144,6 +147,14 @@ namespace NcTestRibbon.Rates
         throw new InvalidDataException("Лист «КП» должен содержать столбцы name/x/y.");
       }
 
+      int angleCol = Col("angle", "угол", "Угол", "rotation", "RotationDeg", "rotationDeg");
+      if (angleCol < 0)
+      {
+        angleCol = cols + 1;
+        sheet.Cells[1, angleCol].Value = "angle";
+        headers["angle"] = angleCol;
+      }
+
       int updated = 0;
       for (int r = 2; r <= rows; r++)
       {
@@ -155,6 +166,7 @@ namespace NcTestRibbon.Rates
 
         sheet.Cells[r, xCol].Value = pad.X;
         sheet.Cells[r, yCol].Value = pad.Y;
+        sheet.Cells[r, angleCol].Value = pad.RotationDeg;
         updated++;
       }
 
@@ -356,6 +368,7 @@ namespace NcTestRibbon.Rates
       int gasCol = Col("active_gas", "gas");
       int widthCol = Col("Ширина", "width", "widthM");
       int lengthCol = Col("Длина", "length", "lengthM");
+      int angleCol = Col("angle", "угол", "Угол", "rotation", "RotationDeg", "rotationDeg");
       int sourCol = Col("Сернистая среда", "сернистая среда", "сернистая", "sourMedium", "SourMedium");
       sourMediumColumnPresent = sourCol > 0;
 
@@ -373,6 +386,7 @@ namespace NcTestRibbon.Rates
           Name = name,
           X = ReadDouble(sheet, r, xCol, 0),
           Y = ReadDouble(sheet, r, yCol, 0),
+          RotationDeg = angleCol > 0 ? ReadDouble(sheet, r, angleCol, 0) : 0,
           PressureBar = pressureCol > 0 ? ReadDouble(sheet, r, pressureCol, 0) : 0,
           SeparationMode = separationCol > 0
             ? ((sheet.Cells[r, separationCol].Text ?? "none").Trim() is { Length: > 0 } s ? s : "none")
