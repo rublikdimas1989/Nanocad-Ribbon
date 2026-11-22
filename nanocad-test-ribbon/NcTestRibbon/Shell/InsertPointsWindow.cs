@@ -23,8 +23,8 @@ namespace NcTestRibbon.Shell
     private readonly Label _status;
     private readonly DataGridView _grid;
     private readonly CheckBox _showOnDrawing;
-    private readonly Button _placeButton;
     private readonly Button _saveButton;
+    private readonly Button _loadButton;
     private InsertWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
     private bool _discarding;
@@ -60,7 +60,7 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Мировые X/Y в метрах. Положение — только «Задать положение вручную» на чертеже. "
+        Text = "Мировые X/Y в метрах. Положение — MOVE/grip на чертеже, затем «Сохранить положение». "
           + "Поля среды / давления / лимита — из Excel (лист «Врезки»). Макс. приём нефти — т/сут; пусто = без лимита.",
         AutoSize = true,
         MaximumSize = new Size(1120, 0),
@@ -121,10 +121,10 @@ namespace NcTestRibbon.Shell
       };
       cadRow.Controls.Add(_showOnDrawing);
 
-      _placeButton = MakeButton(cadRow, "Задать положение вручную", PlaceSelected);
-      _placeButton.Enabled = false;
-      _saveButton = MakeButton(cadRow, "Сохранить положения", SaveCoordinates);
+      _saveButton = MakeButton(cadRow, "Сохранить положение", SaveCoordinates);
       _saveButton.Enabled = false;
+      _loadButton = MakeButton(cadRow, "Загрузить из исходных", () => ReloadFromSource(confirm: true));
+      _loadButton.Enabled = false;
 
       _grid = new DataGridView
       {
@@ -230,33 +230,68 @@ namespace NcTestRibbon.Shell
     {
       try { AppPaths.Set(p => p.ShowInsertsOnDrawing = _showOnDrawing.Checked); }
       catch { }
+      // Dirty prompt is handled once by SourceDataWindow / drawing-close dialog.
+    }
 
-      try
+    public bool HasDirtyCoords => _rows.Any(r => r.CoordsDirty);
+
+    public IEnumerable<DirtyCoordItem> EnumerateDirtyItems()
+    {
+      foreach (InsertRow row in _rows.Where(r => r.CoordsDirty))
       {
-        if (!_rows.Any(r => r.CoordsDirty))
+        yield return new DirtyCoordItem
+        {
+          Group = "Врезки",
+          Name = row.Name,
+          Detail = "X=" + row.X + "; Y=" + row.Y
+        };
+      }
+    }
+
+    public void SaveDirtyCoords(bool confirm)
+    {
+      if (!HasDirtyCoords)
+      {
+        return;
+      }
+
+      SaveCoordinates(confirmOverwrite: confirm);
+    }
+
+    public void ReloadFromSource(bool confirm)
+    {
+      string path = _book?.Path;
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        path = AppPaths.Load().InsertsWorkbook;
+      }
+
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException("Нет файла врезок для загрузки из исходных.");
+      }
+
+      if (confirm)
+      {
+        DialogResult ok = MessageBox.Show(
+          FindForm() ?? (System.Windows.Forms.IWin32Window)this,
+          "Загрузить положения врезок из исходного Excel и сбросить изменения на чертеже?\n\n" + path,
+          "Загрузить из исходных",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (ok != DialogResult.Yes)
         {
           return;
         }
+      }
 
-        DialogResult apply = MessageBox.Show(
-          FindForm() ?? (System.Windows.Forms.IWin32Window)this,
-          "Применить новые координаты?",
-          "Точки врезки",
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (apply == DialogResult.Yes)
-        {
-          SaveCoordinates(confirmOverwrite: false);
-        }
-        else
-        {
-          DiscardUnsaved();
-        }
-      }
-      catch (Exception ex)
-      {
-        Log("Закрытие: координаты врезок — " + ex.Message);
-      }
+      LoadWorkbook(path, remember: false);
+      Log("Врезки загружены из исходных: " + Path.GetFileName(path));
+    }
+
+    public void DiscardDirtyCoords()
+    {
+      DiscardUnsaved();
     }
 
     private void DiscardUnsaved()
@@ -297,9 +332,9 @@ namespace NcTestRibbon.Shell
 
     private void UpdateButtons()
     {
-      InsertRow row = Selected();
-      _placeButton.Enabled = row?.Record != null;
+      bool hasBook = _book != null && !string.IsNullOrWhiteSpace(_book.Path);
       _saveButton.Enabled = _rows.Any(r => r.CoordsDirty);
+      _loadButton.Enabled = hasBook || !string.IsNullOrWhiteSpace(AppPaths.Load().InsertsWorkbook);
     }
 
     private InsertRow Selected()

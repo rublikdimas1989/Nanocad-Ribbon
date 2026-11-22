@@ -32,6 +32,9 @@ namespace NcTestRibbon
     private static CartographyWindow _cartographyLive;
     private static AllowableSitesWindow _allowableSitesLive;
     private static bool _bridgeWired;
+    private static readonly object SourceDataGate = new object();
+    private static bool _sourceDataOpening;
+    private static long _lastSourceDataOpenTicks;
 
     static TestCommands()
     {
@@ -48,6 +51,11 @@ namespace NcTestRibbon
 
       TestCommandsBridge.OpenPadsWindow = OpenPadsWindowStatic;
       TestCommandsBridge.ApplyPadCadPose = ApplyPadCadPoseStatic;
+      DrawingDirtyGuard.GetLiveSourceData = () =>
+        _sourceDataLive != null && !_sourceDataLive.IsDisposed ? _sourceDataLive : null;
+      try { DrawingDirtyGuard.TryAttach(); }
+      catch { }
+
       _bridgeWired = true;
     }
 
@@ -55,9 +63,12 @@ namespace NcTestRibbon
     {
       var cmd = new TestCommands();
       cmd.OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadDblClick");
-      if (_sourceDataLive != null && !_sourceDataLive.IsDisposed && !string.IsNullOrWhiteSpace(padName))
+      lock (SourceDataGate)
       {
-        _sourceDataLive.SelectPadByName(padName);
+        if (_sourceDataLive != null && !_sourceDataLive.IsDisposed && !string.IsNullOrWhiteSpace(padName))
+        {
+          _sourceDataLive.SelectPadByName(padName);
+        }
       }
     }
 
@@ -284,37 +295,134 @@ namespace NcTestRibbon
       OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
     }
 
-    /// <summary>
-    /// Ribbon «Обновить данные в Excel»: flush pending KP X/Y/angle after MOVE/ROTATE/grip.
-    /// </summary>
+    /// <summary>Legacy alias → «Сохранить в исходные».</summary>
     [CommandMethod("NcTestPadSyncExcel")]
     public void NcTestPadSyncExcel()
+    {
+      NcTestSaveSources();
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Сохранить в исходные (confirm, then write).
+    /// </summary>
+    [CommandMethod("NcTestSaveSources")]
+    public void NcTestSaveSources()
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       Editor ed = doc?.Editor;
       try
       {
-        if (!CadPadInteraction.HasPendingExcelSync)
+        OpenSourceDataForm(SourceDataTab.Pads, "NcTestSaveSources");
+        SourceDataWindow live;
+        lock (SourceDataGate)
         {
-          ed?.WriteMessage("\nNcTestPadSyncExcel: нет ожидающих изменений КП.");
+          live = _sourceDataLive;
+        }
+
+        if (live == null || live.IsDisposed)
+        {
+          if (!CadPadInteraction.HasPendingExcelSync)
+          {
+            ed?.WriteMessage("\nNcTestSaveSources: нет ожидающих изменений.");
+            return;
+          }
+
+          DialogResult confirm = MessageBox.Show(
+            "Сохранить положения КП с чертежа в исходный Excel?",
+            "Сохранить в исходные",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+          if (confirm != DialogResult.Yes)
+          {
+            return;
+          }
+
+          int n = CadPadInteraction.CommitPendingToExcel();
+          ed?.WriteMessage("\nNcTestSaveSources: записано КП: " + n + ".");
+          return;
+        }
+
+        List<DirtyCoordItem> dirty = live.CollectDirtyItems();
+        if (dirty.Count == 0 && !CadPadInteraction.HasPendingExcelSync)
+        {
+          ed?.WriteMessage("\nNcTestSaveSources: нет изменённых положений.");
           try { PadExcelSyncUi.SetPending(false); }
           catch { }
 
           return;
         }
 
-        IReadOnlyCollection<string> names = CadPadInteraction.PendingPadNames;
-        int n = CadPadInteraction.CommitPendingToExcel();
-        ed?.WriteMessage(
-          "\nNcTestPadSyncExcel: записано в Excel " + n + " КП"
-          + (names.Count == 0 ? "." : " (" + string.Join(", ", names) + ")."));
+        DialogResult ok = MessageBox.Show(
+          live,
+          "Сохранить изменённые положения в исходные Excel?\n\nОбъектов: "
+            + Math.Max(dirty.Count, CadPadInteraction.PendingPadNames.Count),
+          "Сохранить в исходные",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (ok != DialogResult.Yes)
+        {
+          return;
+        }
+
+        live.SaveAllToSource(confirm: false);
+        ed?.WriteMessage("\nNcTestSaveSources: положения сохранены в исходные.");
       }
       catch (System.Exception ex)
       {
-        WriteException(ed, "NcTestPadSyncExcel", ex);
+        WriteException(ed, "NcTestSaveSources", ex);
         try
         {
-          CadApp.ShowAlertDialog("Не удалось обновить Excel:\n" + ex.Message);
+          CadApp.ShowAlertDialog("Не удалось сохранить в исходные:\n" + ex.Message);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Загрузить из исходных (confirm, then reload).
+    /// </summary>
+    [CommandMethod("NcTestLoadSources")]
+    public void NcTestLoadSources()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        OpenSourceDataForm(SourceDataTab.Pads, "NcTestLoadSources");
+        SourceDataWindow live;
+        lock (SourceDataGate)
+        {
+          live = _sourceDataLive;
+        }
+
+        if (live == null || live.IsDisposed)
+        {
+          ed?.WriteMessage("\nNcTestLoadSources: окно «Исходные данные» не открыто.");
+          return;
+        }
+
+        DialogResult ok = MessageBox.Show(
+          live,
+          "Загрузить положения из исходных Excel для всех вкладок и сбросить изменения на чертеже?",
+          "Загрузить из исходных",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (ok != DialogResult.Yes)
+        {
+          return;
+        }
+
+        live.LoadFromSource(confirm: false, activeTabOnly: false);
+        ed?.WriteMessage("\nNcTestLoadSources: положения загружены из исходных.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestLoadSources", ex);
+        try
+        {
+          CadApp.ShowAlertDialog("Не удалось загрузить из исходных:\n" + ex.Message);
         }
         catch
         {
@@ -383,37 +491,92 @@ namespace NcTestRibbon
         // Detail profiles dialog (pads) is still WPF.
         EnsureWpfApplication(ed);
 
-        if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+        lock (SourceDataGate)
         {
-          _sourceDataLive.SelectTab(tab);
-          ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
-          return;
-        }
-
-        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
-        SourceDataWindow form = new SourceDataWindow(tab);
-        _sourceDataLive = form;
-        form.FormClosed += (_, __) =>
-        {
-          if (ReferenceEquals(_sourceDataLive, form))
+          long now = DateTime.UtcNow.Ticks;
+          // Debounce rapid double-click / multi-event open storms (first click was spawning many windows).
+          if (_sourceDataOpening
+              || (now - _lastSourceDataOpenTicks < TimeSpan.TicksPerMillisecond * 750
+                  && _sourceDataLive != null && !_sourceDataLive.IsDisposed))
           {
-            _sourceDataLive = null;
+            if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+            {
+              _sourceDataLive.SelectTab(tab);
+            }
+
+            ed?.WriteMessage("\n" + label + ": debounce → reuse open window (" + tab + ").");
+            return;
           }
-        };
 
-        if (hwnd != IntPtr.Zero)
-        {
-          form.Show(new WindowWrapper(hwnd));
-        }
-        else
-        {
-          form.Show();
+          if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+          {
+            _sourceDataLive.SelectTab(tab);
+            ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
+            return;
+          }
+
+          _sourceDataOpening = true;
+          _lastSourceDataOpenTicks = now;
         }
 
-        ed?.WriteMessage("\n" + label + ": Исходные данные open → " + tab + ".");
+        SourceDataWindow form = null;
+        try
+        {
+          IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+          form = new SourceDataWindow(tab);
+          lock (SourceDataGate)
+          {
+            // Another opener won while we constructed — dispose orphan and reuse winner.
+            if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+            {
+              try { form.Dispose(); }
+              catch { }
+
+              _sourceDataLive.SelectTab(tab);
+              ed?.WriteMessage("\n" + label + ": singleton race → reuse open window.");
+              return;
+            }
+
+            _sourceDataLive = form;
+            form.FormClosed += (_, __) =>
+            {
+              lock (SourceDataGate)
+              {
+                if (ReferenceEquals(_sourceDataLive, form))
+                {
+                  _sourceDataLive = null;
+                }
+              }
+            };
+          }
+
+          if (hwnd != IntPtr.Zero)
+          {
+            form.Show(new WindowWrapper(hwnd));
+          }
+          else
+          {
+            form.Show();
+          }
+
+          ed?.WriteMessage("\n" + label + ": Исходные данные open → " + tab + ".");
+        }
+        finally
+        {
+          lock (SourceDataGate)
+          {
+            _sourceDataOpening = false;
+            _lastSourceDataOpenTicks = DateTime.UtcNow.Ticks;
+          }
+        }
       }
       catch (System.Exception ex)
       {
+        lock (SourceDataGate)
+        {
+          _sourceDataOpening = false;
+        }
+
         WriteException(ed, label, ex);
         try
         {

@@ -11,13 +11,14 @@ namespace NcTestRibbon.Cad
   using CadApp = HostMgd.ApplicationServices.Application;
 
   /// <summary>
-  /// Highlights NC Tools ribbon button «Обновить данные в Excel» when pad CAD→Excel sync is pending.
+  /// Highlights NC Tools ribbon button «Сохранить в исходные» when pad CAD→Excel sync is pending.
   /// Uses reflection / WPF visual-tree walk — no MessageBox.
   /// </summary>
   public static class PadExcelSyncUi
   {
-    public const string CommandName = "NcTestPadSyncExcel";
-    public const string ButtonText = "Обновить данные в Excel";
+    public const string CommandName = "NcTestSaveSources";
+    public const string ButtonText = "Сохранить в исходные";
+    public const string LegacyCommandName = "NcTestPadSyncExcel";
 
     private static readonly object Gate = new object();
     private static bool _pending;
@@ -64,7 +65,7 @@ namespace NcTestRibbon.Cad
         if (pending)
         {
           ed.WriteMessage(
-            "\nКП: изменения на чертеже — нажмите «Обновить данные в Excel» на ленте NC Tools.");
+            "\nКП: изменения на чертеже — «Площадные объекты» → «Сохранить в исходные».");
         }
       }
       catch
@@ -214,17 +215,20 @@ namespace NcTestRibbon.Cad
         ?? ReadStringProp(node, "Command")
         ?? string.Empty;
 
-      if (macro.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0)
+      if (macro.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0
+          || macro.IndexOf(LegacyCommandName, StringComparison.OrdinalIgnoreCase) >= 0)
       {
         return true;
       }
 
-      if (id.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0)
+      if (id.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0
+          || id.IndexOf(LegacyCommandName, StringComparison.OrdinalIgnoreCase) >= 0)
       {
         return true;
       }
 
-      return text.IndexOf("Обновить данные в Excel", StringComparison.OrdinalIgnoreCase) >= 0;
+      return text.IndexOf(ButtonText, StringComparison.OrdinalIgnoreCase) >= 0
+        || text.IndexOf("Обновить данные в Excel", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static void ApplyAdButtonStyle(object node, bool pending)
@@ -306,10 +310,12 @@ namespace NcTestRibbon.Cad
           string content = btn.Content?.ToString() ?? string.Empty;
           string name = btn.Name ?? string.Empty;
           string tip = btn.ToolTip?.ToString() ?? string.Empty;
-          if (content.IndexOf("Обновить данные в Excel", StringComparison.OrdinalIgnoreCase) >= 0
+          if (content.IndexOf(ButtonText, StringComparison.OrdinalIgnoreCase) >= 0
+              || content.IndexOf("Обновить данные в Excel", StringComparison.OrdinalIgnoreCase) >= 0
               || name.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0
+              || name.IndexOf(LegacyCommandName, StringComparison.OrdinalIgnoreCase) >= 0
               || tip.IndexOf(CommandName, StringComparison.OrdinalIgnoreCase) >= 0
-              || tip.IndexOf("Обновить данные в Excel", StringComparison.OrdinalIgnoreCase) >= 0)
+              || tip.IndexOf(ButtonText, StringComparison.OrdinalIgnoreCase) >= 0)
           {
             lock (Gate)
             {

@@ -107,9 +107,23 @@
       "iconResource": "NC_ICONS.http.ico"
     },
     {
+      "intername": "NcTestSaveSources",
+      "displayName": "Сохранить в исходные",
+      "tooltip": "Записать изменённые X/Y/угол в исходные Excel (с подтверждением). Краснеет при ожидании после MOVE/ROTATE/grip.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.excel_sync_red.ico"
+    },
+    {
+      "intername": "NcTestLoadSources",
+      "displayName": "Загрузить из исходных",
+      "tooltip": "Перечитать положения из исходных Excel и сбросить изменения на чертеже (с подтверждением).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.wpf.ico"
+    },
+    {
       "intername": "NcTestPadSyncExcel",
-      "displayName": "Обновить данные в Excel",
-      "tooltip": "Записать X/Y/угол КП с чертежа в Excel после MOVE/ROTATE/grip (кнопка краснеет при ожидании).",
+      "displayName": "Сохранить в исходные",
+      "tooltip": "Alias → NcTestSaveSources.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.excel_sync_red.ico"
     }
@@ -141,11 +155,6 @@
       "style": "large"
     },
     {
-      "text": "Обновить данные в Excel",
-      "command": "NcTestPadSyncExcel",
-      "style": "large"
-    },
-    {
       "type": "flyout",
       "text": "Площадные объекты",
       "style": "large",
@@ -157,6 +166,14 @@
         {
           "text": "Добавить БУОС",
           "command": "NcTestAddBuos"
+        },
+        {
+          "text": "Сохранить в исходные",
+          "command": "NcTestSaveSources"
+        },
+        {
+          "text": "Загрузить из исходных",
+          "command": "NcTestLoadSources"
         }
       ]
     },

@@ -29,6 +29,8 @@ namespace NcTestRibbon.Cad
     private static Delegate _beginDoubleClickHandler;
     private static long _lastSessionHandledTicks;
     private const long SessionDebounceTicks = TimeSpan.TicksPerMillisecond * 400;
+    private static long _lastDoubleClickTicks;
+    private const long DoubleClickDebounceTicks = TimeSpan.TicksPerMillisecond * 800;
 
     public static string Status => _status;
 
@@ -134,8 +136,24 @@ namespace NcTestRibbon.Cad
       catch { }
     }
 
+    /// <summary>Drop pending CAD poses without writing Excel (load-from-source / discard).</summary>
+    public static void ClearPending(bool updateRibbon = true)
+    {
+      lock (Gate)
+      {
+        PendingPoses.Clear();
+        SessionModified.Clear();
+      }
+
+      if (updateRibbon)
+      {
+        try { PadExcelSyncUi.SetPending(false); }
+        catch { }
+      }
+    }
+
     /// <summary>
-    /// Ribbon «Обновить данные в Excel»: write all pending X/Y/angle to Excel and clear red state.
+    /// Ribbon «Сохранить в исходные»: write all pending X/Y/angle to Excel and clear red state.
     /// </summary>
     public static int CommitPendingToExcel()
     {
@@ -534,6 +552,17 @@ namespace NcTestRibbon.Cad
       if (_suppress > 0)
       {
         return;
+      }
+
+      long now = DateTime.UtcNow.Ticks;
+      lock (Gate)
+      {
+        if (now - _lastDoubleClickTicks < DoubleClickDebounceTicks)
+        {
+          return;
+        }
+
+        _lastDoubleClickTicks = now;
       }
 
       try

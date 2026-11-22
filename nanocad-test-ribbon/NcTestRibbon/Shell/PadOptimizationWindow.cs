@@ -28,9 +28,8 @@ namespace NcTestRibbon.Shell
     private readonly Label _status;
     private readonly DataGridView _grid;
     private readonly CheckBox _showOnDrawing;
-    private readonly Button _placeButton;
-    private readonly Button _rotateButton;
     private readonly Button _saveButton;
+    private readonly Button _loadButton;
     private PadWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
     private bool _discardingSession;
@@ -180,18 +179,15 @@ namespace NcTestRibbon.Shell
       };
       cadRow.Controls.Add(_showOnDrawing);
 
-      MakeButton(cadRow, "Задать положение вручную", () => PlaceSelectedPad(), out _placeButton);
-      _placeButton.Enabled = false;
-
-      MakeButton(cadRow, "Повернуть вручную", () => ManualRotateSelected(), out _rotateButton);
-      _rotateButton.Enabled = false;
-
-      MakeButton(cadRow, "Сохранить положения", () => SaveCoordinates(), out _saveButton);
+      MakeButton(cadRow, "Сохранить положение", () => SaveCoordinates(), out _saveButton);
       _saveButton.Enabled = false;
+
+      MakeButton(cadRow, "Загрузить из исходных", () => ReloadFromSource(confirm: true), out _loadButton);
+      _loadButton.Enabled = false;
 
       top.Controls.Add(new Label
       {
-        Text = "Таблица только для просмотра (поля из Excel). Положение/угол: кнопки CAD, либо MOVE/ROTATE/grip на чертеже (с запросом записи в Excel). Double-click КП открывает это окно.",
+        Text = "Таблица только для просмотра (поля из Excel). Положение/угол: MOVE/ROTATE/grip на чертеже, затем «Сохранить положение». Double-click КП открывает это окно.",
         AutoSize = true,
         MaximumSize = new Size(1080, 0),
         ForeColor = Color.DimGray,
@@ -392,40 +388,77 @@ namespace NcTestRibbon.Shell
       catch
       {
       }
+      // Dirty prompt is handled once by SourceDataWindow / drawing-close dialog.
+    }
 
-      try
+    public bool HasDirtyCoords => _pads.Any(p => p.CoordsDirty);
+
+    public IEnumerable<DirtyCoordItem> EnumerateDirtyItems()
+    {
+      foreach (PadRow row in _pads.Where(p => p.CoordsDirty))
       {
-        if (!_pads.Any(p => p.CoordsDirty))
+        yield return new DirtyCoordItem
+        {
+          Group = "Кустовые",
+          Name = row.Name,
+          Detail = "X=" + row.X + "; Y=" + row.Y + "; угол=" + row.RotationText + "°"
+        };
+      }
+    }
+
+    public void SaveDirtyCoords(bool confirm)
+    {
+      if (!HasDirtyCoords)
+      {
+        return;
+      }
+
+      SaveCoordinates(confirmOverwrite: confirm);
+    }
+
+    public void ReloadFromSource(bool confirm)
+    {
+      string path = _book?.Path;
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        path = AppPaths.Load().PadsWorkbook;
+      }
+
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException("Нет файла таблиц КП для загрузки из исходных.");
+      }
+
+      if (confirm)
+      {
+        DialogResult ok = MessageBox.Show(
+          FindForm() ?? (System.Windows.Forms.IWin32Window)this,
+          "Загрузить положения КП из исходного Excel и сбросить изменения на чертеже?\n\n" + path,
+          "Загрузить из исходных",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (ok != DialogResult.Yes)
         {
           return;
         }
+      }
 
-        DialogResult apply = MessageBox.Show(
-          FindForm() ?? (System.Windows.Forms.IWin32Window)this,
-          "Применить новые координаты?",
-          "Кустовые площадки",
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (apply == DialogResult.Yes)
-        {
-          SaveCoordinates(confirmOverwrite: false);
-        }
-        else
-        {
-          DiscardUnsavedSession();
-        }
-      }
-      catch (Exception ex)
+      LoadPadsWorkbook(path, remember: false);
+      if (_showOnDrawing.Checked)
       {
-        WriteCrashLog("FormClosing coords", ex);
-        try
-        {
-          Log("Закрытие: координаты КП — " + ex.Message);
-        }
-        catch
-        {
-        }
+        RefreshDrawingOverlay(force: true);
       }
+      else
+      {
+        CadPadOverlay.Clear();
+      }
+
+      Log("КП загружены из исходных: " + Path.GetFileName(path));
+    }
+
+    public void DiscardDirtyCoords()
+    {
+      DiscardUnsavedSession();
     }
 
     /// <summary>
@@ -485,11 +518,9 @@ namespace NcTestRibbon.Shell
 
     private void UpdateActionButtons()
     {
-      PadRow row = SelectedPad();
-      bool hasRow = row?.Record != null;
-      _placeButton.Enabled = hasRow;
-      _rotateButton.Enabled = hasRow;
+      bool hasBook = _book != null && !string.IsNullOrWhiteSpace(_book.Path);
       _saveButton.Enabled = _pads.Any(p => p.CoordsDirty);
+      _loadButton.Enabled = hasBook || !string.IsNullOrWhiteSpace(AppPaths.Load().PadsWorkbook);
     }
 
     private PadRow SelectedPad()

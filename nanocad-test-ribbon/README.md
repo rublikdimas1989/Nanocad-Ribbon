@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.76**): `nanocad-test-ribbon-v1.2.76.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.76.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.76/nanocad-test-ribbon-v1.2.76.zip  
+Актуальный **slim** zip (версия **1.2.77**): `nanocad-test-ribbon-v1.2.77.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.77.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.77/nanocad-test-ribbon-v1.2.77.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.76 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.77 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (incl. flyout «Площадные объекты»), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.76+PadExcelRibbonSync` — MOVE/ROTATE/grip КП → красная кнопка «Обновить данные в Excel» (без MessageBox); zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.77+SourceSaveLoadUx` — «Сохранить/Загрузить из исходных»; tab save/load; drawing-close yellow prompt; dblclick singleton; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
@@ -52,10 +52,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestSettings` | **WPF** «Настройки» (трассировка → каталог БУОС/Узлы → траншея/дорога → сеть) |
 | `NcTestInitialData` | alias → `NcTestSourceData` |
 | `NcTestSourceData` | Лента: «Исходные данные» — Кустовые / Врезки / **размещение** БУОС / Узлы |
-| Flyout **Площадные объекты** | `NcTestAddPad` / `NcTestAddBuos` — открыть вкладку + CAD place jig |
-| Double-click КП (слой `NC_KP_PADS`) | Открыть «Исходные данные» → Кустовые (fallback cmd `NcTestPadOpen`) |
-| `NcTestPadSyncExcel` / лента **Обновить данные в Excel** | После MOVE/ROTATE/grip КП кнопка краснеет; клик пишет X/Y/угол в Excel и снимает pending |
-| MOVE / ROTATE / grip КП | Пометить pending (без MessageBox); один набор до клика по кнопке |
+| Flyout **Площадные объекты** | `NcTestAddPad` / `NcTestAddBuos` / **Сохранить в исходные** / **Загрузить из исходных** (с confirm) |
+| Double-click КП (слой `NC_KP_PADS`) | Открыть «Исходные данные» один раз (singleton/debounce) |
+| `NcTestSaveSources` / `NcTestLoadSources` | Сохранить / загрузить положения ↔ исходные Excel |
+| Вкладки Кустовые/Врезки/БУОС/Узлы | «Сохранить положение» / «Загрузить из исходных» (load = только активная вкладка) |
+| Закрытие чертежа / окна | Жёлтый список изменений → Сохранить положения / Загрузить из исходных |
+| MOVE / ROTATE / grip КП | Пометить pending; «Сохранить в исходные» краснеет |
 | `NcTestPadOpt` / `NcTestInserts` / `NcTestBuos` / `NcTestNodes` | Только командой (без кнопок ленты) → нужная вкладка |
 | `NcTestInterface` | Оформление: шрифт подписей + диаметр круга врезки → interface.conf |
 | `NcTestBlink` | **Toggle**: выбрать полилинию → мигание (Highlight 200 мс, как End). Повтор / отжать → стоп |

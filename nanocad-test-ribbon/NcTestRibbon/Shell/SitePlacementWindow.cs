@@ -34,9 +34,8 @@ namespace NcTestRibbon.Shell
     private readonly Label _status;
     private readonly DataGridView _grid;
     private readonly CheckBox _showOnDrawing;
-    private readonly Button _placeButton;
-    private readonly Button _rotateButton;
     private readonly Button _saveButton;
+    private readonly Button _loadButton;
     private SitePlacementWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
     private bool _discarding;
@@ -82,7 +81,7 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Мировые X/Y и угол — только CAD («Задать положение вручную» / «Повернуть вручную»). "
+        Text = "Мировые X/Y и угол — MOVE/ROTATE/grip на чертеже, затем «Сохранить положение». "
           + "Ширина/длина — из Excel (лист «" + _sheetName + "»). Имена уникальны. "
           + "Каталог размеров/стоимостей — вкладка «" + (buos ? "БУОС" : "Узлы") + "» в «Настройки».",
         AutoSize = true,
@@ -145,12 +144,10 @@ namespace NcTestRibbon.Shell
       };
       cadRow.Controls.Add(_showOnDrawing);
 
-      _placeButton = MakeButton(cadRow, "Задать положение вручную", PlaceSelected);
-      _placeButton.Enabled = false;
-      _rotateButton = MakeButton(cadRow, "Повернуть вручную", ManualRotateSelected);
-      _rotateButton.Enabled = false;
-      _saveButton = MakeButton(cadRow, "Сохранить положения", () => SaveCoordinates(confirmOverwrite: true));
+      _saveButton = MakeButton(cadRow, "Сохранить положение", () => SaveCoordinates(confirmOverwrite: true));
       _saveButton.Enabled = false;
+      _loadButton = MakeButton(cadRow, "Загрузить из исходных", () => ReloadFromSource(confirm: true));
+      _loadButton.Enabled = false;
 
       _grid = new DataGridView
       {
@@ -252,33 +249,70 @@ namespace NcTestRibbon.Shell
     {
       try { PersistShowFlag(_showOnDrawing.Checked); }
       catch { }
+      // Dirty prompt is handled once by SourceDataWindow / drawing-close dialog.
+    }
 
-      try
+    public bool HasDirtyCoords => _rows.Any(r => r.CoordsDirty);
+
+    public IEnumerable<DirtyCoordItem> EnumerateDirtyItems()
+    {
+      string group = _kind == SitePlacementKind.Buos ? "БУОС" : "Узлы";
+      foreach (SiteRow row in _rows.Where(r => r.CoordsDirty))
       {
-        if (!_rows.Any(r => r.CoordsDirty))
+        yield return new DirtyCoordItem
+        {
+          Group = group,
+          Name = row.Name,
+          Detail = "X=" + row.X + "; Y=" + row.Y + "; угол=" + row.RotationText + "°"
+        };
+      }
+    }
+
+    public void SaveDirtyCoords(bool confirm)
+    {
+      if (!HasDirtyCoords)
+      {
+        return;
+      }
+
+      SaveCoordinates(confirmOverwrite: confirm);
+    }
+
+    public void ReloadFromSource(bool confirm)
+    {
+      string path = _book?.Path;
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        AppPaths paths = AppPaths.Load();
+        path = _kind == SitePlacementKind.Buos ? paths.BuosPlacementWorkbook : paths.NodesPlacementWorkbook;
+      }
+
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException("Нет файла размещения «" + _sheetName + "» для загрузки из исходных.");
+      }
+
+      if (confirm)
+      {
+        DialogResult ok = MessageBox.Show(
+          FindForm() ?? (IWin32Window)this,
+          "Загрузить положения «" + _sheetName + "» из исходного Excel и сбросить изменения на чертеже?\n\n" + path,
+          "Загрузить из исходных",
+          MessageBoxButtons.YesNo,
+          MessageBoxIcon.Question);
+        if (ok != DialogResult.Yes)
         {
           return;
         }
+      }
 
-        DialogResult apply = MessageBox.Show(
-          FindForm() ?? (IWin32Window)this,
-          "Применить новые координаты?",
-          Text,
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (apply == DialogResult.Yes)
-        {
-          SaveCoordinates(confirmOverwrite: false);
-        }
-        else
-        {
-          DiscardUnsaved();
-        }
-      }
-      catch (Exception ex)
-      {
-        Log("Закрытие: " + ex.Message);
-      }
+      LoadWorkbook(path, remember: false);
+      Log(_noun + " загружены из исходных.");
+    }
+
+    public void DiscardDirtyCoords()
+    {
+      DiscardUnsaved();
     }
 
     private void PersistShowFlag(bool show)
@@ -684,11 +718,12 @@ namespace NcTestRibbon.Shell
 
     private void UpdateButtons()
     {
-      SiteRow row = SelectedRow();
-      bool has = row?.Record != null;
-      _placeButton.Enabled = has;
-      _rotateButton.Enabled = has;
       _saveButton.Enabled = _rows.Any(r => r.CoordsDirty);
+      string remembered = _kind == SitePlacementKind.Buos
+        ? AppPaths.Load().BuosPlacementWorkbook
+        : AppPaths.Load().NodesPlacementWorkbook;
+      _loadButton.Enabled = (_book != null && !string.IsNullOrWhiteSpace(_book.Path))
+        || !string.IsNullOrWhiteSpace(remembered);
     }
 
     private SiteRow SelectedRow()

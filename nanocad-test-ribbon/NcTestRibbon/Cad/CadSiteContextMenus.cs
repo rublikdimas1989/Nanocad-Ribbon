@@ -35,24 +35,24 @@ namespace NcTestRibbon.Cad
         object cme = Activator.CreateInstance(cmeType);
         cmeType.GetProperty("Title")?.SetValue(cme, "Площадные объекты");
 
-        object placeItem = CreateMenuItem(menuItemType, "Задать положение вручную");
-        object rotateItem = CreateMenuItem(menuItemType, "Повернуть вручную");
+        object saveItem = CreateMenuItem(menuItemType, "Сохранить в исходные");
+        object loadItem = CreateMenuItem(menuItemType, "Загрузить из исходных");
         object openItem = CreateMenuItem(menuItemType, "Открыть исходные данные");
-        if (placeItem == null || rotateItem == null || openItem == null)
+        if (saveItem == null || loadItem == null || openItem == null)
         {
           _status = "HostMgd.Windows.MenuItem ctor failed.";
           return;
         }
 
         EventInfo click = menuItemType.GetEvent("Click");
-        click?.AddEventHandler(placeItem, new EventHandler((_, __) => SendCommand("NcTestAddPad")));
-        click?.AddEventHandler(rotateItem, new EventHandler((_, __) => SendCommand("NcTestPadOpt")));
+        click?.AddEventHandler(saveItem, new EventHandler((_, __) => SendCommand("NcTestSaveSources")));
+        click?.AddEventHandler(loadItem, new EventHandler((_, __) => SendCommand("NcTestLoadSources")));
         click?.AddEventHandler(openItem, new EventHandler((_, __) => SendCommand("NcTestSourceData")));
 
         object items = cmeType.GetProperty("MenuItems")?.GetValue(cme);
         MethodInfo add = items?.GetType().GetMethod("Add", new[] { menuItemType });
-        add?.Invoke(items, new[] { placeItem });
-        add?.Invoke(items, new[] { rotateItem });
+        add?.Invoke(items, new[] { saveItem });
+        add?.Invoke(items, new[] { loadItem });
         add?.Invoke(items, new[] { openItem });
 
         Type appType = FindType("HostMgd.ApplicationServices.Application", "hostmgd", "HostMgd");

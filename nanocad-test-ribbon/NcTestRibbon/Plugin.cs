@@ -51,6 +51,14 @@ namespace NcTestRibbon
 
       try
       {
+        DrawingDirtyGuard.TryDetach();
+      }
+      catch
+      {
+      }
+
+      try
+      {
         CadSiteContextMenus.TryDetach();
       }
       catch
