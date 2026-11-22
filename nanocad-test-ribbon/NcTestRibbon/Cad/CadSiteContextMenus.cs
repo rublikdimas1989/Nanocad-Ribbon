@@ -2,16 +2,10 @@ namespace NcTestRibbon.Cad
 {
   using System;
   using System.Reflection;
-  using HostMgd.ApplicationServices;
-  using HostMgd.EditorInput;
-  using Teigha.DatabaseServices;
-  using Teigha.Runtime;
-  using CadApp = HostMgd.ApplicationServices.Application;
 
   /// <summary>
   /// Optional object context-menu hooks for pad / BUOS placement entities.
-  /// Uses reflection so missing HostMgd.Windows types do not break compile/load.
-  /// See internal report: area-objects-flyout-context-menu.md
+  /// Fully reflection-based so missing HostMgd.Windows / RX helpers never break compile.
   /// </summary>
   public static class CadSiteContextMenus
   {
@@ -30,24 +24,25 @@ namespace NcTestRibbon.Cad
 
       try
       {
-        // AutoCAD-compatible API often present as HostMgd.Windows.* in nanoCAD hostmgd.
-        Type cmeType = Type.GetType("HostMgd.Windows.ContextMenuExtension, hostmgd", throwOnError: false)
-          ?? Type.GetType("HostMgd.Windows.ContextMenuExtension, HostMgd", throwOnError: false);
-        Type menuItemType = Type.GetType("HostMgd.Windows.MenuItem, hostmgd", throwOnError: false)
-          ?? Type.GetType("HostMgd.Windows.MenuItem, HostMgd", throwOnError: false);
+        Type cmeType = FindType("HostMgd.Windows.ContextMenuExtension", "hostmgd", "HostMgd");
+        Type menuItemType = FindType("HostMgd.Windows.MenuItem", "hostmgd", "HostMgd");
         if (cmeType == null || menuItemType == null)
         {
-          _status = "HostMgd.Windows.ContextMenuExtension not found in hostmgd — object context menu not registered.";
+          _status = "HostMgd.Windows.ContextMenuExtension not found — object context menu not registered.";
           return;
         }
 
         object cme = Activator.CreateInstance(cmeType);
-        PropertyInfo title = cmeType.GetProperty("Title");
-        title?.SetValue(cme, "Площадные объекты");
+        cmeType.GetProperty("Title")?.SetValue(cme, "Площадные объекты");
 
-        object placeItem = Activator.CreateInstance(menuItemType, "Задать положение вручную");
-        object rotateItem = Activator.CreateInstance(menuItemType, "Повернуть вручную");
-        object openItem = Activator.CreateInstance(menuItemType, "Открыть исходные данные");
+        object placeItem = CreateMenuItem(menuItemType, "Задать положение вручную");
+        object rotateItem = CreateMenuItem(menuItemType, "Повернуть вручную");
+        object openItem = CreateMenuItem(menuItemType, "Открыть исходные данные");
+        if (placeItem == null || rotateItem == null || openItem == null)
+        {
+          _status = "HostMgd.Windows.MenuItem ctor failed.";
+          return;
+        }
 
         EventInfo click = menuItemType.GetEvent("Click");
         click?.AddEventHandler(placeItem, new EventHandler((_, __) => SendCommand("NcTestAddPad")));
@@ -60,24 +55,53 @@ namespace NcTestRibbon.Cad
         add?.Invoke(items, new[] { rotateItem });
         add?.Invoke(items, new[] { openItem });
 
-        // Prefer object menu on Entity; Popup filter would refine to our layers/XData.
-        MethodInfo addExt = typeof(CadApp).GetMethod(
-          "AddObjectContextMenuExtension",
-          BindingFlags.Public | BindingFlags.Static,
-          binder: null,
-          types: new[] { typeof(RXClass), cmeType },
-          modifiers: null);
-        if (addExt == null)
+        Type appType = FindType("HostMgd.ApplicationServices.Application", "hostmgd", "HostMgd");
+        Type rxClassType = FindType("Teigha.Runtime.RXClass", "hostdbmgd", "hostdbmgd", "TD_Mgd", "Teigha");
+        Type entityType = FindType("Teigha.DatabaseServices.Entity", "hostdbmgd", "hostdbmgd", "TD_Mgd", "Teigha");
+        if (appType == null || rxClassType == null || entityType == null)
         {
-          _status = "Application.AddObjectContextMenuExtension not found — context menu API unavailable.";
+          _status = "HostMgd/Teigha types missing for context-menu attach.";
           return;
         }
 
-        RXClass entityClass = RXObject.GetClass(typeof(Entity));
-        addExt.Invoke(null, new object[] { entityClass, cme });
+        object entityRx = GetRxClass(rxClassType, entityType);
+        if (entityRx == null)
+        {
+          _status = "RXClass.GetClass(Entity) unavailable.";
+          return;
+        }
+
+        MethodInfo addExt = appType.GetMethod(
+          "AddObjectContextMenuExtension",
+          BindingFlags.Public | BindingFlags.Static,
+          binder: null,
+          types: new[] { rxClassType, cmeType },
+          modifiers: null);
+        if (addExt == null)
+        {
+          // Some hosts expose only default menu extension.
+          addExt = appType.GetMethod(
+            "AddDefaultContextMenuExtension",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { cmeType },
+            modifiers: null);
+          if (addExt == null)
+          {
+            _status = "No AddObject/DefaultContextMenuExtension on Application.";
+            return;
+          }
+
+          addExt.Invoke(null, new[] { cme });
+        }
+        else
+        {
+          addExt.Invoke(null, new[] { entityRx, cme });
+        }
+
         _extension = cme;
         _attached = true;
-        _status = "Attached Entity context menu (HostMgd.Windows) — filter by layer/XData still recommended.";
+        _status = "Attached context menu via HostMgd.Windows (reflection).";
       }
       catch (Exception ex)
       {
@@ -97,13 +121,33 @@ namespace NcTestRibbon.Cad
       try
       {
         Type cmeType = _extension.GetType();
-        MethodInfo removeExt = typeof(CadApp).GetMethod(
+        Type appType = FindType("HostMgd.ApplicationServices.Application", "hostmgd", "HostMgd");
+        Type rxClassType = FindType("Teigha.Runtime.RXClass", "hostdbmgd", "hostdbmgd", "TD_Mgd", "Teigha");
+        Type entityType = FindType("Teigha.DatabaseServices.Entity", "hostdbmgd", "hostdbmgd", "TD_Mgd", "Teigha");
+        MethodInfo removeExt = appType?.GetMethod(
           "RemoveObjectContextMenuExtension",
           BindingFlags.Public | BindingFlags.Static,
           binder: null,
-          types: new[] { typeof(RXClass), cmeType },
+          types: new[] { rxClassType, cmeType },
           modifiers: null);
-        removeExt?.Invoke(null, new object[] { RXObject.GetClass(typeof(Entity)), _extension });
+        if (removeExt != null && rxClassType != null && entityType != null)
+        {
+          object entityRx = GetRxClass(rxClassType, entityType);
+          if (entityRx != null)
+          {
+            removeExt.Invoke(null, new[] { entityRx, _extension });
+          }
+        }
+        else
+        {
+          MethodInfo removeDefault = appType?.GetMethod(
+            "RemoveDefaultContextMenuExtension",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: new[] { cmeType },
+            modifiers: null);
+          removeDefault?.Invoke(null, new[] { _extension });
+        }
       }
       catch
       {
@@ -115,35 +159,109 @@ namespace NcTestRibbon.Cad
       }
     }
 
+    private static object CreateMenuItem(Type menuItemType, string text)
+    {
+      try
+      {
+        return Activator.CreateInstance(menuItemType, text);
+      }
+      catch
+      {
+        try
+        {
+          object item = Activator.CreateInstance(menuItemType);
+          menuItemType.GetProperty("Text")?.SetValue(item, text);
+          menuItemType.GetProperty("Header")?.SetValue(item, text);
+          return item;
+        }
+        catch
+        {
+          return null;
+        }
+      }
+    }
+
+    private static object GetRxClass(Type rxClassType, Type entityType)
+    {
+      MethodInfo getClass = rxClassType.GetMethod(
+        "GetClass",
+        BindingFlags.Public | BindingFlags.Static,
+        binder: null,
+        types: new[] { typeof(Type) },
+        modifiers: null);
+      if (getClass != null)
+      {
+        return getClass.Invoke(null, new object[] { entityType });
+      }
+
+      Type rxObjectType = FindType("Teigha.Runtime.RXObject", "hostdbmgd", "hostdbmgd", "TD_Mgd", "Teigha");
+      MethodInfo viaObject = rxObjectType?.GetMethod(
+        "GetClass",
+        BindingFlags.Public | BindingFlags.Static,
+        binder: null,
+        types: new[] { typeof(Type) },
+        modifiers: null);
+      return viaObject?.Invoke(null, new object[] { entityType });
+    }
+
     private static void SendCommand(string command)
     {
       try
       {
-        Document doc = CadApp.DocumentManager.MdiActiveDocument;
+        Type appType = FindType("HostMgd.ApplicationServices.Application", "hostmgd", "HostMgd");
+        object docs = appType?.GetProperty("DocumentManager", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+        object doc = docs?.GetType().GetProperty("MdiActiveDocument")?.GetValue(docs);
         if (doc == null)
         {
           return;
         }
 
-        // Trailing space executes; UsePickSet-friendly for place commands.
-        doc.SendStringToExecute(command + " ", true, false, false);
+        MethodInfo send = doc.GetType().GetMethod(
+          "SendStringToExecute",
+          BindingFlags.Public | BindingFlags.Instance,
+          binder: null,
+          types: new[] { typeof(string), typeof(bool), typeof(bool), typeof(bool) },
+          modifiers: null);
+        send?.Invoke(doc, new object[] { command + " ", true, false, false });
       }
       catch
       {
       }
     }
 
-    /// <summary>Diagnostic helper — writes attach status to the command line.</summary>
-    public static void WriteStatusToEditor()
+    private static Type FindType(string fullName, params string[] assemblyHints)
     {
-      try
+      Type t = Type.GetType(fullName, throwOnError: false);
+      if (t != null)
       {
-        Editor ed = CadApp.DocumentManager.MdiActiveDocument?.Editor;
-        ed?.WriteMessage("\nNcTestRibbon context menu: " + _status);
+        return t;
       }
-      catch
+
+      foreach (string hint in assemblyHints)
       {
+        t = Type.GetType(fullName + ", " + hint, throwOnError: false);
+        if (t != null)
+        {
+          return t;
+        }
       }
+
+      foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+      {
+        try
+        {
+          t = asm.GetType(fullName, throwOnError: false, ignoreCase: false);
+          if (t != null)
+          {
+            return t;
+          }
+        }
+        catch
+        {
+        }
+      }
+
+      return null;
     }
   }
 }

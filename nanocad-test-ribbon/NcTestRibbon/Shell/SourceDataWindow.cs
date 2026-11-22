@@ -88,7 +88,7 @@ namespace NcTestRibbon.Shell
     public void BeginPlaceForTab(SourceDataTab tab)
     {
       SelectTab(tab);
-      try { Application.DoEvents(); }
+      try { System.Windows.Forms.Application.DoEvents(); }
       catch { }
 
       if (tab == SourceDataTab.Pads)

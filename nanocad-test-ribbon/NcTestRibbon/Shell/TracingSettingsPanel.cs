@@ -288,7 +288,7 @@ namespace NcTestRibbon.Shell
       }
       catch (Exception ex)
       {
-        MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
+        System.Windows.MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
           ex.Message, "Номенклатура труб", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
     }
@@ -376,7 +376,7 @@ namespace NcTestRibbon.Shell
 
         if (showErrors)
         {
-          MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
+          System.Windows.MessageBox.Show(Window.GetWindow(this) ?? System.Windows.Application.Current?.MainWindow,
             ex.Message, "Расценки", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
       }

@@ -590,7 +590,7 @@ namespace NcTestRibbon.Shell
 
         try
         {
-          Application.DoEvents();
+          System.Windows.Forms.Application.DoEvents();
         }
         catch
         {

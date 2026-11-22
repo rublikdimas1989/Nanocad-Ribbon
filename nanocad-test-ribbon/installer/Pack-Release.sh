@@ -29,6 +29,8 @@ rm -rf \
   "$TMP/plugin/tools/NcGdalGeo/bin" \
   "$TMP/plugin/tools/NcGdalGeo/obj" \
   "$TMP/plugin/installer/gdal"
+# User keeps their own Excel workbooks — never ship sample .xlsx/.xlsm in slim zips.
+find "$TMP/plugin" -type f \( -iname '*.xlsx' -o -iname '*.xlsm' \) -delete
 
 cat > "$TMP/plugin/GDAL-RUNTIME.txt" <<EOF
 Slim plugin zip (~plugin + deps + NcGdalGeo tool). GDAL natives (~132MB) are separate.

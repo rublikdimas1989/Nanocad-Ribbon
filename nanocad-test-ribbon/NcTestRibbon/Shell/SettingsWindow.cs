@@ -24,7 +24,8 @@ namespace NcTestRibbon.Shell
       Foreground = System.Windows.Media.Brushes.Gray,
       TextWrapping = TextWrapping.NoWrap,
       TextAlignment = TextAlignment.Left,
-      FlowDirection = FlowDirection.LeftToRight
+      // Qualify: ImplicitUsings brings System.Windows.Forms (also has FlowDirection).
+      FlowDirection = System.Windows.FlowDirection.LeftToRight
     };
 
     public SettingsWindow()
@@ -122,7 +123,7 @@ namespace NcTestRibbon.Shell
         _tracingPanel.SaveToConfig();
         _trenchPanel.SaveStubConf();
         _networkPanel.SaveToConfig();
-        MessageBox.Show(
+        System.Windows.MessageBox.Show(
           this,
           "Сохранено:\n" + TracingCache.TracingConf + "\n" + TracingCache.TrenchRoadConf
           + "\n" + TracingCache.NetConf,
@@ -133,7 +134,7 @@ namespace NcTestRibbon.Shell
       }
       catch (Exception ex)
       {
-        MessageBox.Show(
+        System.Windows.MessageBox.Show(
           this,
           ex.Message,
           "Проверьте настройки",

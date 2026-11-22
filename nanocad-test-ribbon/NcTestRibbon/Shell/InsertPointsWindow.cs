@@ -356,7 +356,7 @@ namespace NcTestRibbon.Shell
           Hide();
         }
 
-        try { Application.DoEvents(); } catch { }
+        try { System.Windows.Forms.Application.DoEvents(); } catch { }
         cadWork?.Invoke();
       }
       catch (Exception ex)
