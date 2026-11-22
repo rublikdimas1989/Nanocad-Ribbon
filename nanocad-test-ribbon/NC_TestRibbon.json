@@ -105,6 +105,13 @@
       "tooltip": "Команда: Height colorize (лента — в Картография).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.http.ico"
+    },
+    {
+      "intername": "NcTestPadSyncExcel",
+      "displayName": "Обновить данные в Excel",
+      "tooltip": "Записать X/Y/угол КП с чертежа в Excel после MOVE/ROTATE/grip (кнопка краснеет при ожидании).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.excel_sync_red.ico"
     }
   ],
   "buttons": [
@@ -131,6 +138,11 @@
     {
       "text": "Исходные данные",
       "command": "NcTestSourceData",
+      "style": "large"
+    },
+    {
+      "text": "Обновить данные в Excel",
+      "command": "NcTestPadSyncExcel",
       "style": "large"
     },
     {

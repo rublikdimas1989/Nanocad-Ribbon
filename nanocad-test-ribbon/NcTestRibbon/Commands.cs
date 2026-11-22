@@ -1,6 +1,7 @@
 namespace NcTestRibbon
 {
   using System;
+  using System.Collections.Generic;
   using System.Diagnostics;
   using System.IO;
   using System.Net.Http;
@@ -281,6 +282,44 @@ namespace NcTestRibbon
     public void NcTestNodes()
     {
       OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
+    }
+
+    /// <summary>
+    /// Ribbon «Обновить данные в Excel»: flush pending KP X/Y/angle after MOVE/ROTATE/grip.
+    /// </summary>
+    [CommandMethod("NcTestPadSyncExcel")]
+    public void NcTestPadSyncExcel()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        if (!CadPadInteraction.HasPendingExcelSync)
+        {
+          ed?.WriteMessage("\nNcTestPadSyncExcel: нет ожидающих изменений КП.");
+          try { PadExcelSyncUi.SetPending(false); }
+          catch { }
+
+          return;
+        }
+
+        IReadOnlyCollection<string> names = CadPadInteraction.PendingPadNames;
+        int n = CadPadInteraction.CommitPendingToExcel();
+        ed?.WriteMessage(
+          "\nNcTestPadSyncExcel: записано в Excel " + n + " КП"
+          + (names.Count == 0 ? "." : " (" + string.Join(", ", names) + ")."));
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestPadSyncExcel", ex);
+        try
+        {
+          CadApp.ShowAlertDialog("Не удалось обновить Excel:\n" + ex.Message);
+        }
+        catch
+        {
+        }
+      }
     }
 
     /// <summary>

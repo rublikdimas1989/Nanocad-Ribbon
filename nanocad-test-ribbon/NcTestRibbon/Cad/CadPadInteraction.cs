@@ -3,18 +3,16 @@ namespace NcTestRibbon.Cad
   using System;
   using System.Collections.Generic;
   using System.Reflection;
-  using System.Windows.Forms;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
   using Teigha.DatabaseServices;
   using Teigha.Geometry;
   using CadApp = HostMgd.ApplicationServices.Application;
-  using DbPolyline = Teigha.DatabaseServices.Polyline;
 
   /// <summary>
   /// Pad CAD interaction: double-click opens «Исходные данные» → Кустовые;
-  /// after MOVE/ROTATE/grip edits, prompt to write X/Y/angle back to Excel.
-  /// Uses HostMgd Document/Database events; BeginDoubleClick via reflection when present.
+  /// after MOVE/ROTATE/grip, mark pending poses and highlight ribbon
+  /// «Обновить данные в Excel» (no MessageBox — one pending set until user clicks).
   /// </summary>
   public static class CadPadInteraction
   {
@@ -22,11 +20,39 @@ namespace NcTestRibbon.Cad
     private static bool _attached;
     private static string _status = "not attempted";
     private static int _suppress;
-    private static readonly HashSet<ObjectId> Pending = new HashSet<ObjectId>();
+    /// <summary>ObjectIds touched during the current CAD command (cleared each CommandEnded).</summary>
+    private static readonly HashSet<ObjectId> SessionModified = new HashSet<ObjectId>();
+    /// <summary>Pad name → pose waiting for Excel write (survives until CommitPending).</summary>
+    private static readonly Dictionary<string, Pose> PendingPoses =
+      new Dictionary<string, Pose>(StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<Document> HookedDocs = new HashSet<Document>();
     private static Delegate _beginDoubleClickHandler;
+    private static long _lastSessionHandledTicks;
+    private const long SessionDebounceTicks = TimeSpan.TicksPerMillisecond * 400;
 
     public static string Status => _status;
+
+    public static bool HasPendingExcelSync
+    {
+      get
+      {
+        lock (Gate)
+        {
+          return PendingPoses.Count > 0;
+        }
+      }
+    }
+
+    public static IReadOnlyCollection<string> PendingPadNames
+    {
+      get
+      {
+        lock (Gate)
+        {
+          return new List<string>(PendingPoses.Keys);
+        }
+      }
+    }
 
     public static IDisposable SuppressNotifications()
     {
@@ -42,34 +68,34 @@ namespace NcTestRibbon.Cad
           return;
         }
 
-      try
-      {
-        try { CadApp.DocumentManager.DocumentCreated += OnDocumentCreated; }
-        catch { }
-
-        try { CadApp.DocumentManager.DocumentActivated += OnDocumentActivated; }
-        catch { }
-
-        CadApp.DocumentManager.DocumentToBeDestroyed += OnDocumentToBeDestroyed;
-        TryHookBeginDoubleClick();
-
-        Document active = CadApp.DocumentManager.MdiActiveDocument;
-        if (active != null)
+        try
         {
-          HookDocument(active);
-        }
+          try { CadApp.DocumentManager.DocumentCreated += OnDocumentCreated; }
+          catch { }
 
-        _attached = true;
-        if (string.IsNullOrEmpty(_status) || _status == "not attempted")
-        {
-          _status = "Pad CAD interaction attached (double-click + CommandEnded sync).";
+          try { CadApp.DocumentManager.DocumentActivated += OnDocumentActivated; }
+          catch { }
+
+          CadApp.DocumentManager.DocumentToBeDestroyed += OnDocumentToBeDestroyed;
+          TryHookBeginDoubleClick();
+
+          Document active = CadApp.DocumentManager.MdiActiveDocument;
+          if (active != null)
+          {
+            HookDocument(active);
+          }
+
+          _attached = true;
+          if (string.IsNullOrEmpty(_status) || _status == "not attempted")
+          {
+            _status = "Pad CAD interaction attached (double-click + ribbon Excel sync).";
+          }
         }
-      }
-      catch (Exception ex)
-      {
-        _status = "Attach failed: " + ex.GetType().Name + ": " + ex.Message;
-        _attached = false;
-      }
+        catch (Exception ex)
+        {
+          _status = "Attach failed: " + ex.GetType().Name + ": " + ex.Message;
+          _attached = false;
+        }
       }
     }
 
@@ -77,19 +103,19 @@ namespace NcTestRibbon.Cad
     {
       lock (Gate)
       {
-      try
-      {
-        try { CadApp.DocumentManager.DocumentCreated -= OnDocumentCreated; }
-        catch { }
+        try
+        {
+          try { CadApp.DocumentManager.DocumentCreated -= OnDocumentCreated; }
+          catch { }
 
-        try { CadApp.DocumentManager.DocumentActivated -= OnDocumentActivated; }
-        catch { }
+          try { CadApp.DocumentManager.DocumentActivated -= OnDocumentActivated; }
+          catch { }
 
-        CadApp.DocumentManager.DocumentToBeDestroyed -= OnDocumentToBeDestroyed;
-      }
-      catch
-      {
-      }
+          CadApp.DocumentManager.DocumentToBeDestroyed -= OnDocumentToBeDestroyed;
+        }
+        catch
+        {
+        }
 
         TryUnhookBeginDoubleClick();
 
@@ -99,9 +125,79 @@ namespace NcTestRibbon.Cad
         }
 
         HookedDocs.Clear();
-        Pending.Clear();
+        SessionModified.Clear();
+        PendingPoses.Clear();
         _attached = false;
       }
+
+      try { PadExcelSyncUi.SetPending(false); }
+      catch { }
+    }
+
+    /// <summary>
+    /// Ribbon «Обновить данные в Excel»: write all pending X/Y/angle to Excel and clear red state.
+    /// </summary>
+    public static int CommitPendingToExcel()
+    {
+      List<KeyValuePair<string, Pose>> batch;
+      lock (Gate)
+      {
+        batch = new List<KeyValuePair<string, Pose>>(PendingPoses);
+        PendingPoses.Clear();
+        SessionModified.Clear();
+      }
+
+      try { PadExcelSyncUi.SetPending(false); }
+      catch { }
+
+      if (batch.Count == 0)
+      {
+        return 0;
+      }
+
+      int ok = 0;
+      var errors = new List<string>();
+      using (SuppressNotifications())
+      {
+        foreach (KeyValuePair<string, Pose> pair in batch)
+        {
+          try
+          {
+            TestCommandsBridge.ApplyPadCadPose(
+              pair.Key, pair.Value.X, pair.Value.Y, pair.Value.RotationDeg, true);
+            ok++;
+          }
+          catch (Exception ex)
+          {
+            errors.Add(pair.Key + ": " + ex.Message);
+            // Keep failed pads pending so user can retry.
+            lock (Gate)
+            {
+              PendingPoses[pair.Key] = pair.Value;
+            }
+          }
+        }
+      }
+
+      bool stillPending;
+      lock (Gate)
+      {
+        stillPending = PendingPoses.Count > 0;
+      }
+
+      if (stillPending)
+      {
+        try { PadExcelSyncUi.SetPending(true); }
+        catch { }
+      }
+
+      if (errors.Count > 0)
+      {
+        throw new InvalidOperationException(
+          "Обновлено " + ok + " из " + batch.Count + ".\n" + string.Join("\n", errors));
+      }
+
+      return ok;
     }
 
     private static void OnDocumentCreated(object sender, DocumentCollectionEventArgs e)
@@ -117,6 +213,13 @@ namespace NcTestRibbon.Cad
       if (e?.Document != null)
       {
         HookDocument(e.Document);
+      }
+
+      // Re-apply red highlight if pending (ribbon may rebuild on doc switch).
+      if (HasPendingExcelSync)
+      {
+        try { PadExcelSyncUi.SetPending(true); }
+        catch { }
       }
     }
 
@@ -189,6 +292,7 @@ namespace NcTestRibbon.Cad
 
     private static void OnObjectModified(object sender, ObjectEventArgs e)
     {
+      // Ignore our own UpdatePad / Excel redraw writes.
       if (_suppress > 0 || e?.DBObject == null)
       {
         return;
@@ -202,10 +306,9 @@ namespace NcTestRibbon.Cad
           return;
         }
 
-        // Prefer polyline (footprint); labels also carry XData.
         lock (Gate)
         {
-          Pending.Add(ent.ObjectId);
+          SessionModified.Add(ent.ObjectId);
         }
       }
       catch
@@ -217,7 +320,7 @@ namespace NcTestRibbon.Cad
     {
       lock (Gate)
       {
-        Pending.Clear();
+        SessionModified.Clear();
       }
     }
 
@@ -227,66 +330,52 @@ namespace NcTestRibbon.Cad
       {
         lock (Gate)
         {
-          Pending.Clear();
+          SessionModified.Clear();
         }
 
         return;
       }
 
       string cmd = (e?.GlobalCommandName ?? string.Empty).Trim().ToUpperInvariant();
+
+      // One pending mark per move session: only transform/grip commands promote session → pending.
+      // Empty / idle CommandEnded must NOT re-process (was the MessageBox infinite loop).
       if (!IsTransformCommand(cmd))
       {
-        // Still process pending if grip/edit command names differ by locale.
         lock (Gate)
         {
-          if (Pending.Count == 0)
-          {
-            return;
-          }
+          SessionModified.Clear();
         }
 
-        if (!string.IsNullOrEmpty(cmd) && cmd != "SETVAR" && cmd != "#")
-        {
-          // Unknown command with pending pad edits — treat as possible grip/transform.
-          if (!cmd.Contains("GRIP") && !cmd.Contains("MOVE") && !cmd.Contains("ROTATE")
-              && !cmd.Contains("STRETCH") && cmd != "U" && cmd != "UNDO")
-          {
-            lock (Gate)
-            {
-              Pending.Clear();
-            }
+        return;
+      }
 
-            return;
-          }
-        }
-        else if (string.IsNullOrEmpty(cmd))
+      long now = DateTime.UtcNow.Ticks;
+      lock (Gate)
+      {
+        if (now - _lastSessionHandledTicks < SessionDebounceTicks && SessionModified.Count == 0)
         {
-          lock (Gate)
-          {
-            if (Pending.Count == 0)
-            {
-              return;
-            }
-          }
+          return;
         }
       }
 
       ObjectId[] ids;
       lock (Gate)
       {
-        ids = new ObjectId[Pending.Count];
-        Pending.CopyTo(ids);
-        Pending.Clear();
-      }
+        if (SessionModified.Count == 0)
+        {
+          return;
+        }
 
-      if (ids.Length == 0)
-      {
-        return;
+        ids = new ObjectId[SessionModified.Count];
+        SessionModified.CopyTo(ids);
+        SessionModified.Clear();
+        _lastSessionHandledTicks = now;
       }
 
       try
       {
-        ProcessTransformedPads(ids);
+        PromoteSessionToPending(ids);
       }
       catch
       {
@@ -306,7 +395,7 @@ namespace NcTestRibbon.Cad
         || cmd == "MOVECOPY" || cmd == "ROTATE3D";
     }
 
-    private static void ProcessTransformedPads(ObjectId[] ids)
+    private static void PromoteSessionToPending(ObjectId[] ids)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
       if (doc == null)
@@ -345,59 +434,51 @@ namespace NcTestRibbon.Cad
             continue;
           }
 
-          if (CadPadOverlay.TryReadPadPose(name, out double x, out double y, out double rot))
+          // Pose read is read-only; still suppress in case overlay helpers touch DB.
+          using (SuppressNotifications())
           {
-            byName[name] = new Pose { X = x, Y = y, RotationDeg = rot };
+            if (CadPadOverlay.TryReadPadPose(name, out double x, out double y, out double rot))
+            {
+              byName[name] = new Pose { X = x, Y = y, RotationDeg = rot };
+            }
           }
         }
 
         tr.Commit();
       }
 
-      foreach (KeyValuePair<string, Pose> pair in byName)
-      {
-        PromptAndSyncPad(pair.Key, pair.Value.X, pair.Value.Y, pair.Value.RotationDeg);
-      }
-    }
-
-    private static void PromptAndSyncPad(string name, double x, double y, double rotationDeg)
-    {
-      DialogResult answer;
-      try
-      {
-        answer = MessageBox.Show(
-          "Обновить данные в Excel / конфигурации?\n\nКП: " + name
-          + "\nX=" + x.ToString("0.###")
-          + "; Y=" + y.ToString("0.###")
-          + "; угол=" + CadPadOverlay.NormalizeDegrees(rotationDeg).ToString("0.###") + "°",
-          "Кустовые площадки",
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-      }
-      catch
+      if (byName.Count == 0)
       {
         return;
       }
 
-      bool saveExcel = answer == DialogResult.Yes;
-      try
+      lock (Gate)
       {
-        TestCommandsBridge.ApplyPadCadPose(name, x, y, rotationDeg, saveExcel);
-      }
-      catch (Exception ex)
-      {
-        try
+        foreach (KeyValuePair<string, Pose> pair in byName)
         {
-          MessageBox.Show(
-            "Не удалось обновить КП «" + name + "».\n\n" + ex.Message,
-            "Кустовые площадки",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Warning);
-        }
-        catch
-        {
+          PendingPoses[pair.Key] = pair.Value;
         }
       }
+
+      // Preview in open SourceData (yellow rows) without writing Excel yet.
+      using (SuppressNotifications())
+      {
+        foreach (KeyValuePair<string, Pose> pair in byName)
+        {
+          try
+          {
+            TestCommandsBridge.ApplyPadCadPose(
+              pair.Key, pair.Value.X, pair.Value.Y, pair.Value.RotationDeg, false);
+          }
+          catch
+          {
+            // Window may be closed / pad not loaded — Excel write still available on button click.
+          }
+        }
+      }
+
+      try { PadExcelSyncUi.SetPending(true); }
+      catch { }
     }
 
     private static void TryHookBeginDoubleClick()
@@ -492,7 +573,6 @@ namespace NcTestRibbon.Cad
 
       try
       {
-        // Non-interactive nested pick at click point (AutoCAD-compatible API).
         Type optsType = Type.GetType("HostMgd.EditorInput.PromptNestedEntityOptions, hostmgd", false)
           ?? typeof(PromptEntityOptions);
         object opts = Activator.CreateInstance(optsType, "\n");
