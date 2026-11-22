@@ -27,11 +27,67 @@ namespace NcTestRibbon.Shell
     public static string MapsDir => Path.Combine(Root, "Maps");
     public static string SourceDataDir => Path.Combine(Root, "SourceData");
 
-    /// <summary>Hard-bound rates workbook (not browsable).</summary>
+    /// <summary>Preferred rates workbook name (xlsx). Kept for display / docs.</summary>
     public static string PriceXlsx => Path.Combine(SettingsDir, "Price.xlsx");
+
+    /// <summary>Macro-enabled rates workbook alternate name.</summary>
+    public static string PriceXlsm => Path.Combine(SettingsDir, "Price.xlsm");
 
     public static string TracingConf => Path.Combine(SettingsDir, "tracing.conf");
     public static string TrenchRoadConf => Path.Combine(SettingsDir, "trench_road.conf");
+    public static string InterfaceConf => Path.Combine(SettingsDir, "interface.conf");
+    public static string GeometryConf => Path.Combine(SettingsDir, "geometry.conf");
+    public static string NetConf => Path.Combine(SettingsDir, "net.conf");
+    public static string PathsJson => Path.Combine(SettingsDir, "paths.json");
+
+    /// <summary>
+    /// Resolve rates workbook: remembered paths.json priceWorkbook, else Price.xlsx, else Price.xlsm.
+    /// Returns preferred xlsx path when neither exists (for UI / error messages).
+    /// </summary>
+    public static string ResolveRatesFilePath()
+    {
+      try
+      {
+        var remembered = Configuration.AppPaths.Load().PriceWorkbook;
+        if (IsUsableRatesFile(remembered))
+        {
+          return remembered;
+        }
+      }
+      catch
+      {
+        // Fall through to default Settings files.
+      }
+
+      if (IsUsableRatesFile(PriceXlsx))
+      {
+        return PriceXlsx;
+      }
+
+      if (IsUsableRatesFile(PriceXlsm))
+      {
+        return PriceXlsm;
+      }
+
+      return PriceXlsx;
+    }
+
+    public static bool RatesFileExists()
+    {
+      return IsUsableRatesFile(PriceXlsx) || IsUsableRatesFile(PriceXlsm);
+    }
+
+    private static bool IsUsableRatesFile(string path)
+    {
+      try
+      {
+        return File.Exists(path) && new FileInfo(path).Length > 0;
+      }
+      catch
+      {
+        return false;
+      }
+    }
 
     /// <summary>Create cache folders and placeholder conf files. Safe to call on every open.</summary>
     public static void EnsureCreated()
@@ -41,7 +97,7 @@ namespace NcTestRibbon.Shell
       Directory.CreateDirectory(SourceDataDir);
 
       // tracing.conf is created/overwritten as JSON by AppSettings on first use.
-      // Do not create an empty Price.xlsx — user places the real End workbook there.
+      // Do not create an empty Price workbook — user places Price.xlsx or Price.xlsm there.
       EnsureTextFile(
         TrenchRoadConf,
         "# NcTestRibbon trench/road settings (shell placeholder)\r\n"

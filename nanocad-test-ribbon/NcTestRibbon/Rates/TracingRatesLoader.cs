@@ -10,8 +10,9 @@ namespace NcTestRibbon.Rates
   using OfficeOpenXml;
 
   /// <summary>
-  /// Local Price.xlsx loader for the tracing settings tab
+  /// Local Price.xlsx / Price.xlsm loader for the tracing settings tab
   /// (subset of End InitialData.LoadRatesFromExcel + PipeMedium transitions).
+  /// EPPlus opens both OOXML formats; VBA macros in .xlsm are ignored.
   /// </summary>
   public static class TracingRatesLoader
   {
@@ -60,7 +61,7 @@ namespace NcTestRibbon.Rates
       if (string.IsNullOrWhiteSpace(request.RatesFilePath) || !File.Exists(request.RatesFilePath))
       {
         throw new FileNotFoundException(
-          "Файл расценок не найден. Положите Price.xlsx в Tracing_cache\\Settings\\.",
+          "Файл расценок не найден. Положите Price.xlsx или Price.xlsm в Tracing_cache\\Settings\\.",
           request.RatesFilePath);
       }
 
@@ -68,7 +69,8 @@ namespace NcTestRibbon.Rates
       using var package = new ExcelPackage(new FileInfo(request.RatesFilePath));
       ExcelWorkbook book = package.Workbook;
       ExcelWorksheet tube = book.Worksheets["ТрубаЛч"]
-        ?? throw new InvalidDataException("Нет листа ТрубаЛч в Price.xlsx.");
+        ?? throw new InvalidDataException(
+          "Нет листа ТрубаЛч в " + Path.GetFileName(request.RatesFilePath) + ".");
 
       result.Catalog = PipeCatalog.Read(tube);
       if (result.Catalog.Count == 0)
@@ -278,7 +280,7 @@ namespace NcTestRibbon.Rates
     private static ExcelWorksheet Require(ExcelWorkbook book, string name)
     {
       return book.Worksheets[name]
-        ?? throw new InvalidDataException("Нет листа «" + name + "» в Price.xlsx.");
+        ?? throw new InvalidDataException("Нет листа «" + name + "» в файле расценок.");
     }
 
     private static void Add(Result result, string name, string unit, string cost)
