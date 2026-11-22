@@ -2,6 +2,7 @@ namespace NcTestRibbon
 {
   using System;
   using System.Diagnostics;
+  using System.IO;
   using System.Net.Http;
   using System.Threading.Tasks;
   using System.Windows.Forms;
@@ -9,7 +10,11 @@ namespace NcTestRibbon
   using System.Windows.Interop;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
+  using NcTestRibbon.Cad;
+  using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
   using NcTestRibbon.Shell;
+  using Teigha.DatabaseServices;
   using Teigha.Runtime;
   using CadApp = HostMgd.ApplicationServices.Application;
   using WinFormsApp = System.Windows.Forms.Application;
@@ -22,6 +27,142 @@ namespace NcTestRibbon
     private const string DefaultHttpUrl = "https://httpbin.org/get";
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
+    private static SourceDataWindow _sourceDataLive;
+    private static CartographyWindow _cartographyLive;
+    private static AllowableSitesWindow _allowableSitesLive;
+    private static bool _bridgeWired;
+
+    static TestCommands()
+    {
+      WireCadBridge();
+    }
+
+    /// <summary>CAD double-click / MOVE sync → UI + Excel.</summary>
+    internal static void WireCadBridge()
+    {
+      if (_bridgeWired)
+      {
+        return;
+      }
+
+      TestCommandsBridge.OpenPadsWindow = OpenPadsWindowStatic;
+      TestCommandsBridge.ApplyPadCadPose = ApplyPadCadPoseStatic;
+      _bridgeWired = true;
+    }
+
+    private static void OpenPadsWindowStatic(string padName)
+    {
+      var cmd = new TestCommands();
+      cmd.OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadDblClick");
+      if (_sourceDataLive != null && !_sourceDataLive.IsDisposed && !string.IsNullOrWhiteSpace(padName))
+      {
+        _sourceDataLive.SelectPadByName(padName);
+      }
+    }
+
+    private static void ApplyPadCadPoseStatic(
+      string name, double x, double y, double rotationDeg, bool saveExcel)
+    {
+      if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+      {
+        try
+        {
+          _sourceDataLive.ApplyPadCadPose(name, x, y, rotationDeg, saveExcel);
+          return;
+        }
+        catch
+        {
+          // Fall through to Excel-only path when KP not loaded in the open window.
+        }
+      }
+
+      if (!saveExcel)
+      {
+        return;
+      }
+
+      string path = AppPaths.Load().PadsWorkbook;
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException(
+          "Нет пути к таблицам КП (paths.json → padsWorkbook). Откройте КП во «Исходные данные».");
+      }
+
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
+        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (pad == null)
+      {
+        throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
+      }
+
+      pad.X = x;
+      pad.Y = y;
+      pad.RotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
+      PadWorkbookLoader.SavePadCoordinates(path, new[] { pad });
+
+      // Redraw label + rectangle at committed pose.
+      CadPadOverlay.UpdatePad(new CadPadOverlay.PadGeom
+      {
+        Name = pad.Name,
+        X = pad.X,
+        Y = pad.Y,
+        WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
+        LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
+        RotationDeg = pad.RotationDeg
+      });
+    }
+
+    /// <summary>Manual: open pads window for implied/selected pad (fallback without BeginDoubleClick).</summary>
+    [CommandMethod("NcTestPadOpen")]
+    public void NcTestPadOpen()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        string name = null;
+        PromptSelectionResult sel = ed?.SelectImplied();
+        if (sel != null && sel.Status == PromptStatus.OK && sel.Value != null)
+        {
+          ObjectId[] ids = sel.Value.GetObjectIds();
+          using (doc.LockDocument())
+          using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+          {
+            foreach (ObjectId id in ids ?? Array.Empty<ObjectId>())
+            {
+              var ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+              if (ent == null
+                  || !string.Equals(ent.Layer, CadPadOverlay.LayerName, StringComparison.OrdinalIgnoreCase))
+              {
+                continue;
+              }
+
+              name = CadPadOverlay.ReadPadNamePublic(ent);
+              if (string.IsNullOrWhiteSpace(name) && ent is DBText text)
+              {
+                name = text.TextString;
+              }
+
+              if (!string.IsNullOrWhiteSpace(name))
+              {
+                break;
+              }
+            }
+
+            tr.Commit();
+          }
+        }
+
+        OpenPadsWindowStatic(name);
+        ed?.WriteMessage("\nNcTestPadOpen: Исходные данные → Кустовые"
+          + (string.IsNullOrWhiteSpace(name) ? "." : " («" + name + "»)."));
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestPadOpen", ex);
+      }
+    }
 
     [CommandMethod("NcTestHello")]
     public void NcTestHello()
@@ -94,17 +235,543 @@ namespace NcTestRibbon
     [CommandMethod("NcTestInitialData")]
     public void NcTestInitialData()
     {
-      NcTestSettings();
+      NcTestSourceData();
     }
 
     /// <summary>
-    /// Opens pad-optimization shell (TopologyInputsWindow / TopologyPadWindow UI).
-    /// Code-built WPF — no XAML pack URI.
+    /// «Исходные данные» — Кустовые / Врезки / placement БУОС / Узлы (default: pads).
+    /// </summary>
+    [CommandMethod("NcTestSourceData")]
+    public void NcTestSourceData()
+    {
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestSourceData");
+    }
+
+    /// <summary>
+    /// Display-only KP table tab inside «Исходные данные».
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
     {
-      OpenWpfWindow(ed: null, "NcTestPadOpt", () => new PadOptimizationWindow());
+      OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadOpt");
+    }
+
+    /// <summary>
+    /// Topology insert points tab — End TopologyTieIns analogue.
+    /// </summary>
+    [CommandMethod("NcTestInserts")]
+    public void NcTestInserts()
+    {
+      OpenSourceDataForm(SourceDataTab.Inserts, "NcTestInserts");
+    }
+
+    /// <summary>
+    /// Placement БУОС tab inside «Исходные данные».
+    /// </summary>
+    [CommandMethod("NcTestBuos")]
+    public void NcTestBuos()
+    {
+      OpenSourceDataForm(SourceDataTab.Buos, "NcTestBuos");
+    }
+
+    /// <summary>
+    /// Placement Узлы tab inside «Исходные данные».
+    /// </summary>
+    [CommandMethod("NcTestNodes")]
+    public void NcTestNodes()
+    {
+      OpenSourceDataForm(SourceDataTab.Nodes, "NcTestNodes");
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую.
+    /// </summary>
+    [CommandMethod("NcTestAddPad")]
+    public void NcTestAddPad()
+    {
+      OpenSourceDataAndPlace(SourceDataTab.Pads, "NcTestAddPad");
+    }
+
+    /// <summary>
+    /// Ribbon flyout «Площадные объекты» → Добавить БУОС.
+    /// </summary>
+    [CommandMethod("NcTestAddBuos")]
+    public void NcTestAddBuos()
+    {
+      OpenSourceDataAndPlace(SourceDataTab.Buos, "NcTestAddBuos");
+    }
+
+    private void OpenSourceDataAndPlace(SourceDataTab tab, string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        OpenSourceDataForm(tab, label);
+        if (_sourceDataLive == null || _sourceDataLive.IsDisposed)
+        {
+          return;
+        }
+
+        _sourceDataLive.BeginPlaceForTab(tab);
+        ed?.WriteMessage("\n" + label + ": place jig started (" + tab + ").");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private void OpenSourceDataForm(SourceDataTab tab, string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        // Detail profiles dialog (pads) is still WPF.
+        EnsureWpfApplication(ed);
+
+        if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
+        {
+          _sourceDataLive.SelectTab(tab);
+          ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        SourceDataWindow form = new SourceDataWindow(tab);
+        _sourceDataLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_sourceDataLive, form))
+          {
+            _sourceDataLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Исходные данные open → " + tab + ".");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    /// <summary>
+    /// CAD label font + insert circle diameter → interface.conf
+    /// </summary>
+    [CommandMethod("NcTestInterface")]
+    public void NcTestInterface()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      const string label = "NcTestInterface";
+      try
+      {
+        EnsureVisualStyles(ed);
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        using (InterfaceSettingsWindow form = new InterfaceSettingsWindow())
+        {
+          DialogResult result = hwnd != IntPtr.Zero
+            ? form.ShowDialog(new WindowWrapper(hwnd))
+            : form.ShowDialog();
+          ed?.WriteMessage("\n" + label + ": DialogResult=" + result);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+      }
+    }
+
+    /// <summary>
+    /// Toggle End-style CAD blink on a selected polyline/curve.
+    /// Pickfirst (or prompt) → blink until the same command / ribbon button is pressed again.
+    /// </summary>
+    [CommandMethod("NcTestBlink", CommandFlags.UsePickSet | CommandFlags.Redraw)]
+    public void NcTestBlink()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      if (ed == null)
+      {
+        return;
+      }
+
+      try
+      {
+        CadSegmentBlinker.ToggleFromSelection(ed);
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, "NcTestBlink", ex);
+        CadSegmentBlinker.Stop();
+      }
+    }
+
+    /// <summary>Force-stop blink (same as releasing the ribbon toggle).</summary>
+    [CommandMethod("NcTestBlinkOff")]
+    public void NcTestBlinkOff()
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      CadSegmentBlinker.Stop();
+      ed?.WriteMessage("\nNcTestBlinkOff: мигание ВЫКЛ.");
+    }
+
+    /// <summary>
+    /// Insert ECW/raster with End-style georef (world coords + scale), not plain IMAGEATTACH.
+    /// </summary>
+    [CommandMethod("NcTestEcw")]
+    public void NcTestEcw()
+    {
+      AttachGeoreferencedRaster("NcTestEcw", RasterAttachMode.Direct);
+    }
+
+    /// <summary>Alias for NcTestEcw (any georeferenced raster: ECW/TIFF/JPG/…).</summary>
+    [CommandMethod("NcTestRaster")]
+    public void NcTestRaster()
+    {
+      AttachGeoreferencedRaster("NcTestRaster", RasterAttachMode.Direct);
+    }
+
+    /// <summary>
+    /// «Картография» — Forest / Height / космоснимок toggles + opacity (End-style).
+    /// Open/colorize buttons live in the panel (ribbon TIF/Forest/Height moved here).
+    /// </summary>
+    [CommandMethod("NcTestCartography")]
+    public void NcTestCartography()
+    {
+      OpenCartographyForm("NcTestCartography");
+    }
+
+    /// <summary>
+    /// «Рассчитать допустимые площадки» — End site-grid window (WinForms, modeless).
+    /// </summary>
+    [CommandMethod("NcTestAllowableSites")]
+    public void NcTestAllowableSites()
+    {
+      OpenAllowableSitesForm("NcTestAllowableSites");
+    }
+
+    /// <summary>
+    /// GeoTIFF → ECW (NcGdalGeo translate / CreateCopy, preserve GeoTransform) then attach like ECW.
+    /// Kept as command; ribbon open lives in Картография.
+    /// </summary>
+    [CommandMethod("NcTestTif")]
+    public void NcTestTif()
+    {
+      AttachGeoreferencedRaster("NcTestTif", RasterAttachMode.TifToEcw);
+    }
+
+    /// <summary>End Forest colorize (0/1 → ForestGreen) → Maps\*_geo.tif → attach.</summary>
+    [CommandMethod("NcTestForest")]
+    public void NcTestForest()
+    {
+      AttachGeoreferencedRaster("NcTestForest", RasterAttachMode.ColorizeForest);
+    }
+
+    /// <summary>End Height colorize (viridis 7-band) → Maps\*_geo.tif → attach.</summary>
+    [CommandMethod("NcTestHeight")]
+    public void NcTestHeight()
+    {
+      AttachGeoreferencedRaster("NcTestHeight", RasterAttachMode.ColorizeHeight);
+    }
+
+    private void OpenCartographyForm(string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_cartographyLive != null && !_cartographyLive.IsDisposed)
+        {
+          _cartographyLive.BringToFront();
+          _cartographyLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open.");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        CartographyWindow form = new CartographyWindow();
+        _cartographyLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_cartographyLive, form))
+          {
+            _cartographyLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Картография open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private void OpenAllowableSitesForm(string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        if (_allowableSitesLive != null && !_allowableSitesLive.IsDisposed)
+        {
+          _allowableSitesLive.BringToFront();
+          _allowableSitesLive.Activate();
+          ed?.WriteMessage("\n" + label + ": already open.");
+          return;
+        }
+
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        AllowableSitesWindow form = new AllowableSitesWindow();
+        _allowableSitesLive = form;
+        form.FormClosed += (_, __) =>
+        {
+          if (ReferenceEquals(_allowableSitesLive, form))
+          {
+            _allowableSitesLive = null;
+          }
+        };
+
+        if (hwnd != IntPtr.Zero)
+        {
+          form.Show(new WindowWrapper(hwnd));
+        }
+        else
+        {
+          form.Show();
+        }
+
+        ed?.WriteMessage("\n" + label + ": Allowable sites open.");
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
+
+    private enum RasterAttachMode
+    {
+      Direct,
+      TifToEcw,
+      ColorizeForest,
+      ColorizeHeight
+    }
+
+    private void AttachGeoreferencedRaster(string label, RasterAttachMode mode)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        AppPaths paths = AppPaths.Load();
+        string initial = paths.Background;
+        string initialDir = string.Empty;
+        if (!string.IsNullOrWhiteSpace(initial))
+        {
+          try
+          {
+            string dir = Path.GetDirectoryName(initial);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+              initialDir = dir;
+            }
+          }
+          catch
+          {
+          }
+        }
+
+        using (OpenFileDialog dlg = new OpenFileDialog())
+        {
+          if (mode == RasterAttachMode.ColorizeForest)
+          {
+            dlg.Title = "Forest.tif → colorize (End ForestGreen) → Maps\\*_geo.tif";
+            dlg.Filter = "GeoTIFF Forest (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else if (mode == RasterAttachMode.ColorizeHeight)
+          {
+            dlg.Title = "Height.tif → colorize (End viridis) → Maps\\*_geo.tif";
+            dlg.Filter = "GeoTIFF Height (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else if (mode == RasterAttachMode.TifToEcw)
+          {
+            dlg.Title = "GeoTIFF → ECW (геопривязка сохраняется)";
+            dlg.Filter = "GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+          else
+          {
+            dlg.Title = "Растр с геопривязкой (ECW / TIFF / …)";
+            dlg.Filter =
+              "Растры (*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp)|*.ecw;*.tif;*.tiff;*.jpg;*.jpeg;*.png;*.bmp|"
+              + "ECW (*.ecw)|*.ecw|GeoTIFF (*.tif;*.tiff)|*.tif;*.tiff|Все файлы (*.*)|*.*";
+          }
+
+          dlg.FilterIndex = 1;
+          dlg.CheckFileExists = true;
+          dlg.Multiselect = false;
+          if (!string.IsNullOrEmpty(initialDir))
+          {
+            dlg.InitialDirectory = initialDir;
+          }
+
+          if (!string.IsNullOrWhiteSpace(initial) && File.Exists(initial))
+          {
+            dlg.FileName = initial;
+          }
+
+          IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+          DialogResult pick = hwnd != IntPtr.Zero
+            ? dlg.ShowDialog(new WindowWrapper(hwnd))
+            : dlg.ShowDialog();
+          if (pick != DialogResult.OK || string.IsNullOrWhiteSpace(dlg.FileName))
+          {
+            ed?.WriteMessage("\n" + label + ": отменено.");
+            return;
+          }
+
+          string pickedPath = dlg.FileName;
+          AppPaths.Set(p => p.Background = pickedPath);
+          ed?.WriteMessage("\n" + label + ": " + RasterGeoTransform.PackageStamp());
+
+          string rasterPath = pickedPath;
+          string convertNote = string.Empty;
+          if (mode == RasterAttachMode.TifToEcw)
+          {
+            ed?.WriteMessage("\n" + label + ": TIF→Maps (ECW if OEM license, else free GeoTIFF)…");
+            CadTifToEcw.ConvertResult converted = CadTifToEcw.Convert(pickedPath);
+            rasterPath = !string.IsNullOrWhiteSpace(converted.OutputPath)
+              ? converted.OutputPath
+              : converted.EcwPath;
+            convertNote = converted.Note;
+            ed?.WriteMessage("\n" + label + ": " + convertNote);
+            AppPaths.Set(p => p.Background = rasterPath);
+          }
+          else if (mode == RasterAttachMode.ColorizeForest || mode == RasterAttachMode.ColorizeHeight)
+          {
+            var cmode = mode == RasterAttachMode.ColorizeForest
+              ? CadRasterColorize.Mode.Forest
+              : CadRasterColorize.Mode.Height;
+            ed?.WriteMessage("\n" + label + ": colorize " + cmode + " → Maps\\*_geo.tif…");
+            CadRasterColorize.Result colored = CadRasterColorize.Colorize(pickedPath, cmode);
+            rasterPath = colored.OutputPath;
+            convertNote = colored.Note;
+            ed?.WriteMessage("\n" + label + ": " + convertNote);
+            AppPaths.Set(p => p.Background = rasterPath);
+          }
+
+          CadRasterAttach.Result result = CadRasterAttach.Attach(rasterPath, writeWorldSidecar: true);
+          CadRasterAttach.ZoomToImage(result.ImageId);
+
+          string msg =
+            label + " — вставлено\n\n"
+            + (string.IsNullOrEmpty(convertNote) ? string.Empty : convertNote + "\n\n")
+            + Path.GetFileName(result.Path) + "\n"
+            + "Геопривязка: " + result.GeoSource + "\n"
+            + "UL (мир): X=" + result.OriginX.ToString("R")
+            + "  Y=" + result.OriginY.ToString("R") + "\n"
+            + "Пиксель: dX=" + result.PixelSizeX.ToString("R")
+            + "  dY=" + result.PixelSizeY.ToString("R") + "\n"
+            + "Размер: " + result.WidthPx + "×" + result.HeightPx + " px\n"
+            + (string.IsNullOrEmpty(result.WorldFileWritten)
+              ? string.Empty
+              : "World: " + Path.GetFileName(result.WorldFileWritten) + "\n")
+            + "Слой: " + CadRasterAttach.LayerName;
+
+          ed?.WriteMessage("\n" + label + ": OK — " + Path.GetFileName(result.Path)
+            + " (" + result.GeoSource + ")");
+          CadApp.ShowAlertDialog(msg);
+        }
+      }
+      catch (System.Exception ex)
+      {
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
     }
 
     /// <summary>Small WinForms smoke dialog (fallback).</summary>
@@ -182,6 +849,7 @@ namespace NcTestRibbon
     {
       if (WpfApp.Current != null || _wpfAppCreated)
       {
+        HookWpfUnhandled(ed);
         return;
       }
 
@@ -192,11 +860,50 @@ namespace NcTestRibbon
           ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown
         };
         _wpfAppCreated = true;
+        HookWpfUnhandled(ed);
         ed?.WriteMessage("\nWPF Application created (OnExplicitShutdown).");
       }
       catch (System.Exception ex)
       {
         ed?.WriteMessage("\nWPF Application init: " + ex.Message);
+      }
+    }
+
+    private static bool _wpfUnhandledHooked;
+
+    private static void HookWpfUnhandled(Editor ed)
+    {
+      if (_wpfUnhandledHooked || WpfApp.Current == null)
+      {
+        return;
+      }
+
+      try
+      {
+        WpfApp.Current.DispatcherUnhandledException += (_, e) =>
+        {
+          try
+          {
+            string dir = NcTestRibbon.Shell.TracingCache.SettingsDir;
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(
+              Path.Combine(dir, "nc_test_ribbon_crash.log"),
+              DateTime.Now.ToString("s") + " [AppDispatcher] "
+              + e.Exception.GetType().FullName + ": " + e.Exception.Message
+              + Environment.NewLine + e.Exception.StackTrace + Environment.NewLine + "----\n");
+            ed?.WriteMessage("\nWPF unhandled: " + e.Exception.GetType().Name + ": " + e.Exception.Message);
+          }
+          catch
+          {
+          }
+
+          e.Handled = true;
+        };
+        _wpfUnhandledHooked = true;
+      }
+      catch (System.Exception ex)
+      {
+        ed?.WriteMessage("\nWPF unhandled hook: " + ex.Message);
       }
     }
 
