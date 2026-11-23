@@ -3,8 +3,8 @@ using System.Runtime.Versioning;
 
 [assembly: AssemblyCompany("NcBootstrap")]
 [assembly: AssemblyConfiguration("Release")]
-[assembly: AssemblyFileVersion("1.2.89.0")]
-[assembly: AssemblyInformationalVersion("1.2.89+InvokeHandleFix")]
+[assembly: AssemblyFileVersion("1.2.90.0")]
+[assembly: AssemblyInformationalVersion("1.2.90+UniqueSiteNames")]
 [assembly: AssemblyProduct("NcBootstrap")]
 [assembly: AssemblyTitle("NcBootstrap")]
 [assembly: TargetPlatform("Windows7.0")]

@@ -7,6 +7,7 @@ namespace NcTestRibbon.Shell
   using System.IO;
   using System.Linq;
   using System.Windows.Forms;
+  using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
 
@@ -248,13 +249,51 @@ namespace NcTestRibbon.Shell
       if (string.IsNullOrWhiteSpace(row.InstanceName))
       {
         MessageBox.Show(this, "Укажите «Имя» экземпляра.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        TryBeginEditInstanceName();
         return;
       }
 
       row.InstanceName = row.InstanceName.Trim();
+      if (IsDuplicateInstanceName(row.InstanceName))
+      {
+        string kind = _buos ? "БУОС" : "Узел";
+        MessageBox.Show(
+          this,
+          kind + " с именем «" + row.InstanceName + "» уже есть на чертеже. Укажите уникальное «Имя».",
+          Text,
+          MessageBoxButtons.OK,
+          MessageBoxIcon.Warning);
+        TryBeginEditInstanceName();
+        return;
+      }
+
       Selected = row;
       DialogResult = DialogResult.OK;
       Close();
+    }
+
+    private bool IsDuplicateInstanceName(string name)
+    {
+      if (string.IsNullOrWhiteSpace(name))
+      {
+        return false;
+      }
+
+      try
+      {
+        if (_buos)
+        {
+          return CadBuosPlacementOverlay.ListPlacedSites()
+            .Any(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return CadNodePlacementOverlay.ListPlacedSites()
+          .Any(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+      }
+      catch
+      {
+        return false;
+      }
     }
 
     public sealed class CatalogPickRow

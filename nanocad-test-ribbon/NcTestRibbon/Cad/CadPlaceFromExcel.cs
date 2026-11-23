@@ -88,6 +88,11 @@ namespace NcTestRibbon.Cad
         return;
       }
 
+      if (!EnsureUniqueSiteName(owner, pick.InstanceName, buos: true))
+      {
+        return;
+      }
+
       var geom = new CadBuosPlacementOverlay.SiteGeom
       {
         Name = pick.InstanceName,
@@ -109,6 +114,12 @@ namespace NcTestRibbon.Cad
         geom.Y = y;
       }
 
+      // Re-check after pick — another instance may have been placed meanwhile.
+      if (!EnsureUniqueSiteName(owner, geom.Name, buos: true))
+      {
+        return;
+      }
+
       CadBuosPlacementOverlay.InsertAtStored(geom);
       // No zoom-to — stay on current view.
     }
@@ -122,6 +133,11 @@ namespace NcTestRibbon.Cad
       PickFromTypicalCatalogDialog.CatalogPickRow pick =
         PickFromTypicalCatalogDialog.ShowPick(owner, buos: false);
       if (pick == null)
+      {
+        return;
+      }
+
+      if (!EnsureUniqueSiteName(owner, pick.InstanceName, buos: false))
       {
         return;
       }
@@ -147,7 +163,49 @@ namespace NcTestRibbon.Cad
         geom.Y = y;
       }
 
+      if (!EnsureUniqueSiteName(owner, geom.Name, buos: false))
+      {
+        return;
+      }
+
       CadNodePlacementOverlay.InsertAtStored(geom);
+    }
+
+    /// <summary>
+    /// Require non-empty unique instance name among placed БУОС or Узлы. Warn + cancel on conflict.
+    /// </summary>
+    private static bool EnsureUniqueSiteName(IWin32Window owner, string name, bool buos)
+    {
+      string kind = buos ? "БУОС" : "Узел";
+      if (string.IsNullOrWhiteSpace(name))
+      {
+        MessageBox.Show(
+          owner,
+          "Укажите «Имя» экземпляра " + kind + ".",
+          kind,
+          MessageBoxButtons.OK,
+          MessageBoxIcon.Warning);
+        return false;
+      }
+
+      string trimmed = name.Trim();
+      bool duplicate = buos
+        ? CadBuosPlacementOverlay.ListPlacedSites()
+          .Any(s => string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase))
+        : CadNodePlacementOverlay.ListPlacedSites()
+          .Any(s => string.Equals(s.Name, trimmed, StringComparison.OrdinalIgnoreCase));
+      if (!duplicate)
+      {
+        return true;
+      }
+
+      MessageBox.Show(
+        owner,
+        kind + " с именем «" + trimmed + "» уже есть на чертеже. Укажите уникальное «Имя».",
+        kind,
+        MessageBoxButtons.OK,
+        MessageBoxIcon.Warning);
+      return false;
     }
 
     public static void PlaceInsert(IWin32Window owner = null)
