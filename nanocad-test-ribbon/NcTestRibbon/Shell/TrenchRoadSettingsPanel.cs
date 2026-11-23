@@ -3,6 +3,7 @@ namespace NcTestRibbon.Shell
   using System;
   using System.Collections.Generic;
   using System.Globalization;
+  using System.Linq;
   using System.Windows;
   using System.Windows.Controls;
   using System.Windows.Media;
@@ -10,7 +11,8 @@ namespace NcTestRibbon.Shell
 
   /// <summary>
   /// UI shell of End TopologyTrenchSettingsPanel («Траншея и дорога»).
-  /// Code-built; no topology calculation — values stay local until Save stubs conf.
+  /// Preview drawing ported from End TopologyTrenchPreview + CrossSection layout.
+  /// Values stay local in trench_road.conf until topology calc is wired.
   /// </summary>
   public sealed class TrenchRoadSettingsPanel : UserControl
   {
@@ -21,6 +23,25 @@ namespace NcTestRibbon.Shell
       public bool HasGap12 { get; set; }
       public bool HasGap23 { get; set; }
       public bool HasAdditionalGap { get; set; }
+    }
+
+    private sealed class PreviewPipe
+    {
+      public string Id { get; set; }
+      public string Fluid { get; set; }
+      public int DiameterMm { get; set; }
+      public bool Outlet { get; set; }
+      public double Offset { get; set; }
+    }
+
+    private sealed class CrossSectionLayout
+    {
+      public double Width { get; set; }
+      public double LeftExtent { get; set; }
+      public double RightExtent { get; set; }
+      public double RoadOffset { get; set; }
+      public double RoadWidth { get; set; }
+      public List<PreviewPipe> Pipes { get; set; } = new List<PreviewPipe>();
     }
 
     private readonly ComboBox _kind = new ComboBox
@@ -36,7 +57,17 @@ namespace NcTestRibbon.Shell
     };
 
     private readonly TextBox _radius = new TextBox { Padding = new Thickness(5), Text = "1.5" };
-    private readonly Canvas _preview = new Canvas { Height = 120, Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)) };
+    private readonly Canvas _canvas = new Canvas
+    {
+      Height = 210,
+      Background = Brushes.WhiteSmoke,
+      ClipToBounds = true
+    };
+    private readonly TextBlock _previewNote = new TextBlock
+    {
+      TextWrapping = TextWrapping.Wrap,
+      Margin = new Thickness(0, 6, 0, 10)
+    };
     private readonly Dictionary<string, StackPanel> _panels = new Dictionary<string, StackPanel>();
     private readonly Dictionary<string, Dictionary<string, FrameworkElement>> _editors =
       new Dictionary<string, Dictionary<string, FrameworkElement>>();
@@ -71,14 +102,16 @@ namespace NcTestRibbon.Shell
         Margin = new Thickness(0, 0, 0, 10)
       });
 
+      var previewHost = new StackPanel();
       var previewBorder = new Border
       {
         BorderBrush = Brushes.LightGray,
         BorderThickness = new Thickness(1),
-        Child = _preview,
-        Margin = new Thickness(0, 0, 0, 8)
+        Child = _canvas
       };
-      root.Children.Add(previewBorder);
+      previewHost.Children.Add(previewBorder);
+      previewHost.Children.Add(_previewNote);
+      root.Children.Add(previewHost);
       root.Children.Add(_error);
 
       foreach (Scheme scheme in _schemes)
@@ -131,6 +164,7 @@ namespace NcTestRibbon.Shell
       root.Children.Add(new TextBlock
       {
         Text = "Одна труба располагается по оси траншеи. Ширина автоматически увеличивается, если выбранные диаметры и зазоры не помещаются. Изменённые параметры затрат действуют при новом расчёте топологии.\n"
+          + "При полном поиске проверяется, помещаются ли отводы заданного радиуса. После изменения радиуса выполните полную трассировку заново. Экспорт не пересчитывает профиль и стоимость.\n"
           + "Конфиг оболочки: " + TracingCache.TrenchRoadConf,
         TextWrapping = TextWrapping.Wrap,
         Margin = new Thickness(0, 12, 0, 0),
@@ -142,7 +176,8 @@ namespace NcTestRibbon.Shell
       _kind.ItemsSource = _schemes;
       _kind.SelectionChanged += (_, __) => Refresh();
       _kind.SelectedIndex = 0;
-      _preview.SizeChanged += (_, __) => Refresh();
+      _canvas.SizeChanged += (_, __) => Refresh();
+      Loaded += (_, __) => Refresh();
       Refresh();
     }
 
@@ -180,6 +215,7 @@ namespace NcTestRibbon.Shell
       catch (Exception ex)
       {
         _error.Text = "Проверьте размеры выбранной схемы: " + ex.Message;
+        _previewNote.Text = string.Empty;
       }
     }
 
@@ -202,65 +238,273 @@ namespace NcTestRibbon.Shell
 
     private void DrawPreview(string schemeId)
     {
-      _preview.Children.Clear();
-      double trench = Math.Max(Read(schemeId, "MinimumWidth", 1.3), 0.5);
-      double road = Math.Max(Read(schemeId, "RoadWidth", 6), 0.5);
-      double clearance = Read(schemeId, "RoadClearance", 5);
-      bool right = (_editors[schemeId]["RoadOnRight"] as CheckBox)?.IsChecked == true;
+      _canvas.Children.Clear();
 
-      double width = _preview.ActualWidth;
-      if (width < 10)
+      Scheme scheme = _schemes.First(s => s.Id == schemeId);
+      double minimumWidth = Read(schemeId, "MinimumWidth", 1.3);
+      double gap12 = scheme.HasGap12 ? Read(schemeId, "PipeGap12", 0.5) : 0.5;
+      double gap23 = scheme.HasGap23 ? Read(schemeId, "PipeGap23", 0.5) : 0.5;
+      double additionalGap = scheme.HasAdditionalGap ? Read(schemeId, "AdditionalGap", 0.5) : 0.5;
+      double sideClearance = Read(schemeId, "SideClearance", 0.2);
+      double roadClearance = Read(schemeId, "RoadClearance", 5);
+      double roadWidth = Math.Max(Read(schemeId, "RoadWidth", 6), 0.01);
+      bool roadOnRight = (_editors[schemeId]["RoadOnRight"] as CheckBox)?.IsChecked == true;
+
+      if (minimumWidth <= 0 || roadWidth <= 0)
       {
-        width = 640;
+        throw new ArgumentException("ширина траншеи и дороги должна быть больше нуля.");
       }
 
-      double scale = Math.Min((width - 40) / (trench + clearance + road), 18);
-      double trenchW = trench * scale;
-      double roadW = road * scale;
-      double gapW = clearance * scale;
-      double total = trenchW + gapW + roadW;
-      double x0 = (width - total) / 2;
-      double y = 40;
+      List<PreviewPipe> pipes = BuildExamplePipes(schemeId);
+      CrossSectionLayout layout = BuildCrossSection(
+        pipes, minimumWidth, gap12, gap23, additionalGap, sideClearance, roadClearance, roadWidth, roadOnRight);
 
-      var trenchRect = new Rectangle
+      double roadLeft = layout.RoadOffset - layout.RoadWidth / 2;
+      double roadRight = layout.RoadOffset + layout.RoadWidth / 2;
+      double lo = Math.Min(-layout.RightExtent, roadLeft) - 0.5;
+      double hi = Math.Max(layout.LeftExtent, roadRight) + 0.5;
+
+      double width = Math.Max(600, _canvas.ActualWidth > 0 ? _canvas.ActualWidth : 800);
+      double scale = (width - 40) / Math.Max(hi - lo, 0.01);
+
+      // Physical left (positive offset) draws to the left of the canvas.
+      double X(double x) => 20 + (hi - x) * scale;
+
+      var trench = new Rectangle
       {
-        Width = trenchW,
-        Height = 36,
-        Fill = new SolidColorBrush(Color.FromRgb(210, 180, 140)),
+        Width = Math.Max(1, layout.Width * scale),
+        Height = 95,
+        Fill = Brushes.Bisque,
         Stroke = Brushes.SaddleBrown
       };
-      Canvas.SetLeft(trenchRect, x0);
-      Canvas.SetTop(trenchRect, y);
-      _preview.Children.Add(trenchRect);
+      Canvas.SetLeft(trench, X(layout.LeftExtent));
+      Canvas.SetTop(trench, 75);
+      _canvas.Children.Add(trench);
 
-      double roadX = right ? x0 + trenchW + gapW : x0 - gapW - roadW;
-      if (!right)
+      var road = new Rectangle
       {
-        // Keep preview inside canvas: flip layout so trench stays centered-ish.
-        roadX = x0 + trenchW + gapW;
+        Width = Math.Max(1, layout.RoadWidth * scale),
+        Height = 30,
+        Fill = Brushes.SlateGray
+      };
+      Canvas.SetLeft(road, X(roadRight));
+      Canvas.SetTop(road, 70);
+      _canvas.Children.Add(road);
+
+      AddLabel(
+        "Дорога " + layout.RoadWidth.ToString("0.###", CultureInfo.CurrentCulture) + " м",
+        X(roadRight),
+        38);
+      AddLabel(
+        "Траншея " + layout.Width.ToString("0.###", CultureInfo.CurrentCulture) + " м",
+        X(layout.LeftExtent),
+        180);
+
+      _canvas.Children.Add(new Line
+      {
+        X1 = X(0),
+        Y1 = 65,
+        X2 = X(0),
+        Y2 = 173,
+        Stroke = Brushes.DarkOrange,
+        StrokeThickness = 1
+      });
+
+      foreach (PreviewPipe pipe in layout.Pipes)
+      {
+        double d = pipe.DiameterMm / 1000.0;
+        double size = Math.Max(4, d * scale);
+        var circle = new Ellipse
+        {
+          Width = size,
+          Height = size,
+          Stroke = Brushes.Black,
+          Fill = PipeBrush(pipe)
+        };
+        Canvas.SetLeft(circle, X(pipe.Offset) - size / 2);
+        Canvas.SetTop(circle, 125 - size / 2);
+        _canvas.Children.Add(circle);
+        AddLabel(pipe.Id, X(pipe.Offset) - 4, 92);
       }
 
-      var roadRect = new Rectangle
-      {
-        Width = roadW,
-        Height = 28,
-        Fill = new SolidColorBrush(Color.FromRgb(120, 120, 120)),
-        Stroke = Brushes.DimGray
-      };
-      Canvas.SetLeft(roadRect, roadX);
-      Canvas.SetTop(roadRect, y + 4);
-      _preview.Children.Add(roadRect);
-
-      _preview.Children.Add(LabelAt(x0, y - 18, "Траншея " + trench.ToString("0.###", CultureInfo.CurrentCulture) + " м"));
-      _preview.Children.Add(LabelAt(roadX, y - 18, "Дорога " + road.ToString("0.###", CultureInfo.CurrentCulture) + " м"));
+      string legend = string.Join(
+        "; ",
+        layout.Pipes.Select(p => p.Id + " — " + (p.Outlet ? "выход БУОС" : FluidName(p.Fluid))));
+      string diameters = string.Join(" / ", layout.Pipes.Select(p => p.DiameterMm.ToString(CultureInfo.InvariantCulture)));
+      _previewNote.Text =
+        scheme.Title + ".\n"
+        + legend + ".\n"
+        + "Край траншеи — край дороги: "
+        + roadClearance.ToString("0.###", CultureInfo.CurrentCulture) + " м. "
+        + "Пример D: " + diameters + " мм. "
+        + "Ширина в расчёте зависит от реальных диаметров и не меньше заданной. "
+        + "Дорога в DXF — ось с указанной шириной.";
     }
 
-    private static TextBlock LabelAt(double x, double y, string text)
+    private void AddLabel(string text, double x, double y)
     {
-      var label = new TextBlock { Text = text, FontSize = 11 };
+      var label = new TextBlock { Text = text, FontSize = 12 };
       Canvas.SetLeft(label, x);
       Canvas.SetTop(label, y);
-      return label;
+      _canvas.Children.Add(label);
+    }
+
+    private static Brush PipeBrush(PreviewPipe pipe)
+    {
+      if (pipe.Outlet)
+      {
+        return Brushes.DarkOrange;
+      }
+
+      return pipe.Fluid switch
+      {
+        "oil" => Brushes.IndianRed,
+        "gas" => Brushes.Gold,
+        _ => Brushes.SkyBlue
+      };
+    }
+
+    private static string FluidName(string key)
+    {
+      return key switch
+      {
+        "oil" => "Нефть",
+        "gas" => "ПНГ",
+        "mixed" => "Нефть + вода + ПНГ",
+        "oil_gas" => "Нефть + ПНГ",
+        "combined" => "Жидкость (нефть + вода)",
+        _ => "Жидкость"
+      };
+    }
+
+    /// <summary>Example pipes matching End TopologyTrenchPreview for each scheme kind.</summary>
+    private static List<PreviewPipe> BuildExamplePipes(string schemeId)
+    {
+      var incoming = new List<(string Fluid, int Diameter)>();
+      bool addOutlet = false;
+
+      switch (schemeId)
+      {
+        case "SingleOutlet":
+          addOutlet = true;
+          break;
+        case "SingleInlet":
+          incoming.Add(("mixed", 426));
+          break;
+        case "OneWithOutlet":
+          incoming.Add(("mixed", 426));
+          addOutlet = true;
+          break;
+        case "TwoPipes":
+          incoming.Add(("oil_gas", 426));
+          incoming.Add(("liquid", 426));
+          break;
+        case "TwoWithOutlet":
+          incoming.Add(("oil_gas", 426));
+          incoming.Add(("liquid", 426));
+          addOutlet = true;
+          break;
+        case "ThreePipes":
+          incoming.Add(("oil", 426));
+          incoming.Add(("liquid", 426));
+          incoming.Add(("gas", 426));
+          break;
+        case "FourPipes":
+          incoming.Add(("oil", 426));
+          incoming.Add(("liquid", 426));
+          incoming.Add(("gas", 426));
+          addOutlet = true;
+          break;
+        default:
+          incoming.Add(("mixed", 426));
+          break;
+      }
+
+      var pipes = new List<PreviewPipe>();
+      for (int i = 0; i < incoming.Count; i++)
+      {
+        pipes.Add(new PreviewPipe
+        {
+          Id = (i + 1).ToString(CultureInfo.InvariantCulture),
+          Fluid = incoming[i].Fluid,
+          DiameterMm = incoming[i].Diameter,
+          Outlet = false
+        });
+      }
+
+      if (addOutlet)
+      {
+        pipes.Add(new PreviewPipe
+        {
+          Id = (incoming.Count + 1).ToString(CultureInfo.InvariantCulture),
+          Fluid = "oil",
+          DiameterMm = 426,
+          Outlet = true
+        });
+      }
+
+      if (pipes.Count == 0)
+      {
+        throw new ArgumentException("Для поперечника нужны трубы.");
+      }
+
+      return pipes;
+    }
+
+    /// <summary>
+    /// Local port of TopologyCorridors.CrossSection for preview-only pipes
+    /// (no TopologySettings / network lanes).
+    /// </summary>
+    private static CrossSectionLayout BuildCrossSection(
+      List<PreviewPipe> pipes,
+      double minimumWidth,
+      double gap12,
+      double gap23,
+      double additionalGap,
+      double sideClearance,
+      double roadClearance,
+      double roadWidth,
+      bool roadOnRight)
+    {
+      double Gap(int i)
+      {
+        if (pipes[i].Outlet)
+        {
+          return additionalGap;
+        }
+
+        return i == 1 ? gap12 : i == 2 ? gap23 : additionalGap;
+      }
+
+      double occupied = pipes.Sum(p => p.DiameterMm / 1000.0)
+        + Enumerable.Range(1, pipes.Count - 1).Sum(Gap);
+      double width = Math.Max(minimumWidth, occupied + 2 * sideClearance);
+
+      var layout = new CrossSectionLayout
+      {
+        Width = width,
+        LeftExtent = width / 2,
+        RightExtent = width / 2,
+        RoadWidth = roadWidth,
+        Pipes = pipes
+      };
+
+      double position = occupied / 2;
+      for (int i = 0; i < pipes.Count; i++)
+      {
+        if (i > 0)
+        {
+          position -= Gap(i);
+        }
+
+        double d = pipes[i].DiameterMm / 1000.0;
+        pipes[i].Offset = position - d / 2;
+        position -= d;
+      }
+
+      layout.RoadOffset = (roadOnRight ? -1 : 1)
+        * (width / 2 + roadClearance + roadWidth / 2);
+      return layout;
     }
 
     /// <summary>Stub persist of current UI values into trench_road.conf.</summary>
