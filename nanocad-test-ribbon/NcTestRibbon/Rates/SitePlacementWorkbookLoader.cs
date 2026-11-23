@@ -9,8 +9,9 @@ namespace NcTestRibbon.Rates
   using OfficeOpenXml;
 
   /// <summary>
-  /// Placement Excel for source-data БУОС / Узлы: Name, X, Y, Angle, Width, Length.
-  /// Unique «Имя» required (like inserts). Saves pose X/Y/Angle by name.
+  /// Placement Excel for drawing instances of БУОС / Узлы:
+  /// sheets «Размещение БУОС» / «Размещение Узлы» — Name, optional Тип, X, Y, Angle, Width, Length.
+  /// Never writes catalog sheets «БУОС» / «Узлы».
   /// </summary>
   public static class SitePlacementWorkbookLoader
   {
@@ -20,6 +21,8 @@ namespace NcTestRibbon.Rates
     public sealed class PlacementRecord
     {
       public string Name { get; set; } = string.Empty;
+      /// <summary>Catalog template name (Тип), optional.</summary>
+      public string TypeName { get; set; } = string.Empty;
       public double X { get; set; }
       public double Y { get; set; }
       public double AngleDeg { get; set; }
@@ -46,10 +49,17 @@ namespace NcTestRibbon.Rates
         throw new FileNotFoundException("Файл размещения не найден.", workbookPath);
       }
 
+      RejectCatalogSheetName(preferredSheet);
+
       using var package = new ExcelPackage(new FileInfo(workbookPath));
-      ExcelWorksheet sheet = FindSheet(package, preferredSheet)
-        ?? throw new InvalidOperationException(
-          "В книге нет листа «" + preferredSheet + "» (или известного алиаса).");
+      bool created = FindSheet(package, preferredSheet) == null;
+      ExcelWorksheet sheet = EnsureSheetInPackage(package, preferredSheet, createIfMissing: true);
+      if (created)
+      {
+        // Persist newly created empty placement sheet so next open finds it.
+        try { package.Save(); }
+        catch { /* read-only ok */ }
+      }
 
       var data = new WorkbookData
       {
@@ -60,6 +70,24 @@ namespace NcTestRibbon.Rates
       return data;
     }
 
+    /// <summary>
+    /// Ensure workbook has placement sheet (create with headers if missing).
+    /// Safe when the same file also holds catalog sheet «БУОС»/«Узлы» — never overwrites those.
+    /// </summary>
+    public static void EnsurePlacementSheet(string workbookPath, string preferredSheet)
+    {
+      if (string.IsNullOrWhiteSpace(workbookPath) || !File.Exists(workbookPath))
+      {
+        throw new FileNotFoundException("Файл размещения не найден.", workbookPath);
+      }
+
+      RejectCatalogSheetName(preferredSheet);
+
+      using var package = new ExcelPackage(new FileInfo(workbookPath));
+      EnsureSheetInPackage(package, preferredSheet, createIfMissing: true);
+      package.Save();
+    }
+
     public static int SavePlacementPose(string workbookPath, string preferredSheet, IReadOnlyList<PlacementRecord> dirty)
     {
       if (string.IsNullOrWhiteSpace(workbookPath) || !File.Exists(workbookPath))
@@ -67,22 +95,37 @@ namespace NcTestRibbon.Rates
         throw new FileNotFoundException("Файл размещения не найден.", workbookPath);
       }
 
+      RejectCatalogSheetName(preferredSheet);
+
       if (dirty == null || dirty.Count == 0)
       {
         return 0;
       }
 
       using var package = new ExcelPackage(new FileInfo(workbookPath));
-      ExcelWorksheet sheet = FindSheet(package, preferredSheet)
-        ?? throw new InvalidOperationException("В книге нет листа «" + preferredSheet + "».");
+      ExcelWorksheet sheet = EnsureSheetInPackage(package, preferredSheet, createIfMissing: true);
 
       Dictionary<string, int> headers = MapHeaders(sheet);
+      if (headers.Count == 0)
+      {
+        WriteHeaders(sheet);
+        headers = MapHeaders(sheet);
+      }
+
       int nameCol = Require(headers, preferredSheet, "имя", "name");
       int xCol = Require(headers, preferredSheet, "x");
       int yCol = Require(headers, preferredSheet, "y");
       int angCol = Find(headers, "угол", "angle", "rotation", "угол °", "угол°");
       int wCol = Find(headers, "ширина", "width", "ширина м", "ширина, м", "ширина площадки", "ширина площадки м");
       int lCol = Find(headers, "длина", "length", "длина м", "длина, м", "длина площадки", "длина площадки м");
+      int typeCol = Find(headers, "тип", "type", "шаблон", "template", "типовой", "вариант");
+      if (typeCol <= 0)
+      {
+        // Append optional «Тип» column for template ref without reshuffling existing columns.
+        typeCol = (sheet.Dimension?.End.Column ?? 0) + 1;
+        sheet.Cells[1, typeCol].Value = "Тип";
+      }
+
       int updated = 0;
       int rows = sheet.Dimension?.End.Row ?? 1;
       var byName = new Dictionary<string, PlacementRecord>(StringComparer.OrdinalIgnoreCase);
@@ -103,7 +146,7 @@ namespace NcTestRibbon.Rates
           continue;
         }
 
-        WritePoseRow(sheet, r, nameCol, xCol, yCol, angCol, wCol, lCol, rec);
+        WritePoseRow(sheet, r, nameCol, typeCol, xCol, yCol, angCol, wCol, lCol, rec);
         matched.Add(rec.Name.Trim());
         updated++;
       }
@@ -117,7 +160,7 @@ namespace NcTestRibbon.Rates
         }
 
         int r = (sheet.Dimension?.End.Row ?? 1) + 1;
-        WritePoseRow(sheet, r, nameCol, xCol, yCol, angCol, wCol, lCol, pair.Value);
+        WritePoseRow(sheet, r, nameCol, typeCol, xCol, yCol, angCol, wCol, lCol, pair.Value);
         updated++;
       }
 
@@ -129,6 +172,7 @@ namespace NcTestRibbon.Rates
       ExcelWorksheet sheet,
       int row,
       int nameCol,
+      int typeCol,
       int xCol,
       int yCol,
       int angCol,
@@ -137,6 +181,11 @@ namespace NcTestRibbon.Rates
       PlacementRecord rec)
     {
       sheet.Cells[row, nameCol].Value = rec.Name;
+      if (typeCol > 0 && !string.IsNullOrWhiteSpace(rec.TypeName))
+      {
+        sheet.Cells[row, typeCol].Value = rec.TypeName;
+      }
+
       sheet.Cells[row, xCol].Value = rec.X;
       sheet.Cells[row, yCol].Value = rec.Y;
       if (angCol > 0)
@@ -162,6 +211,8 @@ namespace NcTestRibbon.Rates
         throw new ArgumentException("Путь к xlsx пуст.", nameof(path));
       }
 
+      RejectCatalogSheetName(sheetName);
+
       string dir = Path.GetDirectoryName(path);
       if (!string.IsNullOrEmpty(dir))
       {
@@ -170,24 +221,20 @@ namespace NcTestRibbon.Rates
 
       using var package = new ExcelPackage();
       ExcelWorksheet sheet = package.Workbook.Worksheets.Add(sheetName);
-      string[] headers = { "Имя", "X", "Y", "Угол", "Ширина", "Длина" };
-      for (int c = 0; c < headers.Length; c++)
-      {
-        sheet.Cells[1, c + 1].Value = headers[c];
-      }
+      WriteHeaders(sheet);
 
       bool buos = sheetName.IndexOf("БУОС", StringComparison.OrdinalIgnoreCase) >= 0
         || sheetName.IndexOf("Buos", StringComparison.OrdinalIgnoreCase) >= 0;
       object[][] rows = buos
         ? new[]
         {
-          new object[] { "БУОС-1", 630100, 6500100, 0, 50, 70 },
-          new object[] { "БУОС-2", 630500, 6500500, 30, 60, 80 }
+          new object[] { "БУОС-1", "БУОС-4000", 630100, 6500100, 0, 50, 70 },
+          new object[] { "БУОС-2", "БУОС-2500", 630500, 6500500, 30, 60, 80 }
         }
         : new[]
         {
-          new object[] { "Узел-1", 630200, 6500200, 0, 20, 20 },
-          new object[] { "Узел-2", 630600, 6500600, 45, 25, 30 }
+          new object[] { "Узел-1", "Узел 3 соединения", 630200, 6500200, 0, 20, 20 },
+          new object[] { "Узел-2", "Узел 4 соединения", 630600, 6500600, 45, 25, 30 }
         };
 
       for (int i = 0; i < rows.Length; i++)
@@ -202,13 +249,69 @@ namespace NcTestRibbon.Rates
       package.SaveAs(new FileInfo(path));
     }
 
+    private static void WriteHeaders(ExcelWorksheet sheet)
+    {
+      string[] headers = { "Имя", "Тип", "X", "Y", "Угол", "Ширина", "Длина" };
+      for (int c = 0; c < headers.Length; c++)
+      {
+        sheet.Cells[1, c + 1].Value = headers[c];
+      }
+    }
+
+    private static ExcelWorksheet EnsureSheetInPackage(
+      ExcelPackage package,
+      string preferredSheet,
+      bool createIfMissing)
+    {
+      ExcelWorksheet sheet = FindSheet(package, preferredSheet);
+      if (sheet != null)
+      {
+        return sheet;
+      }
+
+      if (!createIfMissing)
+      {
+        throw new InvalidOperationException(
+          "В книге нет листа «" + preferredSheet + "» (или известного алиаса).");
+      }
+
+      sheet = package.Workbook.Worksheets.Add(preferredSheet);
+      WriteHeaders(sheet);
+      return sheet;
+    }
+
+    private static void RejectCatalogSheetName(string sheetName)
+    {
+      if (string.IsNullOrWhiteSpace(sheetName))
+      {
+        throw new ArgumentException("Имя листа размещения пусто.", nameof(sheetName));
+      }
+
+      // Catalog sheets from BuosWorkbookLoader / NodesWorkbookLoader — never treat as placement.
+      if (string.Equals(sheetName.Trim(), "БУОС", StringComparison.OrdinalIgnoreCase)
+          || string.Equals(sheetName.Trim(), "Узлы", StringComparison.OrdinalIgnoreCase)
+          || string.Equals(sheetName.Trim(), "Варианты БУОС", StringComparison.OrdinalIgnoreCase)
+          || string.Equals(sheetName.Trim(), "Варианты Узлы", StringComparison.OrdinalIgnoreCase))
+      {
+        throw new InvalidOperationException(
+          "Лист «" + sheetName + "» — каталог типовых, не размещение. "
+          + "Используйте «" + BuosSheetName + "» / «" + NodesSheetName + "».");
+      }
+    }
+
     private static List<PlacementRecord> ReadSheet(ExcelWorksheet sheet, string preferredSheet)
     {
       Dictionary<string, int> headers = MapHeaders(sheet);
+      if (headers.Count == 0)
+      {
+        return new List<PlacementRecord>();
+      }
+
       int nameCol = Require(headers, preferredSheet, "имя", "name");
       int xCol = Require(headers, preferredSheet, "x");
       int yCol = Require(headers, preferredSheet, "y");
       int angCol = Find(headers, "угол", "angle", "rotation", "угол °", "угол°");
+      int typeCol = Find(headers, "тип", "type", "шаблон", "template", "типовой", "вариант");
       int wCol = Find(headers, "ширина", "width", "ширина м", "ширина, м");
       int lCol = Find(headers, "длина", "length", "длина м", "длина, м");
       if (wCol <= 0)
@@ -250,6 +353,7 @@ namespace NcTestRibbon.Rates
         list.Add(new PlacementRecord
         {
           Name = trimmed,
+          TypeName = typeCol > 0 ? CellText(sheet, r, typeCol).Trim() : string.Empty,
           X = ParseDouble(sheet, r, xCol),
           Y = ParseDouble(sheet, r, yCol),
           AngleDeg = angCol > 0 ? ParseDouble(sheet, r, angCol) : 0,

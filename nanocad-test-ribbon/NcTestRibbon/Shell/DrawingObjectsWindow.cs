@@ -389,8 +389,8 @@ namespace NcTestRibbon.Shell
     {
       return ActiveTab switch
       {
-        DrawingObjectsTab.Buos => "Сохранить в исходные БУОС",
-        DrawingObjectsTab.Nodes => "Сохранить в исходные Узлы",
+        DrawingObjectsTab.Buos => "Сохранить в размещение БУОС",
+        DrawingObjectsTab.Nodes => "Сохранить в размещение Узлы",
         DrawingObjectsTab.Inserts => "Сохранить в исходные Врезки",
         _ => "Сохранить в исходные КП"
       };
@@ -400,8 +400,8 @@ namespace NcTestRibbon.Shell
     {
       return ActiveTab switch
       {
-        DrawingObjectsTab.Buos => "Загрузить из исходных БУОС",
-        DrawingObjectsTab.Nodes => "Загрузить из исходных Узлы",
+        DrawingObjectsTab.Buos => "Загрузить из размещения БУОС",
+        DrawingObjectsTab.Nodes => "Загрузить из размещения Узлы",
         DrawingObjectsTab.Inserts => "Загрузить из исходных Врезки",
         _ => "Загрузить из исходных КП"
       };

@@ -442,13 +442,21 @@ namespace NcTestRibbon.Shell
       var dirty = _rows.Select(r => new SitePlacementWorkbookLoader.PlacementRecord
       {
         Name = r.Name,
+        TypeName = r.TypeName ?? string.Empty,
         X = r.X,
         Y = r.Y,
         AngleDeg = r.AngleDeg,
         WidthM = r.WidthM,
         LengthM = r.LengthM
       }).ToList();
-      SitePlacementWorkbookLoader.SavePlacementPose(path, SitePlacementWorkbookLoader.BuosSheetName, dirty);
+      int n = SitePlacementWorkbookLoader.SavePlacementPose(
+        path, SitePlacementWorkbookLoader.BuosSheetName, dirty);
+      if (n <= 0)
+      {
+        throw new InvalidOperationException(
+          "Не записано ни одной строки в «" + SitePlacementWorkbookLoader.BuosSheetName + "».");
+      }
+
       foreach (CadRow row in _rows)
       {
         row.CoordsDirty = false;
@@ -461,13 +469,21 @@ namespace NcTestRibbon.Shell
       var dirty = _rows.Select(r => new SitePlacementWorkbookLoader.PlacementRecord
       {
         Name = r.Name,
+        TypeName = r.TypeName ?? string.Empty,
         X = r.X,
         Y = r.Y,
         AngleDeg = r.AngleDeg,
         WidthM = r.WidthM,
         LengthM = r.LengthM
       }).ToList();
-      SitePlacementWorkbookLoader.SavePlacementPose(path, SitePlacementWorkbookLoader.NodesSheetName, dirty);
+      int n = SitePlacementWorkbookLoader.SavePlacementPose(
+        path, SitePlacementWorkbookLoader.NodesSheetName, dirty);
+      if (n <= 0)
+      {
+        throw new InvalidOperationException(
+          "Не записано ни одной строки в «" + SitePlacementWorkbookLoader.NodesSheetName + "».");
+      }
+
       foreach (CadRow row in _rows)
       {
         row.CoordsDirty = false;
@@ -529,12 +545,7 @@ namespace NcTestRibbon.Shell
 
     private void LoadBuosOntoCad()
     {
-      string path = AppPaths.Load().BuosPlacementWorkbook;
-      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-      {
-        throw new InvalidOperationException("Нет файла размещения БУОС.");
-      }
-
+      string path = EnsurePlacementPath(buos: true);
       var book = SitePlacementWorkbookLoader.LoadWorkbook(path, SitePlacementWorkbookLoader.BuosSheetName);
       foreach (CadRow row in _rows.ToList())
       {
@@ -548,6 +559,7 @@ namespace NcTestRibbon.Shell
         CadBuosPlacementOverlay.UpdatePad(new CadBuosPlacementOverlay.SiteGeom
         {
           Name = rec.Name,
+          TypeName = rec.TypeName,
           X = rec.X,
           Y = rec.Y,
           RotationDeg = rec.AngleDeg,
@@ -559,12 +571,7 @@ namespace NcTestRibbon.Shell
 
     private void LoadNodesOntoCad()
     {
-      string path = AppPaths.Load().NodesPlacementWorkbook;
-      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-      {
-        throw new InvalidOperationException("Нет файла размещения Узлы.");
-      }
-
+      string path = EnsurePlacementPath(buos: false);
       var book = SitePlacementWorkbookLoader.LoadWorkbook(path, SitePlacementWorkbookLoader.NodesSheetName);
       foreach (CadRow row in _rows.ToList())
       {
@@ -578,6 +585,7 @@ namespace NcTestRibbon.Shell
         CadNodePlacementOverlay.UpdatePad(new CadNodePlacementOverlay.SiteGeom
         {
           Name = rec.Name,
+          TypeName = rec.TypeName,
           X = rec.X,
           Y = rec.Y,
           RotationDeg = rec.AngleDeg,
@@ -616,39 +624,7 @@ namespace NcTestRibbon.Shell
 
     private string EnsurePlacementPath(bool buos)
     {
-      string path = buos
-        ? AppPaths.Load().BuosPlacementWorkbook
-        : AppPaths.Load().NodesPlacementWorkbook;
-      if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
-      {
-        return path;
-      }
-
-      string sheet = buos
-        ? SitePlacementWorkbookLoader.BuosSheetName
-        : SitePlacementWorkbookLoader.NodesSheetName;
-      path = EnsurePlacementWorkbookDialog.EnsurePath(
-        FindForm(),
-        buos ? "БУОС" : "Узлы",
-        sheet,
-        path,
-        p =>
-        {
-          if (buos)
-          {
-            AppPaths.Set(x => x.BuosPlacementWorkbook = p);
-          }
-          else
-          {
-            AppPaths.Set(x => x.NodesPlacementWorkbook = p);
-          }
-        });
-      if (string.IsNullOrWhiteSpace(path))
-      {
-        throw new InvalidOperationException("Файл размещения не выбран.");
-      }
-
-      return path;
+      return PlacementWorkbookPaths.Ensure(FindForm(), buos);
     }
 
     private void LoadExcelBaseline()
@@ -666,6 +642,9 @@ namespace NcTestRibbon.Shell
                 return;
               }
 
+              // Create «Размещение БУОС» if user pointed a catalog workbook.
+              SitePlacementWorkbookLoader.EnsurePlacementSheet(
+                path, SitePlacementWorkbookLoader.BuosSheetName);
               foreach (var s in SitePlacementWorkbookLoader.LoadWorkbook(
                 path, SitePlacementWorkbookLoader.BuosSheetName).Sites)
               {
@@ -683,6 +662,8 @@ namespace NcTestRibbon.Shell
                 return;
               }
 
+              SitePlacementWorkbookLoader.EnsurePlacementSheet(
+                path, SitePlacementWorkbookLoader.NodesSheetName);
               foreach (var s in SitePlacementWorkbookLoader.LoadWorkbook(
                 path, SitePlacementWorkbookLoader.NodesSheetName).Sites)
               {
@@ -772,6 +753,7 @@ namespace NcTestRibbon.Shell
       return new CadRow
       {
         Name = g.Name,
+        TypeName = g.TypeName,
         X = g.X,
         Y = g.Y,
         AngleDeg = g.RotationDeg,
@@ -785,6 +767,7 @@ namespace NcTestRibbon.Shell
       return new CadRow
       {
         Name = g.Name,
+        TypeName = g.TypeName,
         X = g.X,
         Y = g.Y,
         AngleDeg = g.RotationDeg,

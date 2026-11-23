@@ -76,11 +76,15 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Add БУОС from Типовые: empty editable «Имя», then pick insert point on current view (no zoom).
+    /// Add БУОС from Типовые: ensure placement workbook, empty editable «Имя»,
+    /// then pick insert point on current view (no zoom).
     /// </summary>
     public static void PlaceBuosFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
+      // Placement file first — never write catalog «БУОС».
+      PlacementWorkbookPaths.Ensure(owner, buos: true);
+
       PickFromTypicalCatalogDialog.CatalogPickRow pick =
         PickFromTypicalCatalogDialog.ShowPick(owner, buos: true);
       if (pick == null)
@@ -96,6 +100,7 @@ namespace NcTestRibbon.Cad
       var geom = new CadBuosPlacementOverlay.SiteGeom
       {
         Name = pick.InstanceName,
+        TypeName = pick.TypeName ?? string.Empty,
         X = 0,
         Y = 0,
         RotationDeg = 0,
@@ -125,11 +130,15 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Add Узел from Типовые: empty editable «Имя», then pick insert point on current view (no zoom).
+    /// Add Узел from Типовые: ensure placement workbook, empty editable «Имя»,
+    /// then pick insert point on current view (no zoom).
     /// </summary>
     public static void PlaceNodeFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
+      // Placement file first — never write catalog «Узлы».
+      PlacementWorkbookPaths.Ensure(owner, buos: false);
+
       PickFromTypicalCatalogDialog.CatalogPickRow pick =
         PickFromTypicalCatalogDialog.ShowPick(owner, buos: false);
       if (pick == null)
@@ -145,6 +154,7 @@ namespace NcTestRibbon.Cad
       var geom = new CadNodePlacementOverlay.SiteGeom
       {
         Name = pick.InstanceName,
+        TypeName = pick.TypeName ?? string.Empty,
         X = 0,
         Y = 0,
         RotationDeg = 0,

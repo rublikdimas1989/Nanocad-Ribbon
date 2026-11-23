@@ -214,6 +214,7 @@ namespace NcTestRibbon.Cad
         result.Add(new SiteGeom
         {
           Name = name,
+          TypeName = TryReadPadType(name),
           X = x,
           Y = y,
           RotationDeg = rot,
@@ -501,7 +502,7 @@ namespace NcTestRibbon.Cad
       pl.Closed = true;
       model.AppendEntity(pl);
       tr.AddNewlyCreatedDBObject(pl, true);
-      SetPadName(tr, db, pl, pad.Name);
+      SetPadName(tr, db, pl, pad.Name, pad.TypeName);
     }
 
     private static void AddLabel(Transaction tr, BlockTableRecord model, Database db, SiteGeom pad)
@@ -542,10 +543,10 @@ namespace NcTestRibbon.Cad
 
       model.AppendEntity(text);
       tr.AddNewlyCreatedDBObject(text, true);
-      SetPadName(tr, db, text, pad.Name);
+      SetPadName(tr, db, text, pad.Name, pad.TypeName);
     }
 
-    private static void SetPadName(Transaction tr, Database db, Entity entity, string name)
+    private static void SetPadName(Transaction tr, Database db, Entity entity, string name, string typeName = null)
     {
       try
       {
@@ -559,9 +560,19 @@ namespace NcTestRibbon.Cad
           tr.AddNewlyCreatedDBObject(record, true);
         }
 
-        entity.XData = new ResultBuffer(
-          new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
-          new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty));
+        if (!string.IsNullOrWhiteSpace(typeName))
+        {
+          entity.XData = new ResultBuffer(
+            new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
+            new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty),
+            new TypedValue((int)DxfCode.ExtendedDataAsciiString, typeName.Trim()));
+        }
+        else
+        {
+          entity.XData = new ResultBuffer(
+            new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
+            new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty));
+        }
       }
       catch
       {
@@ -592,6 +603,78 @@ namespace NcTestRibbon.Cad
       }
 
       return null;
+    }
+
+    private static string ReadPadType(Entity entity)
+    {
+      try
+      {
+        ResultBuffer data = entity.GetXDataForApplication("NC_NODE_PLACED");
+        if (data == null)
+        {
+          return string.Empty;
+        }
+
+        int seen = 0;
+        foreach (TypedValue tv in data)
+        {
+          if (tv.TypeCode != (int)DxfCode.ExtendedDataAsciiString)
+          {
+            continue;
+          }
+
+          seen++;
+          if (seen == 2)
+          {
+            return Convert.ToString(tv.Value) ?? string.Empty;
+          }
+        }
+      }
+      catch
+      {
+      }
+
+      return string.Empty;
+    }
+
+    private static string TryReadPadType(string padName)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null || string.IsNullOrWhiteSpace(padName))
+      {
+        return string.Empty;
+      }
+
+      string type = string.Empty;
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          foreach (ObjectId id in FindNamedPadIds(tr, model, padName))
+          {
+            Entity ent = tr.GetObject(id, OpenMode.ForRead) as Entity;
+            if (ent == null)
+            {
+              continue;
+            }
+
+            type = ReadPadType(ent);
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+              break;
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+      }
+
+      return type ?? string.Empty;
     }
 
     private static ObjectId[] FindNamedPadIds(Transaction tr, BlockTableRecord model, string name)
@@ -1245,6 +1328,8 @@ namespace NcTestRibbon.Cad
     public sealed class SiteGeom
     {
       public string Name { get; set; } = string.Empty;
+      /// <summary>Catalog template name (Тип), optional.</summary>
+      public string TypeName { get; set; } = string.Empty;
       public double X { get; set; }
       public double Y { get; set; }
       /// <summary>Short side — vertical at 0°.</summary>

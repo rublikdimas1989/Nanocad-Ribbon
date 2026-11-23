@@ -50,6 +50,22 @@ namespace NcTestRibbon.Shell
         return null;
       }
 
+      // Opened an existing file (possibly catalog-only): ensure placement sheet exists.
+      try
+      {
+        SitePlacementWorkbookLoader.EnsurePlacementSheet(path, sheetName);
+      }
+      catch (Exception ex)
+      {
+        MessageBox.Show(
+          owner,
+          ex.Message,
+          "Файл размещения «" + noun + "»",
+          MessageBoxButtons.OK,
+          MessageBoxIcon.Warning);
+        return null;
+      }
+
       rememberPath?.Invoke(path);
       return path;
     }

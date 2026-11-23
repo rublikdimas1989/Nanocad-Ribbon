@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.93**): `nanocad-test-ribbon-v1.2.93.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.93.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.93/nanocad-test-ribbon-v1.2.93.zip  
+Актуальный **slim** zip (версия **1.2.94**): `nanocad-test-ribbon-v1.2.94.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.94.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.94/nanocad-test-ribbon-v1.2.94.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.93 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.94 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (группы Исходные/Коридоры/Расчёт), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.93+SaveClearDirty` — Save clears yellow + upsert Excel; Объекты чертежа no flicker on save/refresh; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.94+PlacementSave` — БУОС/Узлы Save→листы «Размещение …» (не каталог); EnsurePlacement на Add; yellow clear; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
@@ -177,9 +177,11 @@ NcTestBlink
 **Добавить Кустовую/БУОС/Узел** (и кнопка размещения во вкладках, в т.ч. врезки): вставка по X/Y/углу из Excel **без** place jig; zoom к объекту или к группе при multi-select.  
 Если файл размещения БУОС/Узлы не задан: диалог **Создать новый файл** / **Открыть существующий** → `paths.json`.
 
-Размещение БУОС/Узлы (как Врезка + КП):
+Размещение БУОС/Узлы (как Врезка + КП; **не** каталог «БУОС»/«Узлы»):
 
-- Excel лист **«Размещение БУОС»** / **«Размещение Узлы»**: Имя, X, Y, Угол, Ширина, Длина
+- Excel лист **«Размещение БУОС»** / **«Размещение Узлы»**: Имя, Тип (шаблон), X, Y, Угол, Ширина, Длина
+- «Сохранить в исходные БУОС/Узлы» пишет только эти листы (confirm: «в размещение»); типовые не трогает
+- Add БУОС/Узел: EnsurePlacementPath (создать/открыть файл размещения; при отсутствии листа — создать)
 - CAD: «Показывать на чертеже»; MOVE/ROTATE/grip → «Сохранить положение»; слои `NC_BUOS_PLACED` / `NC_NODES_PLACED`
 - Жёлтые строки = несохранённые X/Y/угол; при закрытии — «Применить новые координаты?»
 - `paths.json`: `buosPlacementWorkbook` / `nodesPlacementWorkbook`, `showBuosOnDrawing` / `showNodesOnDrawing`
