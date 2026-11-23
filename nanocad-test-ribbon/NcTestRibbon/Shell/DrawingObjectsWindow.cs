@@ -588,8 +588,5 @@ namespace NcTestRibbon.Shell
       page.Controls.Add(content);
       return page;
     }
-
-      public IntPtr Handle { get; }
-    }
   }
 }
