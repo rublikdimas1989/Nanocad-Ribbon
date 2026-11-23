@@ -377,7 +377,7 @@ namespace NcTestRibbon.Shell
     {
       if (action == DirtyCoordsAction.Save)
       {
-        try { CadPadInteraction.CommitPendingToExcel(); }
+        try { CadPadInteraction.CommitPendingToExcel(discardFailures: true); }
         catch { }
 
         try { _pads.SaveToSource(confirm: false, confirmTitle: string.Empty); }
@@ -393,6 +393,9 @@ namespace NcTestRibbon.Shell
         catch { }
 
         CadPadInteraction.ClearPending();
+        try { ClearDirtyAfterCloseSave(); }
+        catch { }
+
         return;
       }
 

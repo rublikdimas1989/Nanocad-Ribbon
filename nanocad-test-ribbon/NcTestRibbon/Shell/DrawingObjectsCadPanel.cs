@@ -263,13 +263,23 @@ namespace NcTestRibbon.Shell
       // Flush pending KP Excel sync first — during drawing close CAD list may be empty.
       if (_kind == Kind.Pads && CadPadInteraction.HasPendingExcelSync)
       {
-        CadPadInteraction.CommitPendingToExcel();
+        try { CadPadInteraction.CommitPendingToExcel(discardFailures: true); }
+        catch { }
+
+        // Pending flush is the source of truth on close; empty CAD must not leave
+        // «ожидает записи» or re-prompt. Clear now even if Sync finds 0 rows.
+        CadPadInteraction.ClearPending();
       }
 
       // Sync poses in place (no DataSource tear-down) so Save does not blink the window.
       SyncPosesFromCadInPlace();
       if (_rows.Count == 0)
       {
+        if (_kind == Kind.Pads)
+        {
+          CadPadInteraction.ClearPending();
+        }
+
         return;
       }
 

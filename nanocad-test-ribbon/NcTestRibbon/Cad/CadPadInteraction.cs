@@ -181,7 +181,11 @@ namespace NcTestRibbon.Cad
     /// <summary>
     /// Ribbon «Сохранить в исходные»: write all pending X/Y/angle to Excel and clear red state.
     /// </summary>
-    public static int CommitPendingToExcel()
+    /// <param name="discardFailures">
+    /// When true (drawing close «Сохранить положения»), never re-queue failed pads —
+    /// leaves no «ожидает записи с чертежа» for a second close prompt.
+    /// </param>
+    public static int CommitPendingToExcel(bool discardFailures = false)
     {
       List<KeyValuePair<string, Pose>> batch;
       lock (Gate)
@@ -215,10 +219,13 @@ namespace NcTestRibbon.Cad
           catch (Exception ex)
           {
             errors.Add(pair.Key + ": " + ex.Message);
-            // Keep failed pads pending so user can retry.
-            lock (Gate)
+            if (!discardFailures)
             {
-              PendingPoses[pair.Key] = pair.Value;
+              // Keep failed pads pending so user can retry (ribbon Save).
+              lock (Gate)
+              {
+                PendingPoses[pair.Key] = pair.Value;
+              }
             }
           }
         }
@@ -236,7 +243,7 @@ namespace NcTestRibbon.Cad
         catch { }
       }
 
-      if (errors.Count > 0)
+      if (errors.Count > 0 && !discardFailures)
       {
         throw new InvalidOperationException(
           "Обновлено " + ok + " из " + batch.Count + ".\n" + string.Join("\n", errors));
@@ -560,11 +567,21 @@ namespace NcTestRibbon.Cad
       catch { }
 
       Interlocked.Exchange(ref _uiFlushPosted, 0);
+      if (_suppress > 0)
+      {
+        return;
+      }
+
       FlushPendingToUi();
     }
 
     private static void FlushPendingToUi()
     {
+      if (_suppress > 0)
+      {
+        return;
+      }
+
       List<KeyValuePair<string, Pose>> batch;
       lock (Gate)
       {

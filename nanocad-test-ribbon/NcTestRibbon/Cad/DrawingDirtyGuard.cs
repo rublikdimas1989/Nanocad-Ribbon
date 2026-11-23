@@ -133,6 +133,10 @@ namespace NcTestRibbon.Cad
         }
 
         _prompting = true;
+        // Mark handled before modal returns — nested DocumentToBeDestroyed must not re-prompt
+        // (PadMoveLight Idle flush / pending «ожидает записи» race after Save).
+        _handledCloseDoc = doc;
+
         IWin32Window owner = null;
         try
         {
@@ -152,67 +156,72 @@ namespace NcTestRibbon.Cad
           "На чертеже есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
           items);
 
-        if (action == DirtyCoordsAction.Save)
+        // Suppress MOVE/grip → pending while we flush/clear (avoids re-queue during Save).
+        using (CadPadInteraction.SuppressNotifications())
         {
-          // Flush pending KP poses to Excel first (works even if CAD list is already empty).
-          try { CadPadInteraction.CommitPendingToExcel(); }
-          catch { }
-
-          if (drawingLive != null && !drawingLive.IsDisposed)
+          if (action == DirtyCoordsAction.Save)
           {
-            try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
+            // Flush pending KP poses to Excel first (works even if CAD list is already empty).
+            // discardFailures: close-save must not leave «ожидает записи» pending.
+            try { CadPadInteraction.CommitPendingToExcel(discardFailures: true); }
             catch { }
-          }
-          else if (sourceLive != null && !sourceLive.IsDisposed)
-          {
-            try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
-            catch { }
-          }
 
-          // Save chosen: clear dirty so a second DocumentToBeDestroyed cannot re-prompt.
-          CadPadInteraction.ClearPending();
-          try { drawingLive?.ClearDirtyAfterCloseSave(); }
-          catch { }
-
-          try { sourceLive?.ClearDirtyAfterCloseSave(); }
-          catch { }
-        }
-        else if (action == DirtyCoordsAction.Load)
-        {
-          if (drawingLive != null && !drawingLive.IsDisposed)
-          {
-            try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
-            catch { CadPadInteraction.ClearPending(); }
-          }
-          else if (sourceLive != null && !sourceLive.IsDisposed)
-          {
-            try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
-            catch { CadPadInteraction.ClearPending(); }
-          }
-          else
-          {
-            CadPadInteraction.ClearPending();
-          }
-        }
-        else
-        {
-          // Cancel — discard pending so close can finish without looping.
-          try
-          {
             if (drawingLive != null && !drawingLive.IsDisposed)
             {
-              drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+              try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
+              catch { }
             }
             else if (sourceLive != null && !sourceLive.IsDisposed)
             {
-              sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+              try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
+              catch { }
+            }
+
+            // Save chosen: clear dirty so a second DocumentToBeDestroyed cannot re-prompt.
+            CadPadInteraction.ClearPending();
+            try { drawingLive?.ClearDirtyAfterCloseSave(); }
+            catch { }
+
+            try { sourceLive?.ClearDirtyAfterCloseSave(); }
+            catch { }
+          }
+          else if (action == DirtyCoordsAction.Load)
+          {
+            if (drawingLive != null && !drawingLive.IsDisposed)
+            {
+              try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
+              catch { CadPadInteraction.ClearPending(); }
+            }
+            else if (sourceLive != null && !sourceLive.IsDisposed)
+            {
+              try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
+              catch { CadPadInteraction.ClearPending(); }
+            }
+            else
+            {
+              CadPadInteraction.ClearPending();
             }
           }
-          catch
+          else
           {
-          }
+            // Cancel — discard pending so close can finish without looping.
+            try
+            {
+              if (drawingLive != null && !drawingLive.IsDisposed)
+              {
+                drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+              }
+              else if (sourceLive != null && !sourceLive.IsDisposed)
+              {
+                sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+              }
+            }
+            catch
+            {
+            }
 
-          CadPadInteraction.ClearPending();
+            CadPadInteraction.ClearPending();
+          }
         }
 
         _handledCloseDoc = doc;
@@ -221,6 +230,11 @@ namespace NcTestRibbon.Cad
       {
         try { CadPadInteraction.ClearPending(); }
         catch { }
+
+        if (doc != null)
+        {
+          _handledCloseDoc = doc;
+        }
       }
       finally
       {
