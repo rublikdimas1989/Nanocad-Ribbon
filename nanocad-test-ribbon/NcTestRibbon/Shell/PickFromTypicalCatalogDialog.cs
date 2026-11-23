@@ -137,6 +137,8 @@ namespace NcTestRibbon.Shell
       AcceptButton = ok;
       CancelButton = cancel;
 
+      // Focus «Имя» only after the HWND exists — BeginInvoke in ctor throws.
+      Shown += (_, __) => TryBeginEditInstanceName();
       LoadCatalog();
     }
 
@@ -200,17 +202,36 @@ namespace NcTestRibbon.Shell
       {
         _grid.ClearSelection();
         _grid.Rows[0].Selected = true;
-        _grid.CurrentCell = _grid.Rows[0].Cells[0];
-        BeginInvoke(new Action(() =>
+        if (_grid.Columns.Count > 0)
         {
-          try
-          {
-            _grid.BeginEdit(true);
-          }
-          catch
-          {
-          }
-        }));
+          _grid.CurrentCell = _grid.Rows[0].Cells[0];
+        }
+      }
+
+      TryBeginEditInstanceName();
+    }
+
+    private void TryBeginEditInstanceName()
+    {
+      if (_rows.Count == 0 || _grid.Rows.Count == 0 || _grid.Columns.Count == 0)
+      {
+        return;
+      }
+
+      try
+      {
+        _grid.CurrentCell = _grid.Rows[0].Cells[0];
+        // Only edit once HWND exists — never BeginInvoke before IsHandleCreated.
+        if (!IsHandleCreated || !_grid.IsHandleCreated || IsDisposed || _grid.IsDisposed)
+        {
+          return;
+        }
+
+        _grid.BeginEdit(selectAll: true);
+      }
+      catch
+      {
+        // Never surface Invoke/handle timing as a MessageBox.
       }
     }
 

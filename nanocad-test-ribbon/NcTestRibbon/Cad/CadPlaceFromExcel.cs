@@ -209,10 +209,22 @@ namespace NcTestRibbon.Cad
         return NullScope.Instance;
       }
 
+      // Soft-hide: keep HWND alive (Hide can race with Invoke/refresh).
       bool wasTop = form.TopMost;
+      double wasOpacity = form.Opacity;
+      bool wasEnabled = form.Enabled;
       form.TopMost = false;
-      form.Hide();
-      return new RestoreFormScope(form, wasTop);
+      try
+      {
+        form.Opacity = 0;
+        form.Enabled = false;
+      }
+      catch
+      {
+        form.Hide();
+      }
+
+      return new RestoreFormScope(form, wasTop, wasOpacity, wasEnabled);
     }
 
     private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)
@@ -283,12 +295,16 @@ namespace NcTestRibbon.Cad
     {
       private readonly Form _form;
       private readonly bool _wasTop;
+      private readonly double _wasOpacity;
+      private readonly bool _wasEnabled;
       private bool _done;
 
-      public RestoreFormScope(Form form, bool wasTop)
+      public RestoreFormScope(Form form, bool wasTop, double wasOpacity, bool wasEnabled)
       {
         _form = form;
         _wasTop = wasTop;
+        _wasOpacity = wasOpacity;
+        _wasEnabled = wasEnabled;
       }
 
       public void Dispose()
@@ -301,7 +317,13 @@ namespace NcTestRibbon.Cad
         _done = true;
         try
         {
-          _form.Show();
+          if (!_form.Visible)
+          {
+            _form.Show();
+          }
+
+          _form.Opacity = _wasOpacity <= 0 ? 1 : _wasOpacity;
+          _form.Enabled = _wasEnabled;
           _form.TopMost = _wasTop;
           _form.BringToFront();
         }

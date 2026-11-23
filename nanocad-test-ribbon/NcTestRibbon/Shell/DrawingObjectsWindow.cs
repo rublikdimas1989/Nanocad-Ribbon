@@ -356,10 +356,23 @@ namespace NcTestRibbon.Shell
     private void Guard(Action action)
     {
       try { action(); }
+      catch (InvalidOperationException ex) when (IsHandleInvokeTimingError(ex))
+      {
+        // Anti-flicker / add path: Invoke before HWND — swallow, never MessageBox.
+      }
       catch (Exception ex)
       {
         MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
       }
+    }
+
+    private static bool IsHandleInvokeTimingError(Exception ex)
+    {
+      string msg = ex?.Message ?? string.Empty;
+      return msg.IndexOf("BeginInvoke", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("Invoke", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("дескриптора окна", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("window handle", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void OnFormClosing(object sender, FormClosingEventArgs e)
