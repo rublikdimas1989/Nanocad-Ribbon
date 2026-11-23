@@ -178,7 +178,7 @@ namespace NcTestRibbon.Shell
       out string path)
     {
       using var dlg = new PickFromExcelDialog(title, initialPath, browseTitle, null, loader);
-      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(dlg, owner);
       if (r != DialogResult.OK || dlg.SelectedItems == null || dlg.SelectedItems.Count == 0)
       {
         path = null;

@@ -82,8 +82,8 @@ namespace NcTestRibbon.Cad
     public static void PlaceBuosFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
-      // Modal child dialogs use CAD main hwnd — never ShowDialog(DrawingObjectsWindow).
-      IWin32Window dialogOwner = TryMainWindow() ?? owner;
+      // Never pass DrawingObjectsWindow (Form) as ShowDialog owner.
+      IWin32Window dialogOwner = UiModal.CadOwnerOrNull();
       // Placement file first — never write catalog «БУОС».
       PlacementWorkbookPaths.Ensure(dialogOwner, buos: true);
 
@@ -139,7 +139,7 @@ namespace NcTestRibbon.Cad
     public static void PlaceNodeFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
-      IWin32Window dialogOwner = TryMainWindow() ?? owner;
+      IWin32Window dialogOwner = UiModal.CadOwnerOrNull();
       // Placement file first — never write catalog «Узлы».
       PlacementWorkbookPaths.Ensure(dialogOwner, buos: false);
 
@@ -194,8 +194,7 @@ namespace NcTestRibbon.Cad
       string kind = buos ? "БУОС" : "Узел";
       if (string.IsNullOrWhiteSpace(name))
       {
-        MessageBox.Show(
-          owner,
+        UiModal.Msg(
           "Укажите «Имя» экземпляра " + kind + ".",
           kind,
           MessageBoxButtons.OK,
@@ -214,8 +213,7 @@ namespace NcTestRibbon.Cad
         return true;
       }
 
-      MessageBox.Show(
-        owner,
+      UiModal.Msg(
         kind + " с именем «" + trimmed + "» уже есть на чертеже. Укажите уникальное «Имя».",
         kind,
         MessageBoxButtons.OK,

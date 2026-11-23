@@ -197,17 +197,17 @@ namespace NcTestRibbon.Shell
           WindowState = FormWindowState.Normal;
         }
 
-        // Modeless only. Do not call ShowDialog — throws if already displayed.
+        // Parameterless Show only. Show(owner) throws when already Visible
+        // (same InvalidOperationException as ShowDialog on displayed form).
         if (!Visible)
         {
-          if (!IsHandleCreated)
+          if (IsHandleCreated)
           {
-            Show();
+            Visible = true;
           }
           else
           {
-            Visible = true;
-            Show();
+            Show(); // no owner
           }
         }
 
@@ -239,6 +239,12 @@ namespace NcTestRibbon.Shell
         try { Dispose(); }
         catch { }
       }
+    }
+
+    // Block Show(owner) — throws when already Visible. Use EnsureVisible instead.
+    public new void Show(IWin32Window owner)
+    {
+      EnsureVisible();
     }
 
     // Hide Form.ShowDialog — this window must stay modeless. Callers get EnsureVisible.
@@ -441,8 +447,7 @@ namespace NcTestRibbon.Shell
         int removed = ActivePanel().DeleteSelectedFromCad();
         if (removed == 0)
         {
-          MessageBox.Show(
-            this,
+          UiModal.Msg(
             "Выберите строки для удаления с чертежа.",
             Text,
             MessageBoxButtons.OK,
@@ -490,9 +495,15 @@ namespace NcTestRibbon.Shell
       {
         // Anti-flicker / add path: Invoke before HWND — swallow, never MessageBox.
       }
+      catch (InvalidOperationException ex) when (IsShowDialogOnVisibleError(ex))
+      {
+        // Recover: keep modeless window up; never MessageBox.Show(this).
+        try { EnsureVisible(); }
+        catch { }
+      }
       catch (Exception ex)
       {
-        MessageBox.Show(this, ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        UiModal.Msg(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
       }
     }
 
@@ -503,6 +514,16 @@ namespace NcTestRibbon.Shell
         || msg.IndexOf("Invoke", StringComparison.OrdinalIgnoreCase) >= 0
         || msg.IndexOf("дескриптора окна", StringComparison.OrdinalIgnoreCase) >= 0
         || msg.IndexOf("window handle", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool IsShowDialogOnVisibleError(Exception ex)
+    {
+      string msg = ex?.Message ?? string.Empty;
+      return msg.IndexOf("уже отображенн", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("модальн", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("ShowDialog", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("already visible", StringComparison.OrdinalIgnoreCase) >= 0
+        || msg.IndexOf("already displayed", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void OnFormClosing(object sender, FormClosingEventArgs e)
@@ -518,22 +539,9 @@ namespace NcTestRibbon.Shell
         return;
       }
 
-      // Owner = CAD main hwnd, never ShowDialog(this) — avoids modal-on-self issues.
-      IWin32Window owner = null;
-      try
-      {
-        IntPtr hwnd = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
-        if (hwnd != IntPtr.Zero)
-        {
-          owner = new NativeWindowOwner(hwnd);
-        }
-      }
-      catch
-      {
-      }
-
+      // Never ShowDialog(this). UiModal strips Form owners.
       DirtyCoordsAction action = DirtyCoordsDialog.ShowPrompt(
-        owner,
+        null,
         "Объекты чертежа",
         "Есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
         dirty);
@@ -580,13 +588,6 @@ namespace NcTestRibbon.Shell
       page.Controls.Add(content);
       return page;
     }
-
-    private sealed class NativeWindowOwner : IWin32Window
-    {
-      public NativeWindowOwner(IntPtr handle)
-      {
-        Handle = handle;
-      }
 
       public IntPtr Handle { get; }
     }

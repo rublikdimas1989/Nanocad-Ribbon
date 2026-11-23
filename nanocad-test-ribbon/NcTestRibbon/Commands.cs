@@ -674,7 +674,6 @@ namespace NcTestRibbon
         DrawingObjectsWindow form = null;
         try
         {
-          IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
           form = new DrawingObjectsWindow(tab);
           lock (DrawingObjectsGate)
           {
@@ -702,16 +701,8 @@ namespace NcTestRibbon
             };
           }
 
-          // Modeless Show only — never ShowDialog on this singleton.
-          if (hwnd != IntPtr.Zero)
-          {
-            form.Show(new WindowWrapper(hwnd));
-          }
-          else
-          {
-            form.Show();
-          }
-
+          // Parameterless Show only — Show(owner) throws if form already Visible.
+          form.Show();
           form.EnsureVisible();
           ed?.WriteMessage("\n" + label + ": Объекты чертежа open → " + tab + ".");
         }

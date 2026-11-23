@@ -147,7 +147,7 @@ namespace NcTestRibbon.Shell
     {
       string title = buos ? "Добавить БУОС из типовых" : "Добавить Узел из типовых";
       using var dlg = new PickFromTypicalCatalogDialog(buos, title);
-      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(dlg, owner);
       return r == DialogResult.OK ? dlg.Selected : null;
     }
 

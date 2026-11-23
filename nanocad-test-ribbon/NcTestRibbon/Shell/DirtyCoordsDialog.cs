@@ -151,7 +151,8 @@ namespace NcTestRibbon.Shell
       IEnumerable<DirtyCoordItem> items)
     {
       using var dlg = new DirtyCoordsDialog(title, message, items);
-      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      // Never ShowDialog(DrawingObjectsWindow) — SanitizeOwner drops Form owners.
+      DialogResult r = UiModal.ShowDialog(dlg, owner);
       if (r != DialogResult.OK)
       {
         return DirtyCoordsAction.Cancel;

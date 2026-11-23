@@ -28,7 +28,7 @@ namespace NcTestRibbon.Shell
       }
 
       using var dlg = new ChoiceForm(noun);
-      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(dlg, owner);
       if (r != DialogResult.OK || dlg.Choice == Choice.None)
       {
         return null;
@@ -57,8 +57,7 @@ namespace NcTestRibbon.Shell
       }
       catch (Exception ex)
       {
-        MessageBox.Show(
-          owner,
+        UiModal.Msg(
           ex.Message,
           "Файл размещения «" + noun + "»",
           MessageBoxButtons.OK,
@@ -82,7 +81,7 @@ namespace NcTestRibbon.Shell
       }
 
       using var dlg = new ChoiceForm("Врезки");
-      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(dlg, owner);
       if (r != DialogResult.OK || dlg.Choice == Choice.None)
       {
         return null;
@@ -124,7 +123,7 @@ namespace NcTestRibbon.Shell
           : null
       };
 
-      DialogResult r = owner == null ? sfd.ShowDialog() : sfd.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(sfd, owner);
       if (r != DialogResult.OK || string.IsNullOrWhiteSpace(sfd.FileName))
       {
         return null;
@@ -155,7 +154,7 @@ namespace NcTestRibbon.Shell
           : null
       };
 
-      DialogResult r = owner == null ? sfd.ShowDialog() : sfd.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(sfd, owner);
       if (r != DialogResult.OK || string.IsNullOrWhiteSpace(sfd.FileName))
       {
         return null;
@@ -193,7 +192,7 @@ namespace NcTestRibbon.Shell
       {
       }
 
-      DialogResult r = owner == null ? ofd.ShowDialog() : ofd.ShowDialog(owner);
+      DialogResult r = UiModal.ShowDialog(ofd, owner);
       if (r != DialogResult.OK || string.IsNullOrWhiteSpace(ofd.FileName))
       {
         return null;
