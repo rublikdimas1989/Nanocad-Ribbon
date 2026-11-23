@@ -212,6 +212,7 @@ namespace NcTestRibbon.Shell
       if (action == DirtyCoordsAction.Save)
       {
         SaveAllToSource(confirm: false);
+        CadPadInteraction.ClearPending();
         return;
       }
 
@@ -219,6 +220,18 @@ namespace NcTestRibbon.Shell
       {
         LoadFromSource(confirm: false, activeTabOnly: false);
       }
+    }
+
+    /// <summary>After close-dialog Save: drop yellow/pending so the prompt cannot loop.</summary>
+    public void ClearDirtyAfterCloseSave()
+    {
+      try { _pads.ClearDirtyFlags(); }
+      catch { }
+
+      try { _inserts.ClearDirtyFlags(); }
+      catch { }
+
+      CadPadInteraction.ClearPending();
     }
 
     private void OnFormClosing(object sender, FormClosingEventArgs e)

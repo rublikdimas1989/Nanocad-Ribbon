@@ -3,9 +3,12 @@ namespace NcTestRibbon.Shell
   using System;
   using System.Collections.Generic;
   using System.Drawing;
+  using System.IO;
   using System.Linq;
   using System.Windows.Forms;
   using NcTestRibbon.Cad;
+  using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
 
   public enum DrawingObjectsTab
   {
@@ -180,18 +183,62 @@ namespace NcTestRibbon.Shell
     public void ApplyPadCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
     {
       SelectTab(DrawingObjectsTab.Pads);
-      _pads.RefreshFromCad();
-      if (saveExcel)
+      try { _pads.RefreshFromCad(); }
+      catch { }
+
+      if (!saveExcel)
       {
-        try { _pads.SaveToSource(confirm: false, confirmTitle: "Сохранить в исходные КП"); }
-        catch { }
+        return;
       }
+
+      // Write this KP pose to Excel directly (do not rely on full SaveToSource /
+      // RefreshFromCad during drawing close — that path can no-op with 0 CAD rows).
+      string path = AppPaths.Load().PadsWorkbook;
+      if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+      {
+        throw new InvalidOperationException(
+          "Нет пути к таблицам КП (paths.json → padsWorkbook).");
+      }
+
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
+        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (pad == null)
+      {
+        throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
+      }
+
+      pad.X = x;
+      pad.Y = y;
+      pad.RotationDeg = CadPadOverlay.NormalizeDegrees(rotationDeg);
+      PadWorkbookLoader.SavePadCoordinates(path, new[] { pad });
+    }
+
+    /// <summary>Clear yellow/pending after close-dialog Save so the prompt cannot loop.</summary>
+    public void ClearDirtyAfterCloseSave()
+    {
+      try { _pads.ClearDirtyFlags(); }
+      catch { }
+
+      try { _buos.ClearDirtyFlags(); }
+      catch { }
+
+      try { _nodes.ClearDirtyFlags(); }
+      catch { }
+
+      try { _inserts.ClearDirtyFlags(); }
+      catch { }
+
+      CadPadInteraction.ClearPending();
     }
 
     public void ApplyDirtyPromptAction(DirtyCoordsAction action)
     {
       if (action == DirtyCoordsAction.Save)
       {
+        try { CadPadInteraction.CommitPendingToExcel(); }
+        catch { }
+
         try { _pads.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
@@ -204,6 +251,7 @@ namespace NcTestRibbon.Shell
         try { _inserts.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
+        CadPadInteraction.ClearPending();
         return;
       }
 

@@ -274,6 +274,21 @@ namespace NcTestRibbon.Shell
       SaveCoordinates(confirmOverwrite: confirm);
     }
 
+    /// <summary>Clear yellow flags after close-dialog Save (no CAD rewrite).</summary>
+    public void ClearDirtyFlags()
+    {
+      foreach (InsertRow row in _rows)
+      {
+        row.CoordsDirty = false;
+      }
+
+      try { UpdateButtons(); }
+      catch { }
+
+      try { _grid?.Invalidate(); }
+      catch { }
+    }
+
     public void ReloadFromSource(bool confirm)
     {
       string path = _book?.Path;

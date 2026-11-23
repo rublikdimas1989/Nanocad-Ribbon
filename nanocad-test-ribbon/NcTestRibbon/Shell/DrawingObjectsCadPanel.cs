@@ -194,6 +194,13 @@ namespace NcTestRibbon.Shell
 
     public void SaveToSource(bool confirm, string confirmTitle)
     {
+      // Flush pending KP Excel sync first — during drawing close RefreshFromCad may
+      // return 0 rows, but pending poses must still be written.
+      if (_kind == Kind.Pads && CadPadInteraction.HasPendingExcelSync)
+      {
+        CadPadInteraction.CommitPendingToExcel();
+      }
+
       RefreshFromCad();
       if (_rows.Count == 0)
       {
@@ -233,6 +240,18 @@ namespace NcTestRibbon.Shell
       LoadExcelBaseline();
       MarkDirtyAgainstBaseline();
       _grid.Invalidate();
+    }
+
+    /// <summary>After close-dialog Save: drop yellow/pending state without touching CAD.</summary>
+    public void ClearDirtyFlags()
+    {
+      foreach (CadRow row in _rows)
+      {
+        row.CoordsDirty = false;
+      }
+
+      try { _grid.Invalidate(); }
+      catch { }
     }
 
     public void LoadFromSource(bool confirm, string confirmTitle)
@@ -284,11 +303,6 @@ namespace NcTestRibbon.Shell
 
     private void SavePads()
     {
-      if (_kind == Kind.Pads && CadPadInteraction.HasPendingExcelSync)
-      {
-        CadPadInteraction.CommitPendingToExcel();
-      }
-
       string path = AppPaths.Load().PadsWorkbook;
       if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
       {

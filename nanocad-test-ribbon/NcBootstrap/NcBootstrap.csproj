@@ -10,9 +10,9 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>1.2.91</Version>
-    <FileVersion>1.2.91.0</FileVersion>
-    <InformationalVersion>1.2.91+NoTypicalRibbon</InformationalVersion>
+    <Version>1.2.92</Version>
+    <FileVersion>1.2.92.0</FileVersion>
+    <InformationalVersion>1.2.92+CloseDirtySaveFix</InformationalVersion>
     <NcSdkDir Condition="'$(NcSdkDir)' == ''">C:\Users\bublik_da\YandexDisk\Автоматизация проектирования\Проекты\Паспотизация ИЗП\Инструменты nanocad\NC_SDK_RU_24.0.6388.4326.7145\</NcSdkDir>
   </PropertyGroup>
 

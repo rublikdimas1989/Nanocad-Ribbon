@@ -480,6 +480,21 @@ namespace NcTestRibbon.Shell
       DiscardUnsavedSession();
     }
 
+    /// <summary>Clear yellow flags after close-dialog Save (no CAD rewrite).</summary>
+    public void ClearDirtyFlags()
+    {
+      foreach (PadRow row in _pads)
+      {
+        row.CoordsDirty = false;
+      }
+
+      try { UpdateActionButtons(); }
+      catch { }
+
+      try { _grid?.Invalidate(); }
+      catch { }
+    }
+
     /// <summary>
     /// Without «Сохранить положения», restore Record/grid/CAD to last Excel-committed pose.
     /// </summary>

@@ -16,6 +16,8 @@ namespace NcTestRibbon.Cad
     private static readonly object Gate = new object();
     private static bool _attached;
     private static bool _prompting;
+    /// <summary>Document already handled for this close — do not re-show the prompt.</summary>
+    private static Document _handledCloseDoc;
 
     public static Func<SourceDataWindow> GetLiveSourceData { get; set; }
 
@@ -33,6 +35,9 @@ namespace NcTestRibbon.Cad
         try
         {
           CadApp.DocumentManager.DocumentToBeDestroyed += OnDocumentToBeDestroyed;
+          try { CadApp.DocumentManager.DocumentCreated += OnDocumentCreated; }
+          catch { }
+
           _attached = true;
         }
         catch
@@ -59,13 +64,33 @@ namespace NcTestRibbon.Cad
         {
         }
 
+        try { CadApp.DocumentManager.DocumentCreated -= OnDocumentCreated; }
+        catch { }
+
         _attached = false;
+        _handledCloseDoc = null;
+      }
+    }
+
+    private static void OnDocumentCreated(object sender, DocumentCollectionEventArgs e)
+    {
+      // New drawing — allow a fresh close prompt for the next document.
+      if (!ReferenceEquals(_handledCloseDoc, e?.Document))
+      {
+        _handledCloseDoc = null;
       }
     }
 
     private static void OnDocumentToBeDestroyed(object sender, DocumentCollectionEventArgs e)
     {
+      Document doc = e?.Document;
       if (_prompting)
+      {
+        return;
+      }
+
+      // Same close cycle already answered — never re-show.
+      if (doc != null && ReferenceEquals(_handledCloseDoc, doc))
       {
         return;
       }
@@ -127,42 +152,75 @@ namespace NcTestRibbon.Cad
           "На чертеже есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
           items);
 
-        if (drawingLive != null && !drawingLive.IsDisposed)
+        if (action == DirtyCoordsAction.Save)
         {
-          if (action == DirtyCoordsAction.Cancel)
+          // Flush pending KP poses to Excel first (works even if CAD list is already empty).
+          try { CadPadInteraction.CommitPendingToExcel(); }
+          catch { }
+
+          if (drawingLive != null && !drawingLive.IsDisposed)
+          {
+            try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
+            catch { }
+          }
+          else if (sourceLive != null && !sourceLive.IsDisposed)
+          {
+            try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Save); }
+            catch { }
+          }
+
+          // Save chosen: clear dirty so a second DocumentToBeDestroyed cannot re-prompt.
+          CadPadInteraction.ClearPending();
+          try { drawingLive?.ClearDirtyAfterCloseSave(); }
+          catch { }
+
+          try { sourceLive?.ClearDirtyAfterCloseSave(); }
+          catch { }
+        }
+        else if (action == DirtyCoordsAction.Load)
+        {
+          if (drawingLive != null && !drawingLive.IsDisposed)
           {
             try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
             catch { CadPadInteraction.ClearPending(); }
           }
-          else
+          else if (sourceLive != null && !sourceLive.IsDisposed)
           {
-            drawingLive.ApplyDirtyPromptAction(action);
-          }
-        }
-        else if (sourceLive != null && !sourceLive.IsDisposed)
-        {
-          if (action == DirtyCoordsAction.Cancel)
-          {
-            // Drawing is closing — discard unsaved poses back to last Excel.
             try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
             catch { CadPadInteraction.ClearPending(); }
           }
           else
           {
-            sourceLive.ApplyDirtyPromptAction(action);
+            CadPadInteraction.ClearPending();
           }
-        }
-        else if (action == DirtyCoordsAction.Save)
-        {
-          CadPadInteraction.CommitPendingToExcel();
         }
         else
         {
+          // Cancel — discard pending so close can finish without looping.
+          try
+          {
+            if (drawingLive != null && !drawingLive.IsDisposed)
+            {
+              drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+            }
+            else if (sourceLive != null && !sourceLive.IsDisposed)
+            {
+              sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load);
+            }
+          }
+          catch
+          {
+          }
+
           CadPadInteraction.ClearPending();
         }
+
+        _handledCloseDoc = doc;
       }
       catch
       {
+        try { CadPadInteraction.ClearPending(); }
+        catch { }
       }
       finally
       {
