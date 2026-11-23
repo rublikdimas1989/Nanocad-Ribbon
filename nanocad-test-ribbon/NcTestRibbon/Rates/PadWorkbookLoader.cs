@@ -156,6 +156,7 @@ namespace NcTestRibbon.Rates
       }
 
       int updated = 0;
+      var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
       for (int r = 2; r <= rows; r++)
       {
         string name = (sheet.Cells[r, nameCol].Text ?? string.Empty).Trim();
@@ -167,6 +168,22 @@ namespace NcTestRibbon.Rates
         sheet.Cells[r, xCol].Value = pad.X;
         sheet.Cells[r, yCol].Value = pad.Y;
         sheet.Cells[r, angleCol].Value = pad.RotationDeg;
+        matched.Add(name);
+        updated++;
+      }
+
+      foreach (KeyValuePair<string, PadRecord> pair in byName)
+      {
+        if (matched.Contains(pair.Key))
+        {
+          continue;
+        }
+
+        int r = Math.Max(sheet.Dimension?.End.Row ?? 1, 1) + 1;
+        sheet.Cells[r, nameCol].Value = pair.Value.Name;
+        sheet.Cells[r, xCol].Value = pair.Value.X;
+        sheet.Cells[r, yCol].Value = pair.Value.Y;
+        sheet.Cells[r, angleCol].Value = pair.Value.RotationDeg;
         updated++;
       }
 

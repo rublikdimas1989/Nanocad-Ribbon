@@ -81,6 +81,8 @@ namespace NcTestRibbon.Rates
       int xCol = Require(headers, preferredSheet, "x");
       int yCol = Require(headers, preferredSheet, "y");
       int angCol = Find(headers, "угол", "angle", "rotation", "угол °", "угол°");
+      int wCol = Find(headers, "ширина", "width", "ширина м", "ширина, м", "ширина площадки", "ширина площадки м");
+      int lCol = Find(headers, "длина", "length", "длина м", "длина, м", "длина площадки", "длина площадки м");
       int updated = 0;
       int rows = sheet.Dimension?.End.Row ?? 1;
       var byName = new Dictionary<string, PlacementRecord>(StringComparer.OrdinalIgnoreCase);
@@ -92,6 +94,7 @@ namespace NcTestRibbon.Rates
         }
       }
 
+      var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
       for (int r = 2; r <= rows; r++)
       {
         string name = CellText(sheet, r, nameCol);
@@ -100,18 +103,56 @@ namespace NcTestRibbon.Rates
           continue;
         }
 
-        sheet.Cells[r, xCol].Value = rec.X;
-        sheet.Cells[r, yCol].Value = rec.Y;
-        if (angCol > 0)
+        WritePoseRow(sheet, r, nameCol, xCol, yCol, angCol, wCol, lCol, rec);
+        matched.Add(rec.Name.Trim());
+        updated++;
+      }
+
+      // Upsert: append CAD instances that are not yet in Excel (e.g. Add Узел/БУОС).
+      foreach (KeyValuePair<string, PlacementRecord> pair in byName)
+      {
+        if (matched.Contains(pair.Key))
         {
-          sheet.Cells[r, angCol].Value = rec.AngleDeg;
+          continue;
         }
 
+        int r = (sheet.Dimension?.End.Row ?? 1) + 1;
+        WritePoseRow(sheet, r, nameCol, xCol, yCol, angCol, wCol, lCol, pair.Value);
         updated++;
       }
 
       package.Save();
       return updated;
+    }
+
+    private static void WritePoseRow(
+      ExcelWorksheet sheet,
+      int row,
+      int nameCol,
+      int xCol,
+      int yCol,
+      int angCol,
+      int wCol,
+      int lCol,
+      PlacementRecord rec)
+    {
+      sheet.Cells[row, nameCol].Value = rec.Name;
+      sheet.Cells[row, xCol].Value = rec.X;
+      sheet.Cells[row, yCol].Value = rec.Y;
+      if (angCol > 0)
+      {
+        sheet.Cells[row, angCol].Value = rec.AngleDeg;
+      }
+
+      if (wCol > 0 && rec.WidthM > 0)
+      {
+        sheet.Cells[row, wCol].Value = rec.WidthM;
+      }
+
+      if (lCol > 0 && rec.LengthM > 0)
+      {
+        sheet.Cells[row, lCol].Value = rec.LengthM;
+      }
     }
 
     public static void CreateSampleWorkbook(string path, string sheetName)

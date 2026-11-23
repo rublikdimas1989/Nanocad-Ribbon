@@ -237,9 +237,27 @@ namespace NcTestRibbon.Shell
           break;
       }
 
-      LoadExcelBaseline();
-      MarkDirtyAgainstBaseline();
+      // Accept the just-saved CAD poses as baseline and clear yellow immediately.
+      AcceptSavedBaselineFromRows();
+      if (_kind == Kind.Pads)
+      {
+        CadPadInteraction.ClearPending();
+      }
+
       _grid.Invalidate();
+      try { _grid.Refresh(); }
+      catch { }
+    }
+
+    /// <summary>After Excel write: treat current CAD rows as clean (no yellow).</summary>
+    private void AcceptSavedBaselineFromRows()
+    {
+      _excelBaseline.Clear();
+      foreach (CadRow row in _rows)
+      {
+        _excelBaseline[row.Name] = new PoseSnapshot(row.X, row.Y, row.AngleDeg);
+        row.CoordsDirty = false;
+      }
     }
 
     /// <summary>After close-dialog Save: drop yellow/pending state without touching CAD.</summary>

@@ -87,6 +87,7 @@ namespace NcTestRibbon.Rates
         }
       }
 
+      var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
       for (int r = 2; r <= rows; r++)
       {
         string name = CellText(sheet, r, nameCol);
@@ -97,6 +98,21 @@ namespace NcTestRibbon.Rates
 
         sheet.Cells[r, xCol].Value = rec.X;
         sheet.Cells[r, yCol].Value = rec.Y;
+        matched.Add(rec.Name.Trim());
+        updated++;
+      }
+
+      foreach (KeyValuePair<string, InsertRecord> pair in byName)
+      {
+        if (matched.Contains(pair.Key))
+        {
+          continue;
+        }
+
+        int r = (sheet.Dimension?.End.Row ?? 1) + 1;
+        sheet.Cells[r, nameCol].Value = pair.Value.Name;
+        sheet.Cells[r, xCol].Value = pair.Value.X;
+        sheet.Cells[r, yCol].Value = pair.Value.Y;
         updated++;
       }
 
