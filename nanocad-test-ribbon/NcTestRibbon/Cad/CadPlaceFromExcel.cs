@@ -1,0 +1,363 @@
+namespace NcTestRibbon.Cad
+{
+  using System;
+  using System.Collections.Generic;
+  using System.Diagnostics;
+  using System.Globalization;
+  using System.IO;
+  using System.Linq;
+  using System.Windows.Forms;
+  using NcTestRibbon.Configuration;
+  using NcTestRibbon.Rates;
+  using NcTestRibbon.Shell;
+
+  /// <summary>
+  /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel multi-select → insert at stored X/Y/angle
+  /// (no place jig). Zoom to object or group extents. No SourceData / no draw-all.
+  /// </summary>
+  public static class CadPlaceFromExcel
+  {
+    public static void PlacePad(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      string initial = AppPaths.Load().PadsWorkbook;
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
+        owner,
+        "Добавить Кустовую",
+        initial,
+        "выбрать из файла",
+        path => PadWorkbookLoader.LoadWorkbook(path).Pads.Select(ToPickItem).ToList(),
+        out string path);
+
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
+      {
+        return;
+      }
+
+      PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
+      AppPaths.Set(p => p.PadsWorkbook = path);
+
+      var geoms = new List<CadPadOverlay.PadGeom>();
+      foreach (PickFromExcelItem item in picked)
+      {
+        string name = item.Tag as string ?? item.Name;
+        PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
+          string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (pad == null)
+        {
+          throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
+        }
+
+        var geom = new CadPadOverlay.PadGeom
+        {
+          Name = pad.Name,
+          X = pad.X,
+          Y = pad.Y,
+          WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
+          LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
+          RotationDeg = pad.RotationDeg
+        };
+        CadPadOverlay.InsertAtStored(geom);
+        geoms.Add(geom);
+      }
+
+      CadPadOverlay.ZoomToPads(geoms);
+    }
+
+    public static void PlaceBuos(IWin32Window owner = null)
+    {
+      PlaceBuosFromCatalog(owner);
+    }
+
+    public static void PlaceNode(IWin32Window owner = null)
+    {
+      PlaceNodeFromCatalog(owner);
+    }
+
+    /// <summary>
+    /// Add БУОС from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
+    /// Places at 0;0; user can MOVE then Save.
+    /// </summary>
+    public static void PlaceBuosFromCatalog(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      PickFromTypicalCatalogDialog.CatalogPickRow pick =
+        PickFromTypicalCatalogDialog.ShowPick(owner, buos: true);
+      if (pick == null)
+      {
+        return;
+      }
+
+      var geom = new CadBuosPlacementOverlay.SiteGeom
+      {
+        Name = pick.InstanceName,
+        X = 0,
+        Y = 0,
+        RotationDeg = 0,
+        WidthM = pick.WidthValue > 0 ? pick.WidthValue : 150,
+        LengthM = pick.LengthValue > 0 ? pick.LengthValue : 250
+      };
+      CadBuosPlacementOverlay.InsertAtStored(geom);
+      CadBuosPlacementOverlay.ZoomToPads(new[] { geom });
+    }
+
+    /// <summary>
+    /// Add Узел from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
+    /// </summary>
+    public static void PlaceNodeFromCatalog(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      PickFromTypicalCatalogDialog.CatalogPickRow pick =
+        PickFromTypicalCatalogDialog.ShowPick(owner, buos: false);
+      if (pick == null)
+      {
+        return;
+      }
+
+      var geom = new CadNodePlacementOverlay.SiteGeom
+      {
+        Name = pick.InstanceName,
+        X = 0,
+        Y = 0,
+        RotationDeg = 0,
+        WidthM = pick.WidthValue > 0 ? pick.WidthValue : 20,
+        LengthM = pick.LengthValue > 0 ? pick.LengthValue : 20
+      };
+      CadNodePlacementOverlay.InsertAtStored(geom);
+      CadNodePlacementOverlay.ZoomToPads(new[] { geom });
+    }
+
+    public static void PlaceInsert(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      string initial = EnsurePlacementWorkbookDialog.EnsureInsertPath(
+        owner,
+        AppPaths.Load().InsertsWorkbook,
+        path => AppPaths.Set(p => p.InsertsWorkbook = path));
+      if (string.IsNullOrWhiteSpace(initial))
+      {
+        return;
+      }
+
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
+        owner,
+        "Добавить врезки",
+        initial,
+        "выбрать из файла",
+        path => InsertWorkbookLoader.LoadWorkbook(path).Inserts.Select(ToPickItem).ToList(),
+        out string path);
+
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
+      {
+        return;
+      }
+
+      InsertWorkbookLoader.WorkbookData book = InsertWorkbookLoader.LoadWorkbook(path);
+      AppPaths.Set(p => p.InsertsWorkbook = path);
+
+      var geoms = new List<CadInsertOverlay.InsertGeom>();
+      foreach (PickFromExcelItem item in picked)
+      {
+        string name = item.Tag as string ?? item.Name;
+        InsertWorkbookLoader.InsertRecord rec = book.Inserts.Find(i =>
+          string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (rec == null)
+        {
+          throw new InvalidOperationException("Врезка «" + name + "» нет в " + Path.GetFileName(path));
+        }
+
+        var geom = new CadInsertOverlay.InsertGeom
+        {
+          Name = rec.Name,
+          X = rec.X,
+          Y = rec.Y
+        };
+        CadInsertOverlay.InsertAtStored(geom);
+        geoms.Add(geom);
+      }
+
+      CadInsertOverlay.ZoomToInserts(geoms);
+    }
+
+    private static void PlaceSite(
+      IWin32Window owner,
+      string title,
+      string sheetName,
+      Func<string> getInitialPath,
+      Action<string> rememberPath,
+      bool buos)
+    {
+      owner ??= TryMainWindow();
+      string noun = buos ? "БУОС" : "Узлы";
+      string initial = EnsurePlacementWorkbookDialog.EnsurePath(
+        owner,
+        noun,
+        sheetName,
+        getInitialPath(),
+        rememberPath);
+      if (string.IsNullOrWhiteSpace(initial))
+      {
+        return;
+      }
+
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
+        owner,
+        title,
+        initial,
+        "выбрать из файла",
+        path => SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName).Sites.Select(ToPickItem).ToList(),
+        out string path);
+
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
+      {
+        return;
+      }
+
+      SitePlacementWorkbookLoader.WorkbookData book =
+        SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName);
+      rememberPath(path);
+
+      if (buos)
+      {
+        var geoms = new List<CadBuosPlacementOverlay.SiteGeom>();
+        foreach (PickFromExcelItem item in picked)
+        {
+          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
+          var geom = ToBuosGeom(site);
+          CadBuosPlacementOverlay.InsertAtStored(geom);
+          geoms.Add(geom);
+        }
+
+        CadBuosPlacementOverlay.ZoomToPads(geoms);
+      }
+      else
+      {
+        var geoms = new List<CadNodePlacementOverlay.SiteGeom>();
+        foreach (PickFromExcelItem item in picked)
+        {
+          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
+          var geom = ToNodeGeom(site);
+          CadNodePlacementOverlay.InsertAtStored(geom);
+          geoms.Add(geom);
+        }
+
+        CadNodePlacementOverlay.ZoomToPads(geoms);
+      }
+    }
+
+    private static SitePlacementWorkbookLoader.PlacementRecord FindSite(
+      SitePlacementWorkbookLoader.WorkbookData book,
+      PickFromExcelItem item)
+    {
+      string name = item.Tag as string ?? item.Name;
+      SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
+        string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (site == null)
+      {
+        throw new InvalidOperationException("«" + name + "» нет в выбранном Excel.");
+      }
+
+      return site;
+    }
+
+    private static CadBuosPlacementOverlay.SiteGeom ToBuosGeom(SitePlacementWorkbookLoader.PlacementRecord site)
+    {
+      return new CadBuosPlacementOverlay.SiteGeom
+      {
+        Name = site.Name,
+        X = site.X,
+        Y = site.Y,
+        WidthM = site.WidthM > 0 ? site.WidthM : 150,
+        LengthM = site.LengthM > 0 ? site.LengthM : 250,
+        RotationDeg = site.AngleDeg
+      };
+    }
+
+    private static CadNodePlacementOverlay.SiteGeom ToNodeGeom(SitePlacementWorkbookLoader.PlacementRecord site)
+    {
+      return new CadNodePlacementOverlay.SiteGeom
+      {
+        Name = site.Name,
+        X = site.X,
+        Y = site.Y,
+        WidthM = site.WidthM > 0 ? site.WidthM : 150,
+        LengthM = site.LengthM > 0 ? site.LengthM : 250,
+        RotationDeg = site.AngleDeg
+      };
+    }
+
+    private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)
+    {
+      bool has = Math.Abs(p.X) > 1e-9 || Math.Abs(p.Y) > 1e-9;
+      return new PickFromExcelItem
+      {
+        Name = p.Name,
+        HasCoords = has,
+        Detail = has
+          ? "X=" + p.X.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; Y=" + p.Y.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; угол=" + p.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
+          : "координаты не заданы (вставка в 0;0)",
+        Tag = p.Name
+      };
+    }
+
+    private static PickFromExcelItem ToPickItem(SitePlacementWorkbookLoader.PlacementRecord s)
+    {
+      bool has = Math.Abs(s.X) > 1e-9 || Math.Abs(s.Y) > 1e-9;
+      return new PickFromExcelItem
+      {
+        Name = s.Name,
+        HasCoords = has,
+        Detail = has
+          ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; угол=" + s.AngleDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
+          : "координаты не заданы (вставка в 0;0)",
+        Tag = s.Name
+      };
+    }
+
+    private static PickFromExcelItem ToPickItem(InsertWorkbookLoader.InsertRecord s)
+    {
+      bool has = Math.Abs(s.X) > 1e-9 || Math.Abs(s.Y) > 1e-9;
+      return new PickFromExcelItem
+      {
+        Name = s.Name,
+        HasCoords = has,
+        Detail = has
+          ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
+          : "координаты не заданы (вставка в 0;0)",
+        Tag = s.Name
+      };
+    }
+
+    private static IWin32Window TryMainWindow()
+    {
+      try
+      {
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        if (hwnd != IntPtr.Zero)
+        {
+          return new Win32Window(hwnd);
+        }
+      }
+      catch
+      {
+      }
+
+      return null;
+    }
+
+    private sealed class Win32Window : IWin32Window
+    {
+      public Win32Window(IntPtr handle)
+      {
+        Handle = handle;
+      }
+
+      public IntPtr Handle { get; }
+    }
+  }
+}
