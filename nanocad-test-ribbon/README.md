@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.83**): `nanocad-test-ribbon-v1.2.83.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.83.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.83/nanocad-test-ribbon-v1.2.83.zip  
+Актуальный **slim** zip (версия **1.2.84**): `nanocad-test-ribbon-v1.2.84.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.84.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.84/nanocad-test-ribbon-v1.2.84.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,24 +37,24 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.83 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.84 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (группы Исходные/Коридоры/Расчёт), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.83+InsertAtStoredZoom` — Add KP/BUOS/Node/insert at DB pose (no jig) + zoom; База данных; Settings flyout; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.84+TypicalObjectsDirect` — Типовые объекты direct button; Add BUOS/Node missing-file dialog; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» |
 | `NcTestHttp` | WinForms HTTP GET |
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
-| `NcTestSettings` | Flyout «Настройки» (Типовые объекты…); полные настройки — команда `NcTestSettings` |
-| `NcTestTypicalObjects` | Каталоги БУОС / Узлы |
+| `NcTestTypicalObjects` | Лента: «Типовые объекты» — каталоги БУОС / Узлы |
+| `NcTestSettings` | Полные настройки (команда, без кнопки ленты) |
 | `NcTestInitialData` | alias → `NcTestSourceData` |
 | `NcTestSourceData` | Лента: «База данных» — Кустовые / Врезки / **размещение** БУОС / Узлы |
 | Группы ленты | **Исходные** / **Коридоры** / **Расчёт** (flat icons) |
-| Flyout **Площадные объекты** | Добавить Кустовую/БУОС/Узел (Excel multi-select → вставка по X/Y/углу из базы, zoom к объекту/группе, без jig) · Сохранить/Загрузить |
+| Flyout **Площадные объекты** | Добавить Кустовую/БУОС/Узел (Excel multi-select → вставка по X/Y/углу из базы, zoom; нет файла → создать/открыть) · Сохранить/Загрузить |
 | «База данных» | Открывает окно **без** отрисовки на чертеже; размещение — через Добавить… |
 | `NcTestRouteLine` / `NcTestRoad` | Полилиния на `NC_ROUTE_LINE` / `NC_ROAD` (live jig preview + rubber-band) |
 | `NcTestSendToServer` | DXF → solver `api/v1/datasets` → DatasetId |
@@ -172,9 +172,10 @@ NcTestBlink
 ### База данных (v1.2.83)
 
 Окно **«База данных»** (бывш. «Исходные данные»): Кустовые / Врезки / **размещение БУОС** / **размещение Узлы**.  
-Открытие окна **не** рисует объекты. Каталоги размеров — flyout **Настройки → Типовые объекты** (и полные «Настройки»).
+Открытие окна **не** рисует объекты. Каталоги размеров — лента **Типовые объекты** (и команда полных «Настройки»).
 
-**Добавить Кустовую/БУОС/Узел** (и кнопка размещения во вкладках, в т.ч. врезки): вставка по X/Y/углу из Excel **без** place jig; zoom к объекту или к группе при multi-select.
+**Добавить Кустовую/БУОС/Узел** (и кнопка размещения во вкладках, в т.ч. врезки): вставка по X/Y/углу из Excel **без** place jig; zoom к объекту или к группе при multi-select.  
+Если файл размещения БУОС/Узлы не задан: диалог **Создать новый файл** / **Открыть существующий** → `paths.json`.
 
 Размещение БУОС/Узлы (как Врезка + КП):
 

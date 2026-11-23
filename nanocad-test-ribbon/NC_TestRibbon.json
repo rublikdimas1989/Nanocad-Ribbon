@@ -101,7 +101,7 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Flyout настроек (Типовые объекты и далее).",
+      "tooltip": "Полные настройки (команда; на ленте — «Типовые объекты»).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.settings.ico"
     },
@@ -110,7 +110,7 @@
       "displayName": "Типовые объекты",
       "tooltip": "Каталоги БУОС и Узлы (типовые объекты).",
       "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.add_buos.ico"
+      "iconResource": "NC_ICONS.settings.ico"
     },
     {
       "intername": "NcTestInterface",
@@ -207,16 +207,9 @@
           ]
         },
         {
-          "type": "flyout",
-          "text": "Настройки",
-          "command": "NcTestSettings",
-          "style": "large",
-          "items": [
-            {
-              "text": "Типовые объекты",
-              "command": "NcTestTypicalObjects"
-            }
-          ]
+          "text": "Типовые объекты",
+          "command": "NcTestTypicalObjects",
+          "style": "large"
         }
       ]
     },

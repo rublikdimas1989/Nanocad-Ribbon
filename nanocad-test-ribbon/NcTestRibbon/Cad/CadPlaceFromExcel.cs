@@ -95,10 +95,22 @@ namespace NcTestRibbon.Cad
       bool buos)
     {
       owner ??= TryMainWindow();
+      string noun = buos ? "БУОС" : "Узлы";
+      string initial = EnsurePlacementWorkbookDialog.EnsurePath(
+        owner,
+        noun,
+        sheetName,
+        getInitialPath(),
+        rememberPath);
+      if (string.IsNullOrWhiteSpace(initial))
+      {
+        return;
+      }
+
       IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
         owner,
         title,
-        getInitialPath(),
+        initial,
         "выбрать из файла",
         path => SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName).Sites.Select(ToPickItem).ToList(),
         out string path);
