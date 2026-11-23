@@ -40,9 +40,10 @@ namespace NcTestRibbon.Cad
         _pending = pending;
       }
 
-      if (!changed && pending)
+      // Skip ribbon walk / editor spam when state unchanged (every MOVE used to flood).
+      if (!changed)
       {
-        // Still refresh highlight (button may have been rebuilt).
+        return;
       }
 
       try

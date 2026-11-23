@@ -3,6 +3,7 @@ namespace NcTestRibbon.Cad
   using System;
   using System.Collections.Generic;
   using System.Reflection;
+  using System.Threading;
   using HostMgd.ApplicationServices;
   using HostMgd.EditorInput;
   using Teigha.DatabaseServices;
@@ -13,6 +14,7 @@ namespace NcTestRibbon.Cad
   /// Pad CAD interaction: double-click opens «Исходные данные» → Кустовые;
   /// after MOVE/ROTATE/grip, mark pending poses and highlight ribbon
   /// «Обновить данные в Excel» (no MessageBox — one pending set until user clicks).
+  /// UI preview is debounced — no Excel write / no full grid rebuild per MOVE step.
   /// </summary>
   public static class CadPadInteraction
   {
@@ -31,6 +33,10 @@ namespace NcTestRibbon.Cad
     private const long SessionDebounceTicks = TimeSpan.TicksPerMillisecond * 400;
     private static long _lastDoubleClickTicks;
     private const long DoubleClickDebounceTicks = TimeSpan.TicksPerMillisecond * 800;
+    /// <summary>Coalesce rapid GRIP/MOVE CommandEnded into one yellow-grid flush.</summary>
+    private static Timer _uiFlushTimer;
+    private const int UiFlushDelayMs = 250;
+    private static int _uiFlushPosted;
 
     public static string Status => _status;
 
@@ -120,6 +126,7 @@ namespace NcTestRibbon.Cad
         }
 
         TryUnhookBeginDoubleClick();
+        CancelUiFlush();
 
         foreach (Document doc in new List<Document>(HookedDocs))
         {
@@ -136,6 +143,24 @@ namespace NcTestRibbon.Cad
       catch { }
     }
 
+    private static void CancelUiFlush()
+    {
+      try
+      {
+        Timer t = _uiFlushTimer;
+        _uiFlushTimer = null;
+        t?.Dispose();
+      }
+      catch
+      {
+      }
+
+      try { CadApp.Idle -= OnIdleFlushPendingUi; }
+      catch { }
+
+      Interlocked.Exchange(ref _uiFlushPosted, 0);
+    }
+
     /// <summary>Drop pending CAD poses without writing Excel (load-from-source / discard).</summary>
     public static void ClearPending(bool updateRibbon = true)
     {
@@ -143,6 +168,7 @@ namespace NcTestRibbon.Cad
       {
         PendingPoses.Clear();
         SessionModified.Clear();
+        CancelUiFlush();
       }
 
       if (updateRibbon)
@@ -163,6 +189,7 @@ namespace NcTestRibbon.Cad
         batch = new List<KeyValuePair<string, Pose>>(PendingPoses);
         PendingPoses.Clear();
         SessionModified.Clear();
+        CancelUiFlush();
       }
 
       try { PadExcelSyncUi.SetPending(false); }
@@ -478,10 +505,81 @@ namespace NcTestRibbon.Cad
         }
       }
 
-      // Preview in open SourceData (yellow rows) without writing Excel yet.
+      // Ribbon pending flag once; yellow grid via debounced flush (not per grip step).
+      try { PadExcelSyncUi.SetPending(true); }
+      catch { }
+
+      ScheduleUiFlush();
+    }
+
+    private static void ScheduleUiFlush()
+    {
+      try
+      {
+        lock (Gate)
+        {
+          if (_uiFlushTimer == null)
+          {
+            _uiFlushTimer = new Timer(OnUiFlushTimer, null, UiFlushDelayMs, Timeout.Infinite);
+          }
+          else
+          {
+            _uiFlushTimer.Change(UiFlushDelayMs, Timeout.Infinite);
+          }
+        }
+      }
+      catch
+      {
+        FlushPendingToUi();
+      }
+    }
+
+    private static void OnUiFlushTimer(object state)
+    {
+      // Timer is thread-pool — hop to CAD idle so WinForms grid updates stay on UI thread.
+      if (Interlocked.Exchange(ref _uiFlushPosted, 1) != 0)
+      {
+        return;
+      }
+
+      try
+      {
+        CadApp.Idle += OnIdleFlushPendingUi;
+      }
+      catch
+      {
+        Interlocked.Exchange(ref _uiFlushPosted, 0);
+        try { FlushPendingToUi(); }
+        catch { }
+      }
+    }
+
+    private static void OnIdleFlushPendingUi(object sender, EventArgs e)
+    {
+      try { CadApp.Idle -= OnIdleFlushPendingUi; }
+      catch { }
+
+      Interlocked.Exchange(ref _uiFlushPosted, 0);
+      FlushPendingToUi();
+    }
+
+    private static void FlushPendingToUi()
+    {
+      List<KeyValuePair<string, Pose>> batch;
+      lock (Gate)
+      {
+        if (PendingPoses.Count == 0)
+        {
+          return;
+        }
+
+        batch = new List<KeyValuePair<string, Pose>>(PendingPoses);
+      }
+
+      // In-place yellow only (ApplyPadCadPose saveExcel:false) — no Excel, no CAD rewrite.
       using (SuppressNotifications())
       {
-        foreach (KeyValuePair<string, Pose> pair in byName)
+        foreach (KeyValuePair<string, Pose> pair in batch)
         {
           try
           {
@@ -490,13 +588,10 @@ namespace NcTestRibbon.Cad
           }
           catch
           {
-            // Window may be closed / pad not loaded — Excel write still available on button click.
+            // Window may be closed / pad not loaded — Excel write still on Save.
           }
         }
       }
-
-      try { PadExcelSyncUi.SetPending(true); }
-      catch { }
     }
 
     private static void TryHookBeginDoubleClick()

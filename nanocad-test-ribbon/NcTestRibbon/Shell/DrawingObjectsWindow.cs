@@ -323,8 +323,8 @@ namespace NcTestRibbon.Shell
 
     public void ApplyPadCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
     {
-      SelectTab(DrawingObjectsTab.Pads);
-      try { _pads.RefreshFromCad(); }
+      // Preview: in-place yellow only — never SelectTab / RefreshFromCad (lags MOVE/grip).
+      try { _pads.ApplyCadPosePreview(name, x, y, rotationDeg); }
       catch { }
 
       if (!saveExcel)

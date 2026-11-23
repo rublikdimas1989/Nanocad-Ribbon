@@ -377,20 +377,11 @@ namespace NcTestRibbon.Shell
         throw new InvalidOperationException("КП «" + name + "» нет в открытой таблице.");
       }
 
+      // Pose already on CAD (MOVE/grip). Preview = yellow grid only — never UpdatePad
+      // (rewrite fights the drag and lags like full RefreshFromCad).
       row.ApplyPreviewPose(x, y, rotationDeg);
-      if (!_showOnDrawing.Checked)
-      {
-        _showOnDrawing.Checked = true;
-      }
-      else
-      {
-        CadPadOverlay.UpdatePad(ToGeom(row));
-      }
-
       RefreshPadRow(row);
       UpdateActionButtons();
-      Log("С чертежа «" + name + "»: X=" + row.X + "; Y=" + row.Y
-        + "; угол=" + row.RotationText + "°");
 
       if (saveExcel)
       {

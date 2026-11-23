@@ -195,6 +195,40 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
+    /// Lightweight CAD→grid pose update (MOVE/grip). No ListPlaced*/Excel reload/rebuild —
+    /// same lightness as БУОС (yellow only until Save).
+    /// </summary>
+    public void ApplyCadPosePreview(string name, double x, double y, double rotationDeg)
+    {
+      if (string.IsNullOrWhiteSpace(name))
+      {
+        return;
+      }
+
+      for (int i = 0; i < _rows.Count; i++)
+      {
+        CadRow row = _rows[i];
+        if (!string.Equals(row.Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+          continue;
+        }
+
+        row.X = x;
+        row.Y = y;
+        row.AngleDeg = rotationDeg;
+        row.CoordsDirty = true;
+        try { _rows.ResetItem(i); }
+        catch
+        {
+          try { _grid.InvalidateRow(i); }
+          catch { }
+        }
+
+        return;
+      }
+    }
+
+    /// <summary>
     /// Update BindingList without DataSource=null (avoids grid flicker / blink).
     /// </summary>
     private void ReplaceRowsInPlace(List<CadRow> next)
