@@ -280,8 +280,17 @@ namespace NcTestRibbon.Cad
         return NullScope.Instance;
       }
 
-      // Soft-disable only — never Hide/Close/Dispose the owner during CAD pick.
-      // nanoCAD focus steal can leave the form non-Visible; restore must Show+Activate.
+      // DrawingObjectsWindow: leave Visible+Enabled during pick — never Hide/disable
+      // (disable/owner caused hide on mere cursor-over-drawing).
+      if (form is DrawingObjectsWindow drawing)
+      {
+        try { drawing.Owner = null; }
+        catch { }
+
+        return new KeepDrawingObjectsVisibleScope(drawing);
+      }
+
+      // Other hosts: soft-disable only — never Hide/Opacity.
       bool wasEnabled = form.Enabled;
       bool wasVisible = form.Visible;
       try { form.Enabled = false; }
@@ -391,6 +400,42 @@ namespace NcTestRibbon.Cad
       public void Dispose() { }
     }
 
+    private sealed class KeepDrawingObjectsVisibleScope : IDisposable
+    {
+      private readonly DrawingObjectsWindow _form;
+      private bool _done;
+
+      public KeepDrawingObjectsVisibleScope(DrawingObjectsWindow form)
+      {
+        _form = form;
+      }
+
+      public void Dispose()
+      {
+        if (_done)
+        {
+          return;
+        }
+
+        _done = true;
+        try
+        {
+          if (_form == null || _form.IsDisposed)
+          {
+            return;
+          }
+
+          try { _form.Owner = null; }
+          catch { }
+
+          _form.EnsureVisible(activate: true);
+        }
+        catch
+        {
+        }
+      }
+    }
+
     private sealed class RestoreFormScope : IDisposable
     {
       private readonly Form _form;
@@ -421,7 +466,6 @@ namespace NcTestRibbon.Cad
           }
 
           _form.Enabled = _wasEnabled;
-          // Always Show+Activate after CAD pick — form may have gone invisible.
           if (_wasVisible || !_form.Visible)
           {
             if (_form.WindowState == FormWindowState.Minimized)

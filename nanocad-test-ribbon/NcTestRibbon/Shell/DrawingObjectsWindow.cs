@@ -36,6 +36,8 @@ namespace NcTestRibbon.Shell
     private readonly Button _refreshButton;
     private bool _closePromptDone;
     private bool _suppressCadRefresh;
+    /// <summary>Only true while intentionally closing — blocks VisibleChanged auto-restore.</summary>
+    private bool _allowInvisible;
 
     public DrawingObjectsWindow(DrawingObjectsTab initialTab = DrawingObjectsTab.Pads)
     {
@@ -43,9 +45,12 @@ namespace NcTestRibbon.Shell
       Width = 1180;
       Height = 780;
       MinimumSize = new Size(800, 520);
-      StartPosition = FormStartPosition.CenterParent;
+      // CenterScreen + no Owner: CenterParent/owned forms hide when CAD takes mouse.
+      StartPosition = FormStartPosition.CenterScreen;
       FormBorderStyle = FormBorderStyle.Sizable;
       ShowInTaskbar = true;
+      try { Owner = null; }
+      catch { }
 
       var root = new TableLayoutPanel
       {
@@ -106,10 +111,21 @@ namespace NcTestRibbon.Shell
       };
 
       FormClosing += OnFormClosing;
+      // CAD hover/focus must not leave this form invisible — restore immediately.
+      VisibleChanged += OnVisibleChangedKeepAlive;
+      Deactivate += (_, __) =>
+      {
+        // Do not Hide on deactivate (cursor over drawing). Keep Visible; z-order only.
+        try { if (!_allowInvisible && !IsDisposed) Owner = null; }
+        catch { }
+      };
       // One initial load only — do not refresh again on every Shown (causes blink).
       bool firstShow = true;
       Shown += (_, __) =>
       {
+        try { Owner = null; }
+        catch { }
+
         if (!firstShow || _suppressCadRefresh)
         {
           return;
@@ -120,6 +136,36 @@ namespace NcTestRibbon.Shell
       };
       SelectTab(initialTab);
       UpdateToolbarLabels();
+    }
+
+    private void OnVisibleChangedKeepAlive(object sender, EventArgs e)
+    {
+      if (_allowInvisible || IsDisposed || Visible)
+      {
+        return;
+      }
+
+      // nanoCAD / owned-window quirk: form goes invisible on mere cursor over drawing.
+      try
+      {
+        if (IsHandleCreated && !IsDisposed)
+        {
+          BeginInvoke(new Action(() =>
+          {
+            if (_allowInvisible || IsDisposed)
+            {
+              return;
+            }
+
+            EnsureVisible();
+          }));
+        }
+      }
+      catch
+      {
+        try { EnsureVisible(); }
+        catch { }
+      }
     }
 
     public DrawingObjectsTab ActiveTab
@@ -183,7 +229,7 @@ namespace NcTestRibbon.Shell
     /// Force the modeless window back on screen after CAD pick / nanoCAD focus steal.
     /// Never uses ShowDialog — this form is modeless-only.
     /// </summary>
-    public void EnsureVisible()
+    public void EnsureVisible(bool activate = false)
     {
       if (IsDisposed)
       {
@@ -192,14 +238,19 @@ namespace NcTestRibbon.Shell
 
       try
       {
+        // Never stay owned by CAD — owned forms hide when cursor enters the drawing.
+        try { Owner = null; }
+        catch { }
+
         if (WindowState == FormWindowState.Minimized)
         {
           WindowState = FormWindowState.Normal;
         }
 
+        bool wasHidden = !Visible;
         // Parameterless Show only. Show(owner) throws when already Visible
         // (same InvalidOperationException as ShowDialog on displayed form).
-        if (!Visible)
+        if (wasHidden)
         {
           if (IsHandleCreated)
           {
@@ -212,9 +263,12 @@ namespace NcTestRibbon.Shell
         }
 
         BringToFront();
-        Activate();
-        try { Focus(); }
-        catch { }
+        // Activate on ribbon open / after pick; not on every hover keep-alive.
+        if (activate || wasHidden)
+        {
+          try { Activate(); }
+          catch { }
+        }
       }
       catch
       {
@@ -226,6 +280,7 @@ namespace NcTestRibbon.Shell
     /// </summary>
     public void CloseSilent()
     {
+      _allowInvisible = true;
       _closePromptDone = true;
       try
       {
@@ -528,6 +583,7 @@ namespace NcTestRibbon.Shell
 
     private void OnFormClosing(object sender, FormClosingEventArgs e)
     {
+      _allowInvisible = true;
       if (_closePromptDone)
       {
         return;

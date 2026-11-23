@@ -644,7 +644,7 @@ namespace NcTestRibbon
           if (IsDrawingObjectsHandleAlive(live))
           {
             live.SelectTab(tab);
-            live.EnsureVisible();
+            live.EnsureVisible(activate: true);
             ed?.WriteMessage(
               "\n" + label + ": reuse Объекты чертежа → Show+Activate tab " + tab
               + (live.Visible ? "." : " (was hidden)."));
@@ -659,7 +659,7 @@ namespace NcTestRibbon
             if (IsDrawingObjectsHandleAlive(_drawingObjectsLive))
             {
               _drawingObjectsLive.SelectTab(tab);
-              _drawingObjectsLive.EnsureVisible();
+              _drawingObjectsLive.EnsureVisible(activate: true);
             }
 
             ed?.WriteMessage("\n" + label + ": debounce → reuse Объекты чертежа (" + tab + ").");
@@ -683,7 +683,7 @@ namespace NcTestRibbon
               catch { }
 
               _drawingObjectsLive.SelectTab(tab);
-              _drawingObjectsLive.EnsureVisible();
+              _drawingObjectsLive.EnsureVisible(activate: true);
               ed?.WriteMessage("\n" + label + ": singleton race → reuse Объекты чертежа.");
               return;
             }
@@ -703,7 +703,7 @@ namespace NcTestRibbon
 
           // Parameterless Show only — Show(owner) throws if form already Visible.
           form.Show();
-          form.EnsureVisible();
+          form.EnsureVisible(activate: true);
           ed?.WriteMessage("\n" + label + ": Объекты чертежа open → " + tab + ".");
         }
         finally
