@@ -151,57 +151,88 @@ namespace NcTestRibbon.Shell
     public void RefreshFromCad()
     {
       LoadExcelBaseline();
-      _rows.Clear();
+      var next = new List<CadRow>();
       switch (_kind)
       {
         case Kind.Buos:
           foreach (var g in CadBuosPlacementOverlay.ListPlacedSites())
           {
-            _rows.Add(FromSite(g));
+            next.Add(FromSite(g));
           }
 
           break;
         case Kind.Nodes:
           foreach (var g in CadNodePlacementOverlay.ListPlacedSites())
           {
-            _rows.Add(FromSite(g));
+            next.Add(FromSite(g));
           }
 
           break;
         case Kind.Inserts:
           foreach (var g in CadInsertOverlay.ListPlacedInserts())
           {
-            _rows.Add(FromInsert(g));
+            next.Add(FromInsert(g));
           }
 
           break;
         default:
           foreach (var g in CadPadOverlay.ListPlacedPads())
           {
-            _rows.Add(FromPad(g));
+            next.Add(FromPad(g));
           }
 
           break;
       }
 
+      ReplaceRowsInPlace(next);
       MarkDirtyAgainstBaseline();
-      _grid.DataSource = null;
-      _grid.DataSource = _rows;
       _status.Text = _rows.Count == 0
         ? "На чертеже нет объектов этого типа."
         : "На чертеже: " + _rows.Count;
+      try { _grid.Invalidate(); }
+      catch { }
+    }
+
+    /// <summary>
+    /// Update BindingList without DataSource=null (avoids grid flicker / blink).
+    /// </summary>
+    private void ReplaceRowsInPlace(List<CadRow> next)
+    {
+      bool raise = _rows.RaiseListChangedEvents;
+      _rows.RaiseListChangedEvents = false;
+      try
+      {
+        _rows.Clear();
+        foreach (CadRow row in next)
+        {
+          _rows.Add(row);
+        }
+      }
+      finally
+      {
+        _rows.RaiseListChangedEvents = raise;
+      }
+
+      if (_grid.DataSource != _rows)
+      {
+        _grid.DataSource = _rows;
+      }
+      else
+      {
+        _rows.ResetBindings();
+      }
     }
 
     public void SaveToSource(bool confirm, string confirmTitle)
     {
-      // Flush pending KP Excel sync first — during drawing close RefreshFromCad may
-      // return 0 rows, but pending poses must still be written.
+      // Flush pending KP Excel sync first — during drawing close CAD list may be empty.
       if (_kind == Kind.Pads && CadPadInteraction.HasPendingExcelSync)
       {
         CadPadInteraction.CommitPendingToExcel();
       }
 
-      RefreshFromCad();
+      // Sync poses in place (no DataSource tear-down) so Save does not blink the window.
+      SyncPosesFromCadInPlace();
       if (_rows.Count == 0)
       {
         return;
@@ -244,9 +275,71 @@ namespace NcTestRibbon.Shell
         CadPadInteraction.ClearPending();
       }
 
-      _grid.Invalidate();
-      try { _grid.Refresh(); }
+      try { _grid.Invalidate(); }
       catch { }
+    }
+
+    /// <summary>Update X/Y/angle on existing rows from CAD; add/remove without rebinding.</summary>
+    private void SyncPosesFromCadInPlace()
+    {
+      LoadExcelBaseline();
+      var next = new List<CadRow>();
+      switch (_kind)
+      {
+        case Kind.Buos:
+          foreach (var g in CadBuosPlacementOverlay.ListPlacedSites())
+          {
+            next.Add(FromSite(g));
+          }
+
+          break;
+        case Kind.Nodes:
+          foreach (var g in CadNodePlacementOverlay.ListPlacedSites())
+          {
+            next.Add(FromSite(g));
+          }
+
+          break;
+        case Kind.Inserts:
+          foreach (var g in CadInsertOverlay.ListPlacedInserts())
+          {
+            next.Add(FromInsert(g));
+          }
+
+          break;
+        default:
+          foreach (var g in CadPadOverlay.ListPlacedPads())
+          {
+            next.Add(FromPad(g));
+          }
+
+          break;
+      }
+
+      // Merge into existing CadRow instances when names match — less UI churn.
+      var byName = _rows.Where(r => !string.IsNullOrWhiteSpace(r.Name))
+        .ToDictionary(r => r.Name, StringComparer.OrdinalIgnoreCase);
+      var merged = new List<CadRow>();
+      foreach (CadRow n in next)
+      {
+        if (byName.TryGetValue(n.Name, out CadRow existing))
+        {
+          existing.X = n.X;
+          existing.Y = n.Y;
+          existing.AngleDeg = n.AngleDeg;
+          existing.WidthM = n.WidthM;
+          existing.LengthM = n.LengthM;
+          existing.TypeName = n.TypeName;
+          merged.Add(existing);
+        }
+        else
+        {
+          merged.Add(n);
+        }
+      }
+
+      ReplaceRowsInPlace(merged);
+      MarkDirtyAgainstBaseline();
     }
 
     /// <summary>After Excel write: treat current CAD rows as clean (no yellow).</summary>
@@ -728,10 +821,10 @@ namespace NcTestRibbon.Shell
         return;
       }
 
-      if (_rows[e.RowIndex].CoordsDirty)
-      {
-        e.CellStyle.BackColor = Color.LightYellow;
-      }
+      // Always set both states so yellow clears after Save without rebinding.
+      e.CellStyle.BackColor = _rows[e.RowIndex].CoordsDirty
+        ? Color.LightYellow
+        : _grid.DefaultCellStyle.BackColor;
     }
 
     private static DataGridViewTextBoxColumn Col(string header, string prop, float weight)

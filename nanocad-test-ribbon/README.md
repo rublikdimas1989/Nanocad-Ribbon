@@ -42,7 +42,7 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (группы Исходные/Коридоры/Расчёт), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.93+SaveClearDirty` — Save-to-source upserts Excel + clears yellow dirty; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.93+SaveClearDirty` — Save clears yellow + upsert Excel; Объекты чертежа no flicker on save/refresh; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|

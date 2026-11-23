@@ -98,6 +98,7 @@ namespace NcTestRibbon.Shell
       _tabs.SelectedIndexChanged += (_, __) =>
       {
         UpdateToolbarLabels();
+        // Refresh active tab list in place (no Hide/Show / window recreate).
         if (!_suppressCadRefresh)
         {
           ActivePanel().RefreshFromCad();
@@ -105,12 +106,17 @@ namespace NcTestRibbon.Shell
       };
 
       FormClosing += OnFormClosing;
+      // One initial load only — do not refresh again on every Shown (causes blink).
+      bool firstShow = true;
       Shown += (_, __) =>
       {
-        if (!_suppressCadRefresh)
+        if (!firstShow || _suppressCadRefresh)
         {
-          ActivePanel().RefreshFromCad();
+          return;
         }
+
+        firstShow = false;
+        ActivePanel().RefreshFromCad();
       };
       SelectTab(initialTab);
       UpdateToolbarLabels();
