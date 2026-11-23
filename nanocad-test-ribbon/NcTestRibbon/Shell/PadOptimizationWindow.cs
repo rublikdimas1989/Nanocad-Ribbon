@@ -187,7 +187,7 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Таблица только для просмотра (поля из Excel). Положение/угол: MOVE/ROTATE/grip на чертеже, затем «Сохранить положение». Double-click КП открывает это окно.",
+        Text = "Таблица только для просмотра (поля из Excel). Размещение новых КП — лента «Добавить Кустовую». Положение/угол: MOVE/ROTATE/grip, затем «Сохранить положение». Открытие окна само по себе ничего не рисует.",
         AutoSize = true,
         MaximumSize = new Size(1080, 0),
         ForeColor = Color.DimGray,
@@ -267,7 +267,8 @@ namespace NcTestRibbon.Shell
         Log("Откройте таблицы КП (xlsx) через «Обзор…».");
       }
 
-      // Restore «Показывать на чертеже» after workbook load so overlay uses current rows.
+      // Restore checkbox only — do NOT draw on open (ribbon «Исходные данные» is view-only;
+      // placement is via «Добавить Кустовую»). User must toggle «Показывать на чертеже» to draw.
       if (paths.ShowPadsOnDrawing)
       {
         _suppressShowToggle = true;
@@ -282,7 +283,7 @@ namespace NcTestRibbon.Shell
 
         try
         {
-          RefreshDrawingOverlay(force: true);
+          Log("«Показывать на чертеже» было включено — чекбокс восстановлен, чертёж не изменён. Включите/выключите чекбокс, чтобы обновить слой.");
         }
         catch (Exception ex)
         {

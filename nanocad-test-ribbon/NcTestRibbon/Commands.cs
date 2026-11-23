@@ -466,7 +466,7 @@ namespace NcTestRibbon
       try
       {
         place();
-        ed?.WriteMessage("\n" + label + ": placed selected object only (no SourceData).");
+        ed?.WriteMessage("\n" + label + ": placed selected row(s) only (no SourceData / no draw-all).");
       }
       catch (System.Exception ex)
       {

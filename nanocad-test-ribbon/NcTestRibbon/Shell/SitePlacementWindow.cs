@@ -211,14 +211,15 @@ namespace NcTestRibbon.Shell
         Log("Откройте xlsx с листом «" + _sheetName + "» через «Обзор…».");
       }
 
+      // Checkbox restore only — opening SourceData must not mutate the drawing.
+      // Placement is via ribbon «Добавить БУОС» / «Добавить Узел».
       bool show = buos ? paths.ShowBuosOnDrawing : paths.ShowNodesOnDrawing;
       if (show)
       {
         _suppressShowToggle = true;
         try { _showOnDrawing.Checked = true; }
         finally { _suppressShowToggle = false; }
-        try { RefreshDrawing(force: true); }
-        catch (Exception ex) { Log("Показ на чертеже: " + ex.Message); }
+        Log("«Показывать на чертеже» восстановлен без перерисовки. Переключите чекбокс, чтобы обновить слой.");
       }
 
       UpdateButtons();

@@ -1,6 +1,7 @@
 namespace NcTestRibbon.Cad
 {
   using System;
+  using System.Collections.Generic;
   using System.Diagnostics;
   using System.Globalization;
   using System.IO;
@@ -11,7 +12,7 @@ namespace NcTestRibbon.Cad
   using NcTestRibbon.Shell;
 
   /// <summary>
-  /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel pick → place ONLY the selected object.
+  /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel pick (multi-select) → place ONLY selected.
   /// Does not open SourceData and does not redraw the full set.
   /// </summary>
   public static class CadPlaceFromExcel
@@ -20,7 +21,7 @@ namespace NcTestRibbon.Cad
     {
       owner ??= TryMainWindow();
       string initial = AppPaths.Load().PadsWorkbook;
-      PickFromExcelItem picked = PickFromExcelDialog.ShowPick(
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
         owner,
         "Добавить Кустовую",
         initial,
@@ -28,43 +29,52 @@ namespace NcTestRibbon.Cad
         path => PadWorkbookLoader.LoadWorkbook(path).Pads.Select(ToPickItem).ToList(),
         out string path);
 
-      if (picked == null || string.IsNullOrWhiteSpace(path))
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
       {
         return;
       }
 
       PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
-      string name = picked.Tag as string ?? picked.Name;
-      PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
-        string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-      if (pad == null)
-      {
-        throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
-      }
-
       AppPaths.Set(p => p.PadsWorkbook = path);
 
-      var geom = new CadPadOverlay.PadGeom
+      var placed = new List<PadWorkbookLoader.PadRecord>();
+      foreach (PickFromExcelItem item in picked)
       {
-        Name = pad.Name,
-        X = pad.X,
-        Y = pad.Y,
-        WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
-        LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
-        RotationDeg = pad.RotationDeg
-      };
+        string name = item.Tag as string ?? item.Name;
+        PadWorkbookLoader.PadRecord pad = book.Pads.Find(p =>
+          string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (pad == null)
+        {
+          throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
+        }
 
-      if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
-      {
-        return;
+        var geom = new CadPadOverlay.PadGeom
+        {
+          Name = pad.Name,
+          X = pad.X,
+          Y = pad.Y,
+          WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
+          LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
+          RotationDeg = pad.RotationDeg
+        };
+
+        if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
+        {
+          break;
+        }
+
+        pad.X = x;
+        pad.Y = y;
+        geom.X = x;
+        geom.Y = y;
+        CadPadOverlay.UpdatePad(geom);
+        placed.Add(pad);
       }
 
-      pad.X = x;
-      pad.Y = y;
-      geom.X = x;
-      geom.Y = y;
-      CadPadOverlay.UpdatePad(geom);
-      PadWorkbookLoader.SavePadCoordinates(path, new[] { pad });
+      if (placed.Count > 0)
+      {
+        PadWorkbookLoader.SavePadCoordinates(path, placed);
+      }
     }
 
     public static void PlaceBuos(IWin32Window owner = null)
@@ -98,7 +108,7 @@ namespace NcTestRibbon.Cad
       bool buos)
     {
       owner ??= TryMainWindow();
-      PickFromExcelItem picked = PickFromExcelDialog.ShowPick(
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
         owner,
         title,
         getInitialPath(),
@@ -106,70 +116,79 @@ namespace NcTestRibbon.Cad
         path => SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName).Sites.Select(ToPickItem).ToList(),
         out string path);
 
-      if (picked == null || string.IsNullOrWhiteSpace(path))
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
       {
         return;
       }
 
       SitePlacementWorkbookLoader.WorkbookData book =
         SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName);
-      string name = picked.Tag as string ?? picked.Name;
-      SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
-        string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
-      if (site == null)
-      {
-        throw new InvalidOperationException(
-          "«" + name + "» нет в " + Path.GetFileName(path) + " («" + sheetName + "»).");
-      }
-
       rememberPath(path);
 
-      double x;
-      double y;
-      if (buos)
+      var placed = new List<SitePlacementWorkbookLoader.PlacementRecord>();
+      foreach (PickFromExcelItem item in picked)
       {
-        var geom = new CadBuosPlacementOverlay.SiteGeom
+        string name = item.Tag as string ?? item.Name;
+        SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
+          string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (site == null)
         {
-          Name = site.Name,
-          X = site.X,
-          Y = site.Y,
-          WidthM = site.WidthM > 0 ? site.WidthM : 150,
-          LengthM = site.LengthM > 0 ? site.LengthM : 250,
-          RotationDeg = site.AngleDeg
-        };
-        if (!CadBuosPlacementOverlay.TryPlace(geom, out x, out y))
-        {
-          return;
+          throw new InvalidOperationException(
+            "«" + name + "» нет в " + Path.GetFileName(path) + " («" + sheetName + "»).");
         }
 
-        geom.X = x;
-        geom.Y = y;
-        CadBuosPlacementOverlay.UpdatePad(geom);
-      }
-      else
-      {
-        var geom = new CadNodePlacementOverlay.SiteGeom
+        double x;
+        double y;
+        if (buos)
         {
-          Name = site.Name,
-          X = site.X,
-          Y = site.Y,
-          WidthM = site.WidthM > 0 ? site.WidthM : 150,
-          LengthM = site.LengthM > 0 ? site.LengthM : 250,
-          RotationDeg = site.AngleDeg
-        };
-        if (!CadNodePlacementOverlay.TryPlace(geom, out x, out y))
+          var geom = new CadBuosPlacementOverlay.SiteGeom
+          {
+            Name = site.Name,
+            X = site.X,
+            Y = site.Y,
+            WidthM = site.WidthM > 0 ? site.WidthM : 150,
+            LengthM = site.LengthM > 0 ? site.LengthM : 250,
+            RotationDeg = site.AngleDeg
+          };
+          if (!CadBuosPlacementOverlay.TryPlace(geom, out x, out y))
+          {
+            break;
+          }
+
+          geom.X = x;
+          geom.Y = y;
+          CadBuosPlacementOverlay.UpdatePad(geom);
+        }
+        else
         {
-          return;
+          var geom = new CadNodePlacementOverlay.SiteGeom
+          {
+            Name = site.Name,
+            X = site.X,
+            Y = site.Y,
+            WidthM = site.WidthM > 0 ? site.WidthM : 150,
+            LengthM = site.LengthM > 0 ? site.LengthM : 250,
+            RotationDeg = site.AngleDeg
+          };
+          if (!CadNodePlacementOverlay.TryPlace(geom, out x, out y))
+          {
+            break;
+          }
+
+          geom.X = x;
+          geom.Y = y;
+          CadNodePlacementOverlay.UpdatePad(geom);
         }
 
-        geom.X = x;
-        geom.Y = y;
-        CadNodePlacementOverlay.UpdatePad(geom);
+        site.X = x;
+        site.Y = y;
+        placed.Add(site);
       }
 
-      site.X = x;
-      site.Y = y;
-      SitePlacementWorkbookLoader.SavePlacementPose(path, sheetName, new[] { site });
+      if (placed.Count > 0)
+      {
+        SitePlacementWorkbookLoader.SavePlacementPose(path, sheetName, placed);
+      }
     }
 
     private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)

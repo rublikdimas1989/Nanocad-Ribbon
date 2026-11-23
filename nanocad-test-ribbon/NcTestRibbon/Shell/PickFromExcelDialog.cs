@@ -16,7 +16,7 @@ namespace NcTestRibbon.Shell
   }
 
   /// <summary>
-  /// «Выбрать из файла»: browse Excel → list objects → select one.
+  /// «Выбрать из файла»: browse Excel → list → Explorer-style multi-select (Ctrl/Shift) → place selected.
   /// </summary>
   public sealed class PickFromExcelDialog : Form
   {
@@ -29,7 +29,7 @@ namespace NcTestRibbon.Shell
     private List<PickFromExcelItem> _items = new List<PickFromExcelItem>();
 
     public string SelectedPath { get; private set; }
-    public PickFromExcelItem SelectedItem { get; private set; }
+    public IList<PickFromExcelItem> SelectedItems { get; private set; } = Array.Empty<PickFromExcelItem>();
 
     public PickFromExcelDialog(
       string title,
@@ -58,9 +58,10 @@ namespace NcTestRibbon.Shell
       {
         Dock = DockStyle.Fill,
         ColumnCount = 1,
-        RowCount = 3,
+        RowCount = 4,
         Padding = new Padding(10)
       };
+      root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
       root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
       root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
       root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -90,13 +91,21 @@ namespace NcTestRibbon.Shell
       fileRow.Controls.Add(browse);
       root.Controls.Add(fileRow, 0, 0);
 
+      root.Controls.Add(new Label
+      {
+        Text = "Выбор: Ctrl+клик — добавить/снять; Shift+клик — диапазон. Размещаются только выделенные строки.",
+        AutoSize = true,
+        ForeColor = Color.DimGray,
+        Margin = new Padding(0, 4, 0, 4)
+      }, 0, 1);
+
       _grid = new DataGridView
       {
         Dock = DockStyle.Fill,
         ReadOnly = true,
         AllowUserToAddRows = false,
         AllowUserToDeleteRows = false,
-        MultiSelect = false,
+        MultiSelect = true,
         SelectionMode = DataGridViewSelectionMode.FullRowSelect,
         AutoGenerateColumns = false,
         RowHeadersVisible = false,
@@ -122,7 +131,7 @@ namespace NcTestRibbon.Shell
           AcceptSelection();
         }
       };
-      root.Controls.Add(_grid, 0, 1);
+      root.Controls.Add(_grid, 0, 2);
 
       var buttons = new FlowLayoutPanel
       {
@@ -136,7 +145,7 @@ namespace NcTestRibbon.Shell
       _ok.Click += (_, __) => AcceptSelection();
       buttons.Controls.Add(cancel);
       buttons.Controls.Add(_ok);
-      root.Controls.Add(buttons, 0, 2);
+      root.Controls.Add(buttons, 0, 3);
 
       AcceptButton = _ok;
       CancelButton = cancel;
@@ -147,7 +156,6 @@ namespace NcTestRibbon.Shell
       }
       else
       {
-        // Force file pick first when no remembered workbook.
         Shown += (_, __) =>
         {
           if (_items.Count == 0)
@@ -160,7 +168,8 @@ namespace NcTestRibbon.Shell
       _grid.SelectionChanged += (_, __) => UpdateOk();
     }
 
-    public static PickFromExcelItem ShowPick(
+    /// <summary>Multi-select pick; returns selected rows (Explorer Ctrl/Shift).</summary>
+    public static IList<PickFromExcelItem> ShowPickMany(
       IWin32Window owner,
       string title,
       string initialPath,
@@ -170,14 +179,14 @@ namespace NcTestRibbon.Shell
     {
       using var dlg = new PickFromExcelDialog(title, initialPath, browseTitle, null, loader);
       DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
-      if (r != DialogResult.OK || dlg.SelectedItem == null)
+      if (r != DialogResult.OK || dlg.SelectedItems == null || dlg.SelectedItems.Count == 0)
       {
         path = null;
-        return null;
+        return Array.Empty<PickFromExcelItem>();
       }
 
       path = dlg.SelectedPath;
-      return dlg.SelectedItem;
+      return dlg.SelectedItems.ToList();
     }
 
     private void Browse()
@@ -240,28 +249,39 @@ namespace NcTestRibbon.Shell
 
     private void UpdateOk()
     {
-      _ok.Enabled = SelectedRow() != null;
+      _ok.Enabled = CollectSelected().Count > 0 && !string.IsNullOrWhiteSpace(SelectedPath);
+      int n = CollectSelected().Count;
+      _ok.Text = n <= 1 ? "Разместить" : ("Разместить (" + n + ")");
     }
 
-    private PickFromExcelItem SelectedRow()
+    private List<PickFromExcelItem> CollectSelected()
     {
-      if (_grid.CurrentRow == null || _grid.CurrentRow.Index < 0 || _grid.CurrentRow.Index >= _items.Count)
+      var list = new List<PickFromExcelItem>();
+      if (_grid.SelectedRows == null || _grid.SelectedRows.Count == 0)
       {
-        return null;
+        return list;
       }
 
-      return _items[_grid.CurrentRow.Index];
+      foreach (DataGridViewRow row in _grid.SelectedRows.Cast<DataGridViewRow>().OrderBy(r => r.Index))
+      {
+        if (row.Index >= 0 && row.Index < _items.Count)
+        {
+          list.Add(_items[row.Index]);
+        }
+      }
+
+      return list;
     }
 
     private void AcceptSelection()
     {
-      PickFromExcelItem item = SelectedRow();
-      if (item == null || string.IsNullOrWhiteSpace(SelectedPath))
+      List<PickFromExcelItem> items = CollectSelected();
+      if (items.Count == 0 || string.IsNullOrWhiteSpace(SelectedPath))
       {
         return;
       }
 
-      SelectedItem = item;
+      SelectedItems = items;
       DialogResult = DialogResult.OK;
       Close();
     }

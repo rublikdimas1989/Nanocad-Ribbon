@@ -83,6 +83,8 @@ internal static class UiGenerator
 			{
 				stream.CopyTo(destination);
 			}
+			// nanoCAD BitmapDll needs classic DIB ICO (16+32); PNG-compressed ICO shows blank.
+			IconIco.EnsureClassicDibIco(text5);
 			Log.Write("Серверная иконка извлечена: " + command.IconAssembly + " :: " + command.IconResource + " -> " + text5);
 			return "server-icons\\" + text4;
 		}

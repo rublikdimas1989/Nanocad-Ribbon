@@ -53,7 +53,8 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestInitialData` | alias → `NcTestSourceData` |
 | `NcTestSourceData` | Лента: «Исходные данные» — Кустовые / Врезки / **размещение** БУОС / Узлы |
 | Группы ленты | **Исходные** / **Коридоры** / **Расчёт** (flat icons) |
-| Flyout **Площадные объекты** | Добавить Кустовую/БУОС/Узел (Excel pick → **только выбранный** объект, без SourceData) · Сохранить/Загрузить |
+| Flyout **Площадные объекты** | Добавить Кустовую/БУОС/Узел (Excel multi-select Ctrl/Shift → **только выбранные**, без SourceData) · Сохранить/Загрузить |
+| «Исходные данные» | Открывает окно **без** отрисовки на чертеже; размещение — через Добавить… |
 | `NcTestRouteLine` / `NcTestRoad` | Полилиния на `NC_ROUTE_LINE` / `NC_ROAD` (live jig preview + rubber-band) |
 | `NcTestSendToServer` | DXF → solver `api/v1/datasets` → DatasetId |
 | Double-click КП | «Исходные данные» один раз (singleton/debounce) |

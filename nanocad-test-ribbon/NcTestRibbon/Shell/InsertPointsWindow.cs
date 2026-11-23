@@ -189,13 +189,13 @@ namespace NcTestRibbon.Shell
         Log("Откройте xlsx с листом «Врезки» через «Обзор…».");
       }
 
+      // Checkbox restore only — opening SourceData must not mutate the drawing.
       if (paths.ShowInsertsOnDrawing)
       {
         _suppressShowToggle = true;
         try { _showOnDrawing.Checked = true; }
         finally { _suppressShowToggle = false; }
-        try { RefreshDrawing(force: true); }
-        catch (Exception ex) { Log("Показ на чертеже: " + ex.Message); }
+        Log("«Показывать на чертеже» восстановлен без перерисовки. Переключите чекбокс, чтобы обновить слой.");
       }
 
       UpdateButtons();
