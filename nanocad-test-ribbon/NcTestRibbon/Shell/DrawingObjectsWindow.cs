@@ -16,20 +16,20 @@ namespace NcTestRibbon.Shell
   }
 
   /// <summary>
-  /// Ribbon «Объекты чертежа»: Кустовые / БУОС / Узлы / Врезки with per-tab
-  /// Добавить / Сохранить в исходные / Загрузить из исходных.
-  /// Yellow dirty rows come from the hosted panels.
+  /// Ribbon «Объекты чертежа»: only on-drawing objects; per-tab Add/Save/Load.
+  /// No «Показывать на чертеже» — CAD presence is the list source of truth.
   /// </summary>
   public sealed class DrawingObjectsWindow : Form
   {
     private readonly TabControl _tabs;
-    private readonly PadOptimizationWindow _pads;
-    private readonly SitePlacementWindow _buos;
-    private readonly SitePlacementWindow _nodes;
-    private readonly InsertPointsWindow _inserts;
+    private readonly DrawingObjectsCadPanel _pads;
+    private readonly DrawingObjectsCadPanel _buos;
+    private readonly DrawingObjectsCadPanel _nodes;
+    private readonly DrawingObjectsCadPanel _inserts;
     private readonly Button _addButton;
     private readonly Button _saveButton;
     private readonly Button _loadButton;
+    private readonly Button _refreshButton;
     private bool _closePromptDone;
 
     public DrawingObjectsWindow(DrawingObjectsTab initialTab = DrawingObjectsTab.Pads)
@@ -65,6 +65,7 @@ namespace NcTestRibbon.Shell
       _addButton = MakeToolButton(toolbar, "Добавить", OnAdd);
       _saveButton = MakeToolButton(toolbar, "Сохранить в исходные", OnSave);
       _loadButton = MakeToolButton(toolbar, "Загрузить из исходных", OnLoad);
+      _refreshButton = MakeToolButton(toolbar, "Обновить с чертежа", () => ActivePanel().RefreshFromCad());
 
       _tabs = new TabControl
       {
@@ -73,18 +74,23 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(_tabs, 0, 1);
 
-      _pads = new PadOptimizationWindow();
-      _buos = new SitePlacementWindow(SitePlacementKind.Buos);
-      _nodes = new SitePlacementWindow(SitePlacementKind.Nodes);
-      _inserts = new InsertPointsWindow();
+      _pads = new DrawingObjectsCadPanel(DrawingObjectsCadPanel.Kind.Pads);
+      _buos = new DrawingObjectsCadPanel(DrawingObjectsCadPanel.Kind.Buos);
+      _nodes = new DrawingObjectsCadPanel(DrawingObjectsCadPanel.Kind.Nodes);
+      _inserts = new DrawingObjectsCadPanel(DrawingObjectsCadPanel.Kind.Inserts);
 
       _tabs.TabPages.Add(MakePage("Кустовые", _pads));
       _tabs.TabPages.Add(MakePage("БУОС", _buos));
       _tabs.TabPages.Add(MakePage("Узлы", _nodes));
       _tabs.TabPages.Add(MakePage("Врезки", _inserts));
-      _tabs.SelectedIndexChanged += (_, __) => UpdateToolbarLabels();
+      _tabs.SelectedIndexChanged += (_, __) =>
+      {
+        UpdateToolbarLabels();
+        ActivePanel().RefreshFromCad();
+      };
 
       FormClosing += OnFormClosing;
+      Shown += (_, __) => ActivePanel().RefreshFromCad();
       SelectTab(initialTab);
       UpdateToolbarLabels();
     }
@@ -150,44 +156,34 @@ namespace NcTestRibbon.Shell
     public void SelectPadByName(string name)
     {
       SelectTab(DrawingObjectsTab.Pads);
-      try { Application.DoEvents(); }
-      catch { }
-
-      _pads.TrySelectPadByName(name);
+      _pads.RefreshFromCad();
     }
 
     public void ApplyPadCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
     {
       SelectTab(DrawingObjectsTab.Pads);
-      try { Application.DoEvents(); }
-      catch { }
-
-      _pads.TrySelectPadByName(name);
-      _pads.ApplyCadPose(name, x, y, rotationDeg, saveExcel);
+      _pads.RefreshFromCad();
+      if (saveExcel)
+      {
+        try { _pads.SaveToSource(confirm: false, confirmTitle: "Сохранить в исходные КП"); }
+        catch { }
+      }
     }
-
-    public PadOptimizationWindow PadsPanel => _pads;
 
     public void ApplyDirtyPromptAction(DirtyCoordsAction action)
     {
       if (action == DirtyCoordsAction.Save)
       {
-        if (CadPadInteraction.HasPendingExcelSync)
-        {
-          try { CadPadInteraction.CommitPendingToExcel(); }
-          catch { }
-        }
-
-        try { _pads.SaveDirtyCoords(confirm: false); }
+        try { _pads.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _buos.SaveDirtyCoords(confirm: false); }
+        try { _buos.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _nodes.SaveDirtyCoords(confirm: false); }
+        try { _nodes.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _inserts.SaveDirtyCoords(confirm: false); }
+        try { _inserts.SaveToSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
         return;
@@ -195,19 +191,39 @@ namespace NcTestRibbon.Shell
 
       if (action == DirtyCoordsAction.Load)
       {
-        CadPadInteraction.ClearPending();
-        try { _pads.ReloadFromSource(confirm: false); }
+        try { _pads.LoadFromSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _buos.ReloadFromSource(confirm: false); }
+        try { _buos.LoadFromSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _nodes.ReloadFromSource(confirm: false); }
+        try { _nodes.LoadFromSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
 
-        try { _inserts.ReloadFromSource(confirm: false); }
+        try { _inserts.LoadFromSource(confirm: false, confirmTitle: string.Empty); }
         catch { }
       }
+    }
+
+    public void SaveActiveTab(bool confirm)
+    {
+      ActivePanel().SaveToSource(confirm, SaveConfirmTitle());
+    }
+
+    public void LoadActiveTab(bool confirm)
+    {
+      ActivePanel().LoadFromSource(confirm, LoadConfirmTitle());
+    }
+
+    private DrawingObjectsCadPanel ActivePanel()
+    {
+      return ActiveTab switch
+      {
+        DrawingObjectsTab.Buos => _buos,
+        DrawingObjectsTab.Nodes => _nodes,
+        DrawingObjectsTab.Inserts => _inserts,
+        _ => _pads
+      };
     }
 
     private void UpdateToolbarLabels()
@@ -244,22 +260,20 @@ namespace NcTestRibbon.Shell
         switch (ActiveTab)
         {
           case DrawingObjectsTab.Buos:
-            CadPlaceFromExcel.PlaceBuos(this);
-            SafeReload(_buos);
+            CadPlaceFromExcel.PlaceBuosFromCatalog(this);
             break;
           case DrawingObjectsTab.Nodes:
-            CadPlaceFromExcel.PlaceNode(this);
-            SafeReload(_nodes);
+            CadPlaceFromExcel.PlaceNodeFromCatalog(this);
             break;
           case DrawingObjectsTab.Inserts:
             CadPlaceFromExcel.PlaceInsert(this);
-            SafeReload(_inserts);
             break;
           default:
             CadPlaceFromExcel.PlacePad(this);
-            SafeReload(_pads);
             break;
         }
+
+        ActivePanel().RefreshFromCad();
       });
     }
 
@@ -271,84 +285,6 @@ namespace NcTestRibbon.Shell
     private void OnLoad()
     {
       Guard(() => LoadActiveTab(confirm: true));
-    }
-
-    public void SaveActiveTab(bool confirm)
-    {
-      string title = SaveConfirmTitle();
-      if (confirm)
-      {
-        DialogResult ok = MessageBox.Show(
-          this,
-          title + "?",
-          title,
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (ok != DialogResult.Yes)
-        {
-          return;
-        }
-      }
-
-      if (ActiveTab == DrawingObjectsTab.Pads && CadPadInteraction.HasPendingExcelSync)
-      {
-        CadPadInteraction.CommitPendingToExcel();
-      }
-
-      switch (ActiveTab)
-      {
-        case DrawingObjectsTab.Buos:
-          _buos.SaveDirtyCoords(confirm: false);
-          break;
-        case DrawingObjectsTab.Nodes:
-          _nodes.SaveDirtyCoords(confirm: false);
-          break;
-        case DrawingObjectsTab.Inserts:
-          _inserts.SaveDirtyCoords(confirm: false);
-          break;
-        default:
-          _pads.SaveDirtyCoords(confirm: false);
-          break;
-      }
-    }
-
-    public void LoadActiveTab(bool confirm)
-    {
-      string title = LoadConfirmTitle();
-      if (confirm)
-      {
-        DialogResult ok = MessageBox.Show(
-          this,
-          title + " и сбросить изменения на чертеже?",
-          title,
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (ok != DialogResult.Yes)
-        {
-          return;
-        }
-      }
-
-      if (ActiveTab == DrawingObjectsTab.Pads)
-      {
-        CadPadInteraction.ClearPending();
-      }
-
-      switch (ActiveTab)
-      {
-        case DrawingObjectsTab.Buos:
-          _buos.ReloadFromSource(confirm: false);
-          break;
-        case DrawingObjectsTab.Nodes:
-          _nodes.ReloadFromSource(confirm: false);
-          break;
-        case DrawingObjectsTab.Inserts:
-          _inserts.ReloadFromSource(confirm: false);
-          break;
-        default:
-          _pads.ReloadFromSource(confirm: false);
-          break;
-      }
     }
 
     private string SaveConfirmTitle()
@@ -373,24 +309,6 @@ namespace NcTestRibbon.Shell
       };
     }
 
-    private static void SafeReload(PadOptimizationWindow pads)
-    {
-      try { pads.ReloadFromSource(confirm: false); }
-      catch { }
-    }
-
-    private static void SafeReload(SitePlacementWindow sites)
-    {
-      try { sites.ReloadFromSource(confirm: false); }
-      catch { }
-    }
-
-    private static void SafeReload(InsertPointsWindow inserts)
-    {
-      try { inserts.ReloadFromSource(confirm: false); }
-      catch { }
-    }
-
     private void Guard(Action action)
     {
       try { action(); }
@@ -402,18 +320,6 @@ namespace NcTestRibbon.Shell
 
     private void OnFormClosing(object sender, FormClosingEventArgs e)
     {
-      try { _pads.NotifyHostClosing(); }
-      catch { }
-
-      try { _buos.NotifyHostClosing(); }
-      catch { }
-
-      try { _nodes.NotifyHostClosing(); }
-      catch { }
-
-      try { _inserts.NotifyHostClosing(); }
-      catch { }
-
       if (_closePromptDone)
       {
         return;
@@ -449,41 +355,7 @@ namespace NcTestRibbon.Shell
         return;
       }
 
-      if (action == DirtyCoordsAction.Save)
-      {
-        if (CadPadInteraction.HasPendingExcelSync)
-        {
-          try { CadPadInteraction.CommitPendingToExcel(); }
-          catch { }
-        }
-
-        try { _pads.SaveDirtyCoords(confirm: false); }
-        catch { }
-
-        try { _buos.SaveDirtyCoords(confirm: false); }
-        catch { }
-
-        try { _nodes.SaveDirtyCoords(confirm: false); }
-        catch { }
-
-        try { _inserts.SaveDirtyCoords(confirm: false); }
-        catch { }
-
-        return;
-      }
-
-      CadPadInteraction.ClearPending();
-      try { _pads.ReloadFromSource(confirm: false); }
-      catch { }
-
-      try { _buos.ReloadFromSource(confirm: false); }
-      catch { }
-
-      try { _nodes.ReloadFromSource(confirm: false); }
-      catch { }
-
-      try { _inserts.ReloadFromSource(confirm: false); }
-      catch { }
+      ApplyDirtyPromptAction(action);
     }
 
     private static Button MakeToolButton(Control parent, string text, Action click)

@@ -95,6 +95,77 @@ namespace NcTestRibbon.Cad
       UpdatePad(pad);
     }
 
+    /// <summary>Nodes currently on the drawing. Empty if none.</summary>
+    public static List<SiteGeom> ListPlacedSites()
+    {
+      var result = new List<SiteGeom>();
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return result;
+      }
+
+      var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          foreach (ObjectId id in model)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+            if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+            {
+              continue;
+            }
+
+            string name = ReadPadName(ent);
+            if (string.IsNullOrWhiteSpace(name) && ent is DBText text)
+            {
+              name = text.TextString;
+            }
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+              names.Add(name.Trim());
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+        return result;
+      }
+
+      foreach (string name in names.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase))
+      {
+        if (!TryReadPadPose(name, out double x, out double y, out double rot))
+        {
+          continue;
+        }
+
+        result.Add(new SiteGeom
+        {
+          Name = name,
+          X = x,
+          Y = y,
+          RotationDeg = rot,
+          LengthM = 250,
+          WidthM = 150
+        });
+      }
+
+      return result;
+    }
+
     /// <summary>Zoom to one or many sites (union extents). Never throws.</summary>
     public static void ZoomToPads(IEnumerable<SiteGeom> pads)
     {

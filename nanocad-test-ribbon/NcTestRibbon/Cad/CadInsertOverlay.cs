@@ -111,6 +111,87 @@ namespace NcTestRibbon.Cad
       UpdateInsert(point);
     }
 
+    /// <summary>Inserts currently on the drawing. Empty if none.</summary>
+    public static List<InsertGeom> ListPlacedInserts()
+    {
+      var result = new List<InsertGeom>();
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return result;
+      }
+
+      var byName = new Dictionary<string, InsertGeom>(StringComparer.OrdinalIgnoreCase);
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          foreach (ObjectId id in model)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+            if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+            {
+              continue;
+            }
+
+            string name = ReadName(tr, ent);
+            if (string.IsNullOrWhiteSpace(name) && ent is DBText text)
+            {
+              name = text.TextString;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+              continue;
+            }
+
+            name = name.Trim();
+            double x = 0, y = 0;
+            if (ent is DbCircle circle)
+            {
+              x = circle.Center.X;
+              y = circle.Center.Y;
+            }
+            else if (ent is DBText label)
+            {
+              x = label.Position.X;
+              y = label.Position.Y;
+            }
+            else
+            {
+              continue;
+            }
+
+            if (!byName.ContainsKey(name))
+            {
+              byName[name] = new InsertGeom { Name = name, X = x, Y = y };
+            }
+            else if (ent is DbCircle)
+            {
+              byName[name].X = x;
+              byName[name].Y = y;
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+        return result;
+      }
+
+      result.AddRange(byName.Values.OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase));
+      return result;
+    }
+
     /// <summary>Zoom to one or many inserts (union extents). Never throws.</summary>
     public static void ZoomToInserts(IEnumerable<InsertGeom> points)
     {

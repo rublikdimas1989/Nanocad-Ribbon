@@ -66,24 +66,65 @@ namespace NcTestRibbon.Cad
 
     public static void PlaceBuos(IWin32Window owner = null)
     {
-      PlaceSite(
-        owner,
-        "Добавить БУОС",
-        SitePlacementWorkbookLoader.BuosSheetName,
-        () => AppPaths.Load().BuosPlacementWorkbook,
-        path => AppPaths.Set(p => p.BuosPlacementWorkbook = path),
-        buos: true);
+      PlaceBuosFromCatalog(owner);
     }
 
     public static void PlaceNode(IWin32Window owner = null)
     {
-      PlaceSite(
-        owner,
-        "Добавить Узел",
-        SitePlacementWorkbookLoader.NodesSheetName,
-        () => AppPaths.Load().NodesPlacementWorkbook,
-        path => AppPaths.Set(p => p.NodesPlacementWorkbook = path),
-        buos: false);
+      PlaceNodeFromCatalog(owner);
+    }
+
+    /// <summary>
+    /// Add БУОС from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
+    /// Places at 0;0; user can MOVE then Save.
+    /// </summary>
+    public static void PlaceBuosFromCatalog(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      PickFromTypicalCatalogDialog.CatalogPickRow pick =
+        PickFromTypicalCatalogDialog.ShowPick(owner, buos: true);
+      if (pick == null)
+      {
+        return;
+      }
+
+      var geom = new CadBuosPlacementOverlay.SiteGeom
+      {
+        Name = pick.InstanceName,
+        X = 0,
+        Y = 0,
+        RotationDeg = 0,
+        WidthM = pick.WidthValue > 0 ? pick.WidthValue : 150,
+        LengthM = pick.LengthValue > 0 ? pick.LengthValue : 250
+      };
+      CadBuosPlacementOverlay.InsertAtStored(geom);
+      CadBuosPlacementOverlay.ZoomToPads(new[] { geom });
+    }
+
+    /// <summary>
+    /// Add Узел from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
+    /// </summary>
+    public static void PlaceNodeFromCatalog(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      PickFromTypicalCatalogDialog.CatalogPickRow pick =
+        PickFromTypicalCatalogDialog.ShowPick(owner, buos: false);
+      if (pick == null)
+      {
+        return;
+      }
+
+      var geom = new CadNodePlacementOverlay.SiteGeom
+      {
+        Name = pick.InstanceName,
+        X = 0,
+        Y = 0,
+        RotationDeg = 0,
+        WidthM = pick.WidthValue > 0 ? pick.WidthValue : 20,
+        LengthM = pick.LengthValue > 0 ? pick.LengthValue : 20
+      };
+      CadNodePlacementOverlay.InsertAtStored(geom);
+      CadNodePlacementOverlay.ZoomToPads(new[] { geom });
     }
 
     public static void PlaceInsert(IWin32Window owner = null)

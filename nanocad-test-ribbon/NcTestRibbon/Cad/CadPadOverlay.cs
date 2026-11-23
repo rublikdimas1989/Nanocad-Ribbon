@@ -108,6 +108,121 @@ namespace NcTestRibbon.Cad
       UpdatePad(pad);
     }
 
+    /// <summary>
+    /// Objects currently on the drawing (layer + XData/label). Empty if none.
+    /// </summary>
+    public static List<PadGeom> ListPlacedPads()
+    {
+      var result = new List<PadGeom>();
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return result;
+      }
+
+      var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          foreach (ObjectId id in model)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+            if (ent == null || !string.Equals(ent.Layer, LayerName, StringComparison.OrdinalIgnoreCase))
+            {
+              continue;
+            }
+
+            string name = ReadPadName(ent);
+            if (string.IsNullOrWhiteSpace(name) && ent is DBText text)
+            {
+              name = text.TextString;
+            }
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+              names.Add(name.Trim());
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+        return result;
+      }
+
+      foreach (string name in names.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase))
+      {
+        if (!TryReadPadPose(name, out double x, out double y, out double rot))
+        {
+          continue;
+        }
+
+        TryReadPadSize(name, out double lengthM, out double widthM);
+        result.Add(new PadGeom
+        {
+          Name = name,
+          X = x,
+          Y = y,
+          RotationDeg = rot,
+          LengthM = lengthM > 0 ? lengthM : 250,
+          WidthM = widthM > 0 ? widthM : 150
+        });
+      }
+
+      return result;
+    }
+
+    private static void TryReadPadSize(string padName, out double lengthM, out double widthM)
+    {
+      lengthM = 0;
+      widthM = 0;
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null || string.IsNullOrWhiteSpace(padName))
+      {
+        return;
+      }
+
+      double len = 0;
+      double wid = 0;
+      try
+      {
+        RunWrite(doc, (tr, model, db) =>
+        {
+          foreach (ObjectId id in FindNamedPadIds(tr, model, padName))
+          {
+            DbPolyline pl = tr.GetObject(id, OpenMode.ForRead) as DbPolyline;
+            if (pl == null || pl.NumberOfVertices < 3)
+            {
+              continue;
+            }
+
+            Point2d p0 = pl.GetPoint2dAt(0);
+            Point2d p1 = pl.GetPoint2dAt(1);
+            Point2d p2 = pl.GetPoint2dAt(2);
+            len = Math.Sqrt((p1.X - p0.X) * (p1.X - p0.X) + (p1.Y - p0.Y) * (p1.Y - p0.Y));
+            wid = Math.Sqrt((p2.X - p1.X) * (p2.X - p1.X) + (p2.Y - p1.Y) * (p2.Y - p1.Y));
+            break;
+          }
+        });
+      }
+      catch
+      {
+      }
+
+      lengthM = len;
+      widthM = wid;
+    }
+
     /// <summary>Zoom to one or many pads (union extents). Never throws.</summary>
     public static void ZoomToPads(IEnumerable<PadGeom> pads)
     {
