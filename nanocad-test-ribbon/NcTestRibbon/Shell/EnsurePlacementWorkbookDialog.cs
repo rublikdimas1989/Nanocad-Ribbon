@@ -54,6 +54,70 @@ namespace NcTestRibbon.Shell
       return path;
     }
 
+    /// <summary>Same create/open dialog for inserts workbook (sheet «Врезки»).</summary>
+    public static string EnsureInsertPath(
+      IWin32Window owner,
+      string currentPath,
+      Action<string> rememberPath)
+    {
+      if (!string.IsNullOrWhiteSpace(currentPath) && File.Exists(currentPath))
+      {
+        return currentPath;
+      }
+
+      using var dlg = new ChoiceForm("Врезки");
+      DialogResult r = owner == null ? dlg.ShowDialog() : dlg.ShowDialog(owner);
+      if (r != DialogResult.OK || dlg.Choice == Choice.None)
+      {
+        return null;
+      }
+
+      TracingCache.EnsureCreated();
+      string path;
+      if (dlg.Choice == Choice.Create)
+      {
+        path = PromptCreateInsert(owner);
+      }
+      else
+      {
+        path = PromptOpen(owner, "Врезки", currentPath);
+      }
+
+      if (string.IsNullOrWhiteSpace(path))
+      {
+        return null;
+      }
+
+      rememberPath?.Invoke(path);
+      return path;
+    }
+
+    private static string PromptCreateInsert(IWin32Window owner)
+    {
+      string suggested = Path.Combine(TracingCache.SourceDataDir, "Врезки.xlsx");
+      using var sfd = new SaveFileDialog
+      {
+        Title = "Создать файл «Врезки»",
+        Filter = "Excel (*.xlsx)|*.xlsx|Все файлы|*.*",
+        DefaultExt = "xlsx",
+        AddExtension = true,
+        OverwritePrompt = true,
+        FileName = Path.GetFileName(suggested),
+        InitialDirectory = Directory.Exists(TracingCache.SourceDataDir)
+          ? TracingCache.SourceDataDir
+          : null
+      };
+
+      DialogResult r = owner == null ? sfd.ShowDialog() : sfd.ShowDialog(owner);
+      if (r != DialogResult.OK || string.IsNullOrWhiteSpace(sfd.FileName))
+      {
+        return null;
+      }
+
+      InsertWorkbookLoader.CreateSampleWorkbook(sfd.FileName);
+      return sfd.FileName;
+    }
+
     private static string PromptCreate(IWin32Window owner, string noun, string sheetName)
     {
       string suggested = Path.Combine(

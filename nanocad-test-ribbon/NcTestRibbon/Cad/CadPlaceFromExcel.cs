@@ -86,6 +86,58 @@ namespace NcTestRibbon.Cad
         buos: false);
     }
 
+    public static void PlaceInsert(IWin32Window owner = null)
+    {
+      owner ??= TryMainWindow();
+      string initial = EnsurePlacementWorkbookDialog.EnsureInsertPath(
+        owner,
+        AppPaths.Load().InsertsWorkbook,
+        path => AppPaths.Set(p => p.InsertsWorkbook = path));
+      if (string.IsNullOrWhiteSpace(initial))
+      {
+        return;
+      }
+
+      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
+        owner,
+        "Добавить врезки",
+        initial,
+        "выбрать из файла",
+        path => InsertWorkbookLoader.LoadWorkbook(path).Inserts.Select(ToPickItem).ToList(),
+        out string path);
+
+      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
+      {
+        return;
+      }
+
+      InsertWorkbookLoader.WorkbookData book = InsertWorkbookLoader.LoadWorkbook(path);
+      AppPaths.Set(p => p.InsertsWorkbook = path);
+
+      var geoms = new List<CadInsertOverlay.InsertGeom>();
+      foreach (PickFromExcelItem item in picked)
+      {
+        string name = item.Tag as string ?? item.Name;
+        InsertWorkbookLoader.InsertRecord rec = book.Inserts.Find(i =>
+          string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (rec == null)
+        {
+          throw new InvalidOperationException("Врезка «" + name + "» нет в " + Path.GetFileName(path));
+        }
+
+        var geom = new CadInsertOverlay.InsertGeom
+        {
+          Name = rec.Name,
+          X = rec.X,
+          Y = rec.Y
+        };
+        CadInsertOverlay.InsertAtStored(geom);
+        geoms.Add(geom);
+      }
+
+      CadInsertOverlay.ZoomToInserts(geoms);
+    }
+
     private static void PlaceSite(
       IWin32Window owner,
       string title,
@@ -220,6 +272,21 @@ namespace NcTestRibbon.Cad
           ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
             + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
             + "; угол=" + s.AngleDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
+          : "координаты не заданы (вставка в 0;0)",
+        Tag = s.Name
+      };
+    }
+
+    private static PickFromExcelItem ToPickItem(InsertWorkbookLoader.InsertRecord s)
+    {
+      bool has = Math.Abs(s.X) > 1e-9 || Math.Abs(s.Y) > 1e-9;
+      return new PickFromExcelItem
+      {
+        Name = s.Name,
+        HasCoords = has,
+        Detail = has
+          ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
+            + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
           : "координаты не заданы (вставка в 0;0)",
         Tag = s.Name
       };

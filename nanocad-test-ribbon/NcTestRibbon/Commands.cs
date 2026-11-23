@@ -30,12 +30,16 @@ namespace NcTestRibbon
     private static bool _visualStylesTried;
     private static bool _wpfAppCreated;
     private static SourceDataWindow _sourceDataLive;
+    private static DrawingObjectsWindow _drawingObjectsLive;
     private static CartographyWindow _cartographyLive;
     private static AllowableSitesWindow _allowableSitesLive;
     private static bool _bridgeWired;
     private static readonly object SourceDataGate = new object();
+    private static readonly object DrawingObjectsGate = new object();
     private static bool _sourceDataOpening;
+    private static bool _drawingObjectsOpening;
     private static long _lastSourceDataOpenTicks;
+    private static long _lastDrawingObjectsOpenTicks;
 
     static TestCommands()
     {
@@ -54,6 +58,8 @@ namespace NcTestRibbon
       TestCommandsBridge.ApplyPadCadPose = ApplyPadCadPoseStatic;
       DrawingDirtyGuard.GetLiveSourceData = () =>
         _sourceDataLive != null && !_sourceDataLive.IsDisposed ? _sourceDataLive : null;
+      DrawingDirtyGuard.GetLiveDrawingObjects = () =>
+        _drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed ? _drawingObjectsLive : null;
       try { DrawingDirtyGuard.TryAttach(); }
       catch { }
 
@@ -63,6 +69,18 @@ namespace NcTestRibbon
     private static void OpenPadsWindowStatic(string padName)
     {
       var cmd = new TestCommands();
+      // Prefer Объекты чертежа when already open; otherwise База данных.
+      if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+      {
+        cmd.OpenDrawingObjectsForm(DrawingObjectsTab.Pads, "NcTestPadDblClick");
+        if (!string.IsNullOrWhiteSpace(padName))
+        {
+          _drawingObjectsLive.SelectPadByName(padName);
+        }
+
+        return;
+      }
+
       cmd.OpenSourceDataForm(SourceDataTab.Pads, "NcTestPadDblClick");
       lock (SourceDataGate)
       {
@@ -76,6 +94,18 @@ namespace NcTestRibbon
     private static void ApplyPadCadPoseStatic(
       string name, double x, double y, double rotationDeg, bool saveExcel)
     {
+      if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+      {
+        try
+        {
+          _drawingObjectsLive.ApplyPadCadPose(name, x, y, rotationDeg, saveExcel);
+          return;
+        }
+        catch
+        {
+        }
+      }
+
       if (_sourceDataLive != null && !_sourceDataLive.IsDisposed)
       {
         try
@@ -248,7 +278,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Settings flyout → «Типовые объекты»: catalogs БУОС + Узлы.
+    /// Ribbon «Типовые объекты»: catalogs БУОС + Узлы.
     /// </summary>
     [CommandMethod("NcTestTypicalObjects")]
     public void NcTestTypicalObjects()
@@ -261,6 +291,22 @@ namespace NcTestRibbon
     public void NcTestInitialData()
     {
       NcTestSourceData();
+    }
+
+    /// <summary>
+    /// Ribbon «Объекты чертежа»: Кустовые / БУОС / Узлы / Врезки + Add/Save/Load per tab.
+    /// </summary>
+    [CommandMethod("NcTestDrawingObjects")]
+    public void NcTestDrawingObjects()
+    {
+      OpenDrawingObjectsForm(DrawingObjectsTab.Pads, "NcTestDrawingObjects");
+    }
+
+    /// <summary>Legacy flyout parent → «Объекты чертежа».</summary>
+    [CommandMethod("NcTestAreaObjects")]
+    public void NcTestAreaObjects()
+    {
+      NcTestDrawingObjects();
     }
 
     /// <summary>
@@ -316,7 +362,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Сохранить в исходные (confirm, then write).
+    /// CAD sync / command: open «Объекты чертежа» → Кустовые and save КП (confirm).
     /// </summary>
     [CommandMethod("NcTestSaveSources")]
     public void NcTestSaveSources()
@@ -325,11 +371,11 @@ namespace NcTestRibbon
       Editor ed = doc?.Editor;
       try
       {
-        OpenSourceDataForm(SourceDataTab.Pads, "NcTestSaveSources");
-        SourceDataWindow live;
-        lock (SourceDataGate)
+        OpenDrawingObjectsForm(DrawingObjectsTab.Pads, "NcTestSaveSources");
+        DrawingObjectsWindow live;
+        lock (DrawingObjectsGate)
         {
-          live = _sourceDataLive;
+          live = _drawingObjectsLive;
         }
 
         if (live == null || live.IsDisposed)
@@ -341,8 +387,8 @@ namespace NcTestRibbon
           }
 
           DialogResult confirm = MessageBox.Show(
-            "Сохранить положения КП с чертежа в исходный Excel?",
-            "Сохранить в исходные",
+            "Сохранить в исходные КП?",
+            "Сохранить в исходные КП",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
           if (confirm != DialogResult.Yes)
@@ -355,30 +401,9 @@ namespace NcTestRibbon
           return;
         }
 
-        List<DirtyCoordItem> dirty = live.CollectDirtyItems();
-        if (dirty.Count == 0 && !CadPadInteraction.HasPendingExcelSync)
-        {
-          ed?.WriteMessage("\nNcTestSaveSources: нет изменённых положений.");
-          try { PadExcelSyncUi.SetPending(false); }
-          catch { }
-
-          return;
-        }
-
-        DialogResult ok = MessageBox.Show(
-          live,
-          "Сохранить изменённые положения в исходные Excel?\n\nОбъектов: "
-            + Math.Max(dirty.Count, CadPadInteraction.PendingPadNames.Count),
-          "Сохранить в исходные",
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (ok != DialogResult.Yes)
-        {
-          return;
-        }
-
-        live.SaveAllToSource(confirm: false);
-        ed?.WriteMessage("\nNcTestSaveSources: положения сохранены в исходные.");
+        live.SelectTab(DrawingObjectsTab.Pads);
+        live.SaveActiveTab(confirm: true);
+        ed?.WriteMessage("\nNcTestSaveSources: Сохранить в исходные КП.");
       }
       catch (System.Exception ex)
       {
@@ -394,7 +419,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Загрузить из исходных (confirm, then reload).
+    /// Command: open «Объекты чертежа» → Кустовые and load КП (confirm).
     /// </summary>
     [CommandMethod("NcTestLoadSources")]
     public void NcTestLoadSources()
@@ -403,32 +428,22 @@ namespace NcTestRibbon
       Editor ed = doc?.Editor;
       try
       {
-        OpenSourceDataForm(SourceDataTab.Pads, "NcTestLoadSources");
-        SourceDataWindow live;
-        lock (SourceDataGate)
+        OpenDrawingObjectsForm(DrawingObjectsTab.Pads, "NcTestLoadSources");
+        DrawingObjectsWindow live;
+        lock (DrawingObjectsGate)
         {
-          live = _sourceDataLive;
+          live = _drawingObjectsLive;
         }
 
         if (live == null || live.IsDisposed)
         {
-          ed?.WriteMessage("\nNcTestLoadSources: окно «Исходные данные» не открыто.");
+          ed?.WriteMessage("\nNcTestLoadSources: окно «Объекты чертежа» не открыто.");
           return;
         }
 
-        DialogResult ok = MessageBox.Show(
-          live,
-          "Загрузить положения из исходных Excel для всех вкладок и сбросить изменения на чертеже?",
-          "Загрузить из исходных",
-          MessageBoxButtons.YesNo,
-          MessageBoxIcon.Question);
-        if (ok != DialogResult.Yes)
-        {
-          return;
-        }
-
-        live.LoadFromSource(confirm: false, activeTabOnly: false);
-        ed?.WriteMessage("\nNcTestLoadSources: положения загружены из исходных.");
+        live.SelectTab(DrawingObjectsTab.Pads);
+        live.LoadActiveTab(confirm: true);
+        ed?.WriteMessage("\nNcTestLoadSources: Загрузить из исходных КП.");
       }
       catch (System.Exception ex)
       {
@@ -443,32 +458,32 @@ namespace NcTestRibbon
       }
     }
 
-    /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Кустовую
-    /// (Excel multi-select → insert at stored X/Y/angle, zoom; no jig / no SourceData).
-    /// </summary>
+    /// <summary>Command: Добавить Кустовую (Excel multi-select → insert at stored pose + zoom).</summary>
     [CommandMethod("NcTestAddPad")]
     public void NcTestAddPad()
     {
       PlaceSingleFromExcel("NcTestAddPad", () => CadPlaceFromExcel.PlacePad());
     }
 
-    /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить БУОС (insert at stored pose + zoom).
-    /// </summary>
+    /// <summary>Command: Добавить БУОС (insert at stored pose + zoom).</summary>
     [CommandMethod("NcTestAddBuos")]
     public void NcTestAddBuos()
     {
       PlaceSingleFromExcel("NcTestAddBuos", () => CadPlaceFromExcel.PlaceBuos());
     }
 
-    /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Узел (insert at stored pose + zoom).
-    /// </summary>
+    /// <summary>Command: Добавить Узел (insert at stored pose + zoom).</summary>
     [CommandMethod("NcTestAddNode")]
     public void NcTestAddNode()
     {
       PlaceSingleFromExcel("NcTestAddNode", () => CadPlaceFromExcel.PlaceNode());
+    }
+
+    /// <summary>Command: Добавить врезки (multi-select → insert at stored X/Y + zoom).</summary>
+    [CommandMethod("NcTestAddInsert")]
+    public void NcTestAddInsert()
+    {
+      PlaceSingleFromExcel("NcTestAddInsert", () => CadPlaceFromExcel.PlaceInsert());
     }
 
     private void PlaceSingleFromExcel(string label, Action place)
@@ -569,6 +584,115 @@ namespace NcTestRibbon
       }
     }
 
+
+    private void OpenDrawingObjectsForm(DrawingObjectsTab tab, string label)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      Editor ed = doc?.Editor;
+      try
+      {
+        EnsureVisualStyles(ed);
+        EnsureWpfApplication(ed);
+
+        lock (DrawingObjectsGate)
+        {
+          long now = DateTime.UtcNow.Ticks;
+          if (_drawingObjectsOpening
+              || (now - _lastDrawingObjectsOpenTicks < TimeSpan.TicksPerMillisecond * 750
+                  && _drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed))
+          {
+            if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+            {
+              _drawingObjectsLive.SelectTab(tab);
+            }
+
+            ed?.WriteMessage("\n" + label + ": debounce → reuse Объекты чертежа (" + tab + ").");
+            return;
+          }
+
+          if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+          {
+            _drawingObjectsLive.SelectTab(tab);
+            ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
+            return;
+          }
+
+          _drawingObjectsOpening = true;
+          _lastDrawingObjectsOpenTicks = now;
+        }
+
+        DrawingObjectsWindow form = null;
+        try
+        {
+          IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+          form = new DrawingObjectsWindow(tab);
+          lock (DrawingObjectsGate)
+          {
+            if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+            {
+              try { form.Dispose(); }
+              catch { }
+
+              _drawingObjectsLive.SelectTab(tab);
+              ed?.WriteMessage("\n" + label + ": singleton race → reuse Объекты чертежа.");
+              return;
+            }
+
+            _drawingObjectsLive = form;
+            form.FormClosed += (_, __) =>
+            {
+              lock (DrawingObjectsGate)
+              {
+                if (ReferenceEquals(_drawingObjectsLive, form))
+                {
+                  _drawingObjectsLive = null;
+                }
+              }
+            };
+          }
+
+          if (hwnd != IntPtr.Zero)
+          {
+            form.Show(new WindowWrapper(hwnd));
+          }
+          else
+          {
+            form.Show();
+          }
+
+          ed?.WriteMessage("\n" + label + ": Объекты чертежа open → " + tab + ".");
+        }
+        finally
+        {
+          lock (DrawingObjectsGate)
+          {
+            _drawingObjectsOpening = false;
+            _lastDrawingObjectsOpenTicks = DateTime.UtcNow.Ticks;
+          }
+        }
+      }
+      catch (System.Exception ex)
+      {
+        lock (DrawingObjectsGate)
+        {
+          _drawingObjectsOpening = false;
+        }
+
+        WriteException(ed, label, ex);
+        try
+        {
+          MessageBox.Show(
+            label + " failed.\n\n" + ex.GetType().Name + ": " + ex.Message
+            + (ex.InnerException != null ? "\n\nInner: " + ex.InnerException.Message : string.Empty),
+            label,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        }
+        catch
+        {
+        }
+      }
+    }
 
     private void OpenSourceDataForm(SourceDataTab tab, string label)
     {

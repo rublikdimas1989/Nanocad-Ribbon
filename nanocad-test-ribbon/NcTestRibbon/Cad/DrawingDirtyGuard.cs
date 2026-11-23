@@ -19,6 +19,8 @@ namespace NcTestRibbon.Cad
 
     public static Func<SourceDataWindow> GetLiveSourceData { get; set; }
 
+    public static Func<DrawingObjectsWindow> GetLiveDrawingObjects { get; set; }
+
     public static void TryAttach()
     {
       lock (Gate)
@@ -70,14 +72,22 @@ namespace NcTestRibbon.Cad
 
       try
       {
-        SourceDataWindow live = null;
-        try { live = GetLiveSourceData?.Invoke(); }
+        SourceDataWindow sourceLive = null;
+        DrawingObjectsWindow drawingLive = null;
+        try { sourceLive = GetLiveSourceData?.Invoke(); }
+        catch { }
+
+        try { drawingLive = GetLiveDrawingObjects?.Invoke(); }
         catch { }
 
         var items = new List<DirtyCoordItem>();
-        if (live != null && !live.IsDisposed)
+        if (drawingLive != null && !drawingLive.IsDisposed)
         {
-          items.AddRange(live.CollectDirtyItems());
+          items.AddRange(drawingLive.CollectDirtyItems());
+        }
+        else if (sourceLive != null && !sourceLive.IsDisposed)
+        {
+          items.AddRange(sourceLive.CollectDirtyItems());
         }
         else
         {
@@ -117,17 +127,29 @@ namespace NcTestRibbon.Cad
           "На чертеже есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
           items);
 
-        if (live != null && !live.IsDisposed)
+        if (drawingLive != null && !drawingLive.IsDisposed)
         {
           if (action == DirtyCoordsAction.Cancel)
           {
-            // Drawing is closing — discard unsaved poses back to last Excel.
-            try { live.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
+            try { drawingLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
             catch { CadPadInteraction.ClearPending(); }
           }
           else
           {
-            live.ApplyDirtyPromptAction(action);
+            drawingLive.ApplyDirtyPromptAction(action);
+          }
+        }
+        else if (sourceLive != null && !sourceLive.IsDisposed)
+        {
+          if (action == DirtyCoordsAction.Cancel)
+          {
+            // Drawing is closing — discard unsaved poses back to last Excel.
+            try { sourceLive.ApplyDirtyPromptAction(DirtyCoordsAction.Load); }
+            catch { CadPadInteraction.ClearPending(); }
+          }
+          else
+          {
+            sourceLive.ApplyDirtyPromptAction(action);
           }
         }
         else if (action == DirtyCoordsAction.Save)

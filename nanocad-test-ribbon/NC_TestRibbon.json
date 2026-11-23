@@ -50,11 +50,25 @@
       "iconResource": "NC_ICONS.save_sources.ico"
     },
     {
-      "intername": "NcTestAreaObjects",
-      "displayName": "Площадные объекты",
-      "tooltip": "Flyout: добавить КП/БУОС/Узел, сохранить/загрузить исходные.",
+      "intername": "NcTestDrawingObjects",
+      "displayName": "Объекты чертежа",
+      "tooltip": "Кустовые / БУОС / Узлы / Врезки: добавить, сохранить/загрузить в исходные (по вкладке).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.area_objects.ico"
+    },
+    {
+      "intername": "NcTestAreaObjects",
+      "displayName": "Объекты чертежа",
+      "tooltip": "Alias → NcTestDrawingObjects.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.area_objects.ico"
+    },
+    {
+      "intername": "NcTestAddInsert",
+      "displayName": "Добавить врезки",
+      "tooltip": "Excel multi-select → вставка по X/Y из базы (без jig) → zoom.",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.add_node.ico"
     },
     {
       "intername": "NcTestRouteLine",
@@ -179,32 +193,9 @@
           "style": "large"
         },
         {
-          "type": "flyout",
-          "text": "Площадные объекты",
-          "command": "NcTestAreaObjects",
-          "style": "large",
-          "items": [
-            {
-              "text": "Добавить Кустовую",
-              "command": "NcTestAddPad"
-            },
-            {
-              "text": "Добавить БУОС",
-              "command": "NcTestAddBuos"
-            },
-            {
-              "text": "Добавить Узел",
-              "command": "NcTestAddNode"
-            },
-            {
-              "text": "Сохранить в исходные",
-              "command": "NcTestSaveSources"
-            },
-            {
-              "text": "Загрузить из исходных",
-              "command": "NcTestLoadSources"
-            }
-          ]
+          "text": "Объекты чертежа",
+          "command": "NcTestDrawingObjects",
+          "style": "large"
         },
         {
           "text": "Типовые объекты",
