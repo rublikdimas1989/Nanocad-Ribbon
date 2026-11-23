@@ -75,7 +75,7 @@ namespace NcTestRibbon.Cad
       return drawn;
     }
 
-    public static void UpdatePad(PadGeom pad)
+    public static void UpdatePad(PadGeom pad, bool refreshView = true)
     {
       if (pad == null || string.IsNullOrWhiteSpace(pad.Name))
       {
@@ -96,16 +96,85 @@ namespace NcTestRibbon.Cad
         });
       }
 
-      TryRegen(doc);
-      TryUpdateScreen(doc);
+      if (refreshView)
+      {
+        TryRegen(doc);
+        TryUpdateScreen(doc);
+      }
     }
 
     /// <summary>
     /// Draw KP at stored X/Y/angle — no place jig. Prefer ribbon Add for new objects.
     /// </summary>
-    public static void InsertAtStored(PadGeom pad)
+    public static void InsertAtStored(PadGeom pad, bool refreshView = true)
     {
-      UpdatePad(pad);
+      UpdatePad(pad, refreshView);
+    }
+
+    /// <summary>Batch insert in one write + one regen (anti-flicker).</summary>
+    public static int InsertManyAtStored(IEnumerable<PadGeom> pads)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+      PadGeom[] list = (pads ?? Enumerable.Empty<PadGeom>())
+        .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return 0;
+      }
+
+      using (CadPadInteraction.SuppressNotifications())
+      {
+        RunWrite(doc, (tr, model, db) =>
+        {
+          EnsureLayer(tr, db, unlockForWrite: true);
+          foreach (PadGeom pad in list)
+          {
+            EraseNamedPad(tr, model, pad.Name);
+            AddRectangle(tr, model, db, pad);
+            AddLabel(tr, model, db, pad);
+          }
+        });
+      }
+
+      TryRegen(doc);
+      TryUpdateScreen(doc);
+      return list.Length;
+    }
+
+    /// <summary>Erase named КП entities from the drawing.</summary>
+    public static void RemoveByNames(IEnumerable<string> names)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      string[] list = (names ?? Enumerable.Empty<string>())
+        .Where(n => !string.IsNullOrWhiteSpace(n))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return;
+      }
+
+      using (CadPadInteraction.SuppressNotifications())
+      {
+        RunWrite(doc, (tr, model, db) =>
+        {
+          EnsureLayer(tr, db, unlockForWrite: true);
+          foreach (string name in list)
+          {
+            EraseNamedPad(tr, model, name);
+          }
+        });
+      }
+
+      TryRegen(doc);
+      TryUpdateScreen(doc);
     }
 
     /// <summary>
@@ -1148,10 +1217,8 @@ namespace NcTestRibbon.Cad
 
       layer.IsOff = false;
       layer.IsFrozen = false;
-      if (unlockForWrite)
-      {
-        layer.IsLocked = false;
-      }
+      // Never lock placement layers — grips/MOVE/ROTATE must work.
+      layer.IsLocked = false;
     }
 
     private static void UnlockLayer(Transaction tr, Database db)

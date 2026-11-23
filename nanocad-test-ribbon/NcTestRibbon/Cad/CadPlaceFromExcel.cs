@@ -13,7 +13,8 @@ namespace NcTestRibbon.Cad
 
   /// <summary>
   /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel multi-select → insert at stored X/Y/angle
-  /// (no place jig). Zoom to object or group extents. No SourceData / no draw-all.
+  /// (no place jig). Zoom once to the whole inserted set. БУОС/Узел from catalog: pick point
+  /// on current view (no zoom). No SourceData / no draw-all / no per-item window refresh.
   /// </summary>
   public static class CadPlaceFromExcel
   {
@@ -48,7 +49,7 @@ namespace NcTestRibbon.Cad
           throw new InvalidOperationException("КП «" + name + "» нет в " + Path.GetFileName(path));
         }
 
-        var geom = new CadPadOverlay.PadGeom
+        geoms.Add(new CadPadOverlay.PadGeom
         {
           Name = pad.Name,
           X = pad.X,
@@ -56,11 +57,11 @@ namespace NcTestRibbon.Cad
           WidthM = pad.WidthM > 0 ? pad.WidthM : 150,
           LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
           RotationDeg = pad.RotationDeg
-        };
-        CadPadOverlay.InsertAtStored(geom);
-        geoms.Add(geom);
+        });
       }
 
+      // Draw all first, then one zoom to the added set (anti-flicker).
+      CadPadOverlay.InsertManyAtStored(geoms);
       CadPadOverlay.ZoomToPads(geoms);
     }
 
@@ -75,8 +76,7 @@ namespace NcTestRibbon.Cad
     }
 
     /// <summary>
-    /// Add БУОС from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
-    /// Places at 0;0; user can MOVE then Save.
+    /// Add БУОС from Типовые: empty editable «Имя», then pick insert point on current view (no zoom).
     /// </summary>
     public static void PlaceBuosFromCatalog(IWin32Window owner = null)
     {
@@ -97,12 +97,24 @@ namespace NcTestRibbon.Cad
         WidthM = pick.WidthValue > 0 ? pick.WidthValue : 150,
         LengthM = pick.LengthValue > 0 ? pick.LengthValue : 250
       };
+
+      using (HideOwnerForCadPick(owner))
+      {
+        if (!CadBuosPlacementOverlay.TryPlaceOnCurrentView(geom, out double x, out double y, zoomFirst: false))
+        {
+          return;
+        }
+
+        geom.X = x;
+        geom.Y = y;
+      }
+
       CadBuosPlacementOverlay.InsertAtStored(geom);
-      CadBuosPlacementOverlay.ZoomToPads(new[] { geom });
+      // No zoom-to — stay on current view.
     }
 
     /// <summary>
-    /// Add Узел from Типовые объекты catalog (instance «Имя» + type sizes). No place jig.
+    /// Add Узел from Типовые: empty editable «Имя», then pick insert point on current view (no zoom).
     /// </summary>
     public static void PlaceNodeFromCatalog(IWin32Window owner = null)
     {
@@ -123,8 +135,19 @@ namespace NcTestRibbon.Cad
         WidthM = pick.WidthValue > 0 ? pick.WidthValue : 20,
         LengthM = pick.LengthValue > 0 ? pick.LengthValue : 20
       };
+
+      using (HideOwnerForCadPick(owner))
+      {
+        if (!CadNodePlacementOverlay.TryPlaceOnCurrentView(geom, out double x, out double y, zoomFirst: false))
+        {
+          return;
+        }
+
+        geom.X = x;
+        geom.Y = y;
+      }
+
       CadNodePlacementOverlay.InsertAtStored(geom);
-      CadNodePlacementOverlay.ZoomToPads(new[] { geom });
     }
 
     public static void PlaceInsert(IWin32Window owner = null)
@@ -166,124 +189,30 @@ namespace NcTestRibbon.Cad
           throw new InvalidOperationException("Врезка «" + name + "» нет в " + Path.GetFileName(path));
         }
 
-        var geom = new CadInsertOverlay.InsertGeom
+        geoms.Add(new CadInsertOverlay.InsertGeom
         {
           Name = rec.Name,
           X = rec.X,
           Y = rec.Y
-        };
-        CadInsertOverlay.InsertAtStored(geom);
-        geoms.Add(geom);
+        });
       }
 
+      CadInsertOverlay.InsertManyAtStored(geoms);
       CadInsertOverlay.ZoomToInserts(geoms);
     }
 
-    private static void PlaceSite(
-      IWin32Window owner,
-      string title,
-      string sheetName,
-      Func<string> getInitialPath,
-      Action<string> rememberPath,
-      bool buos)
+    private static IDisposable HideOwnerForCadPick(IWin32Window owner)
     {
-      owner ??= TryMainWindow();
-      string noun = buos ? "БУОС" : "Узлы";
-      string initial = EnsurePlacementWorkbookDialog.EnsurePath(
-        owner,
-        noun,
-        sheetName,
-        getInitialPath(),
-        rememberPath);
-      if (string.IsNullOrWhiteSpace(initial))
+      Form form = owner as Form;
+      if (form == null || !form.Visible)
       {
-        return;
+        return NullScope.Instance;
       }
 
-      IList<PickFromExcelItem> picked = PickFromExcelDialog.ShowPickMany(
-        owner,
-        title,
-        initial,
-        "выбрать из файла",
-        path => SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName).Sites.Select(ToPickItem).ToList(),
-        out string path);
-
-      if (picked == null || picked.Count == 0 || string.IsNullOrWhiteSpace(path))
-      {
-        return;
-      }
-
-      SitePlacementWorkbookLoader.WorkbookData book =
-        SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName);
-      rememberPath(path);
-
-      if (buos)
-      {
-        var geoms = new List<CadBuosPlacementOverlay.SiteGeom>();
-        foreach (PickFromExcelItem item in picked)
-        {
-          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
-          var geom = ToBuosGeom(site);
-          CadBuosPlacementOverlay.InsertAtStored(geom);
-          geoms.Add(geom);
-        }
-
-        CadBuosPlacementOverlay.ZoomToPads(geoms);
-      }
-      else
-      {
-        var geoms = new List<CadNodePlacementOverlay.SiteGeom>();
-        foreach (PickFromExcelItem item in picked)
-        {
-          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
-          var geom = ToNodeGeom(site);
-          CadNodePlacementOverlay.InsertAtStored(geom);
-          geoms.Add(geom);
-        }
-
-        CadNodePlacementOverlay.ZoomToPads(geoms);
-      }
-    }
-
-    private static SitePlacementWorkbookLoader.PlacementRecord FindSite(
-      SitePlacementWorkbookLoader.WorkbookData book,
-      PickFromExcelItem item)
-    {
-      string name = item.Tag as string ?? item.Name;
-      SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
-        string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
-      if (site == null)
-      {
-        throw new InvalidOperationException("«" + name + "» нет в выбранном Excel.");
-      }
-
-      return site;
-    }
-
-    private static CadBuosPlacementOverlay.SiteGeom ToBuosGeom(SitePlacementWorkbookLoader.PlacementRecord site)
-    {
-      return new CadBuosPlacementOverlay.SiteGeom
-      {
-        Name = site.Name,
-        X = site.X,
-        Y = site.Y,
-        WidthM = site.WidthM > 0 ? site.WidthM : 150,
-        LengthM = site.LengthM > 0 ? site.LengthM : 250,
-        RotationDeg = site.AngleDeg
-      };
-    }
-
-    private static CadNodePlacementOverlay.SiteGeom ToNodeGeom(SitePlacementWorkbookLoader.PlacementRecord site)
-    {
-      return new CadNodePlacementOverlay.SiteGeom
-      {
-        Name = site.Name,
-        X = site.X,
-        Y = site.Y,
-        WidthM = site.WidthM > 0 ? site.WidthM : 150,
-        LengthM = site.LengthM > 0 ? site.LengthM : 250,
-        RotationDeg = site.AngleDeg
-      };
+      bool wasTop = form.TopMost;
+      form.TopMost = false;
+      form.Hide();
+      return new RestoreFormScope(form, wasTop);
     }
 
     private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)
@@ -299,22 +228,6 @@ namespace NcTestRibbon.Cad
             + "; угол=" + p.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
           : "координаты не заданы (вставка в 0;0)",
         Tag = p.Name
-      };
-    }
-
-    private static PickFromExcelItem ToPickItem(SitePlacementWorkbookLoader.PlacementRecord s)
-    {
-      bool has = Math.Abs(s.X) > 1e-9 || Math.Abs(s.Y) > 1e-9;
-      return new PickFromExcelItem
-      {
-        Name = s.Name,
-        HasCoords = has,
-        Detail = has
-          ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
-            + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
-            + "; угол=" + s.AngleDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
-          : "координаты не заданы (вставка в 0;0)",
-        Tag = s.Name
       };
     }
 
@@ -358,6 +271,44 @@ namespace NcTestRibbon.Cad
       }
 
       public IntPtr Handle { get; }
+    }
+
+    private sealed class NullScope : IDisposable
+    {
+      public static readonly NullScope Instance = new NullScope();
+      public void Dispose() { }
+    }
+
+    private sealed class RestoreFormScope : IDisposable
+    {
+      private readonly Form _form;
+      private readonly bool _wasTop;
+      private bool _done;
+
+      public RestoreFormScope(Form form, bool wasTop)
+      {
+        _form = form;
+        _wasTop = wasTop;
+      }
+
+      public void Dispose()
+      {
+        if (_done)
+        {
+          return;
+        }
+
+        _done = true;
+        try
+        {
+          _form.Show();
+          _form.TopMost = _wasTop;
+          _form.BringToFront();
+        }
+        catch
+        {
+        }
+      }
     }
   }
 }

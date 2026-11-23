@@ -13,7 +13,7 @@ namespace NcTestRibbon.Cad
   using DbPolyline = Teigha.DatabaseServices.Polyline;
 
   /// <summary>
-  /// БУОС rectangles + labels on locked layer NC_BUOS_PLACED.
+  /// БУОС rectangles + labels on unlocked layer NC_BUOS_PLACED.
   /// Placement overlay for «БУОС». Orientation at 0°: Length along X, Width along Y.
   /// </summary>
   public static class CadBuosPlacementOverlay
@@ -32,7 +32,6 @@ namespace NcTestRibbon.Cad
       {
         UnlockLayer(tr, db);
         EraseLayerEntities(tr, model);
-        LockLayer(tr, db);
       });
       TryRegen(doc);
     }
@@ -60,14 +59,13 @@ namespace NcTestRibbon.Cad
           drawn++;
         }
 
-        LockLayer(tr, db);
       });
       TryRegen(doc);
       TryUpdateScreen(doc);
       return drawn;
     }
 
-    public static void UpdatePad(SiteGeom pad)
+    public static void UpdatePad(SiteGeom pad, bool refreshView = true)
     {
       if (pad == null || string.IsNullOrWhiteSpace(pad.Name))
       {
@@ -83,16 +81,150 @@ namespace NcTestRibbon.Cad
         EraseNamedPad(tr, model, pad.Name);
         AddRectangle(tr, model, db, pad);
         AddLabel(tr, model, db, pad);
-        LockLayer(tr, db);
+      });
+      if (refreshView)
+      {
+        TryRegen(doc);
+        TryUpdateScreen(doc);
+      }
+    }
+
+    /// <summary>Draw at stored X/Y/angle — no place jig.</summary>
+    public static void InsertAtStored(SiteGeom pad, bool refreshView = true)
+    {
+      UpdatePad(pad, refreshView);
+    }
+
+    /// <summary>Batch insert in one write + one regen (anti-flicker).</summary>
+    public static int InsertManyAtStored(IEnumerable<SiteGeom> pads)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+      SiteGeom[] list = (pads ?? Enumerable.Empty<SiteGeom>())
+        .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return 0;
+      }
+
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        foreach (SiteGeom pad in list)
+        {
+          EraseNamedPad(tr, model, pad.Name);
+          AddRectangle(tr, model, db, pad);
+          AddLabel(tr, model, db, pad);
+        }
+      });
+      TryRegen(doc);
+      TryUpdateScreen(doc);
+      return list.Length;
+    }
+
+    /// <summary>Erase named БУОС entities from the drawing.</summary>
+    public static void RemoveByNames(IEnumerable<string> names)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      string[] list = (names ?? Enumerable.Empty<string>())
+        .Where(n => !string.IsNullOrWhiteSpace(n))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return;
+      }
+
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        foreach (string name in list)
+        {
+          EraseNamedPad(tr, model, name);
+        }
       });
       TryRegen(doc);
       TryUpdateScreen(doc);
     }
 
-    /// <summary>Draw at stored X/Y/angle — no place jig.</summary>
-    public static void InsertAtStored(SiteGeom pad)
+    /// <summary>
+    /// Whether the drawing has both габарит polyline and Текст for the given name.
+    /// </summary>
+    public static bool HasCompleteCadGeom(string name)
     {
-      UpdatePad(pad);
+      TryGetCadGeomFlags(name, out bool hasPl, out bool hasText);
+      return hasPl && hasText;
+    }
+
+    public static void TryGetCadGeomFlags(string name, out bool hasPolyline, out bool hasText)
+    {
+      hasPolyline = false;
+      hasText = false;
+      if (string.IsNullOrWhiteSpace(name))
+      {
+        return;
+      }
+
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      string key = name.Trim();
+      try
+      {
+        using (Transaction tr = doc.Database.TransactionManager.StartTransaction())
+        {
+          var bt = (BlockTable)tr.GetObject(doc.Database.BlockTableId, OpenMode.ForRead);
+          var model = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+          foreach (ObjectId id in model)
+          {
+            if (id.IsNull || id.IsErased)
+            {
+              continue;
+            }
+
+            Entity ent = tr.GetObject(id, OpenMode.ForRead, false) as Entity;
+            if (ent == null)
+            {
+              continue;
+            }
+
+            bool match = string.Equals(ReadPadName(ent), key, StringComparison.OrdinalIgnoreCase);
+            if (!match && ent is DBText label
+                && string.Equals(label.TextString, key, StringComparison.OrdinalIgnoreCase))
+            {
+              match = true;
+            }
+
+            if (!match)
+            {
+              continue;
+            }
+
+            if (ent is DbPolyline)
+            {
+              hasPolyline = true;
+            }
+            else if (ent is DBText)
+            {
+              hasText = true;
+            }
+          }
+
+          tr.Commit();
+        }
+      }
+      catch
+      {
+      }
     }
 
     /// <summary>БУОС currently on the drawing. Empty if none.</summary>
@@ -233,6 +365,12 @@ namespace NcTestRibbon.Cad
 
     public static bool TryPlace(SiteGeom pad, out double x, out double y)
     {
+      return TryPlaceOnCurrentView(pad, out x, out y, zoomFirst: true);
+    }
+
+    /// <summary>Pick insert point on the current view (optional zoom). No auto-zoom by default for Add.</summary>
+    public static bool TryPlaceOnCurrentView(SiteGeom pad, out double x, out double y, bool zoomFirst = false)
+    {
       x = pad?.X ?? 0;
       y = pad?.Y ?? 0;
       if (pad == null)
@@ -245,10 +383,26 @@ namespace NcTestRibbon.Cad
       Editor ed = doc.Editor
         ?? throw new InvalidOperationException("Нет редактора активного чертежа.");
 
-      // Same zoom-to-KP as «Повернуть вручную» before the move jig (never throws).
-      SafeZoomToPadOrGeom(ed, doc, pad);
+      if (zoomFirst)
+      {
+        SafeZoomToPadOrGeom(ed, doc, pad);
+      }
 
-      var jig = new PadPlaceJig(pad, new Point3d(pad.X, pad.Y, 0));
+      // Start jig at view center when coords are 0;0 so pick stays on current view.
+      Point3d start = new Point3d(pad.X, pad.Y, 0);
+      if (Math.Abs(pad.X) < 1e-9 && Math.Abs(pad.Y) < 1e-9)
+      {
+        try
+        {
+          ViewTableRecord view = ed.GetCurrentView();
+          start = new Point3d(view.CenterPoint.X, view.CenterPoint.Y, 0);
+        }
+        catch
+        {
+        }
+      }
+
+      var jig = new PadPlaceJig(pad, start);
       PromptResult result = ed.Drag(jig);
       if (result.Status != PromptStatus.OK)
       {
@@ -326,12 +480,10 @@ namespace NcTestRibbon.Cad
       // Always rotate about KP rectangle center (no free base-point pick).
       if (!RotateAboutCenter(ed, doc, ids, center))
       {
-        RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
         return false;
       }
 
       poseUpdated = TryReadPadPose(padName, out x, out y, out rotationDeg);
-      RunWrite(doc, (tr, model, db) => LockLayer(tr, db));
       TryRegen(doc);
       TryUpdateScreen(doc);
       return true;
@@ -1084,10 +1236,8 @@ namespace NcTestRibbon.Cad
 
       layer.IsOff = false;
       layer.IsFrozen = false;
-      if (unlockForWrite)
-      {
-        layer.IsLocked = false;
-      }
+      // Never lock placement layers — grips/MOVE/ROTATE must work.
+      layer.IsLocked = false;
     }
 
     private static void UnlockLayer(Transaction tr, Database db)

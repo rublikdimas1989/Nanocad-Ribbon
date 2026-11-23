@@ -88,13 +88,50 @@ namespace NcTestRibbon.Shell
       };
       root.Controls.Add(_status, 0, 1);
 
-      VisibleChanged += (_, __) =>
+      // Do not auto-refresh on VisibleChanged — causes flicker when the parent
+      // hides briefly for CAD point pick / multi-add. Parent refreshes explicitly.
+    }
+
+    /// <summary>Delete selected rows from the drawing and refresh the list.</summary>
+    public int DeleteSelectedFromCad()
+    {
+      var names = new List<string>();
+      foreach (DataGridViewRow viewRow in _grid.SelectedRows)
       {
-        if (Visible)
+        if (viewRow.DataBoundItem is CadRow row && !string.IsNullOrWhiteSpace(row.Name))
         {
-          RefreshFromCad();
+          names.Add(row.Name);
         }
-      };
+      }
+
+      if (names.Count == 0 && _grid.CurrentRow?.DataBoundItem is CadRow current)
+      {
+        names.Add(current.Name);
+      }
+
+      if (names.Count == 0)
+      {
+        return 0;
+      }
+
+      switch (_kind)
+      {
+        case Kind.Buos:
+          CadBuosPlacementOverlay.RemoveByNames(names);
+          break;
+        case Kind.Nodes:
+          CadNodePlacementOverlay.RemoveByNames(names);
+          break;
+        case Kind.Inserts:
+          CadInsertOverlay.RemoveByNames(names);
+          break;
+        default:
+          CadPadOverlay.RemoveByNames(names);
+          break;
+      }
+
+      RefreshFromCad();
+      return names.Count;
     }
 
     public bool HasDirtyCoords => _rows.Any(r => r.CoordsDirty);

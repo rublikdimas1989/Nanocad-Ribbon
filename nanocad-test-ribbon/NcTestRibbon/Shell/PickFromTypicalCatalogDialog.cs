@@ -48,7 +48,7 @@ namespace NcTestRibbon.Shell
 
       root.Controls.Add(new Label
       {
-        Text = "Выберите тип из каталога. Колонка «Имя» — имя экземпляра на чертеже (можно изменить).",
+        Text = "Выберите тип из каталога. Колонка «Имя» — имя экземпляра (пусто по умолчанию, введите сразу).",
         AutoSize = true,
         ForeColor = Color.DimGray,
         Margin = new Padding(0, 0, 0, 6)
@@ -164,7 +164,7 @@ namespace NcTestRibbon.Shell
         BuosWorkbookLoader.WorkbookData book = BuosWorkbookLoader.LoadWorkbook(path);
         _rows = book.Variants.Select(v => new CatalogPickRow
         {
-          InstanceName = v.Name,
+          InstanceName = string.Empty,
           TypeName = v.Name,
           CombinedCapacity = v.CombinedCapacity.ToString("0.###", CultureInfo.CurrentCulture),
           GasCapacity = v.GasCapacity.ToString("0.###", CultureInfo.CurrentCulture),
@@ -186,7 +186,7 @@ namespace NcTestRibbon.Shell
         NodesWorkbookLoader.WorkbookData book = NodesWorkbookLoader.LoadWorkbook(path);
         _rows = book.Variants.Select(v => new CatalogPickRow
         {
-          InstanceName = v.Name,
+          InstanceName = string.Empty,
           TypeName = v.Name,
           LengthM = v.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
           WidthM = v.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
@@ -200,6 +200,17 @@ namespace NcTestRibbon.Shell
       {
         _grid.ClearSelection();
         _grid.Rows[0].Selected = true;
+        _grid.CurrentCell = _grid.Rows[0].Cells[0];
+        BeginInvoke(new Action(() =>
+        {
+          try
+          {
+            _grid.BeginEdit(true);
+          }
+          catch
+          {
+          }
+        }));
       }
     }
 

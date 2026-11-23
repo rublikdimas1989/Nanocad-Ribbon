@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.87**): `nanocad-test-ribbon-v1.2.87.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.87.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.87/nanocad-test-ribbon-v1.2.87.zip  
+Актуальный **slim** zip (версия **1.2.88**): `nanocad-test-ribbon-v1.2.88.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.88.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.88/nanocad-test-ribbon-v1.2.88.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,12 +37,12 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.87 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.88 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (группы Исходные/Коридоры/Расчёт), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.87+BazaTypicalTabs` — База: БУОС/Узлы типовые; no Show/Save/Load in База; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.88+DrawingUx` — Add БУОС/Узел: empty Имя + pick on view; no lock; Типовые red if no polyline/Текст; Удалить; batch draw+one zoom; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
@@ -56,7 +56,7 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 | `NcTestDrawingObjects` | Лента: «Объекты чертежа» — только объекты на чертеже; Добавить/Сохранить/Загрузить по вкладке |
 | Группы ленты | **Исходные** / **Коридоры** / **Расчёт** (flat icons) |
 | «База данных» | Открывает окно **без** отрисовки на чертеже |
-| «Объекты чертежа» | Список = CAD entities; Add КП/Врезки из Excel; Add БУОС/Узел из типового каталога (+Имя); без «Показывать на чертеже» |
+| «Объекты чертежа» | CAD-only list; Add; Удалить; Add БУОС/Узел: empty Имя + pick on view; batch draw → one zoom; no lock |
 | `NcTestRouteLine` / `NcTestRoad` | Полилиния на `NC_ROUTE_LINE` / `NC_ROAD` (live jig preview + rubber-band) |
 | `NcTestSendToServer` | DXF → solver `api/v1/datasets` → DatasetId |
 | Double-click КП | «База данных» один раз (singleton/debounce) |

@@ -13,7 +13,7 @@ namespace NcTestRibbon.Cad
   using DbCircle = Teigha.DatabaseServices.Circle;
 
   /// <summary>
-  /// Insert-point (врезка) circles + labels on locked layer NC_INSERTS.
+  /// Insert-point (врезка) circles + labels on unlocked layer NC_INSERTS.
   /// Size from Tracing_cache\Settings\interface.conf.
   /// </summary>
   public static class CadInsertOverlay
@@ -41,7 +41,6 @@ namespace NcTestRibbon.Cad
       {
         UnlockLayer(tr, db);
         EraseLayerEntities(tr, model);
-        LockLayer(tr, db);
       });
       TryRegen(doc);
     }
@@ -71,13 +70,12 @@ namespace NcTestRibbon.Cad
           drawn++;
         }
 
-        LockLayer(tr, db);
       });
       TryRegen(doc);
       return drawn;
     }
 
-    public static void UpdateInsert(InsertGeom point)
+    public static void UpdateInsert(InsertGeom point, bool refreshView = true)
     {
       if (point == null || string.IsNullOrWhiteSpace(point.Name))
       {
@@ -99,16 +97,77 @@ namespace NcTestRibbon.Cad
           AddCircle(tr, model, db, point, diameter);
           AddLabel(tr, model, db, point, diameter, font);
         }
-
-        LockLayer(tr, db);
       });
-      TryRegen(doc);
+      if (refreshView)
+      {
+        TryRegen(doc);
+      }
     }
 
     /// <summary>Draw insert at stored X/Y — no point pick jig.</summary>
-    public static void InsertAtStored(InsertGeom point)
+    public static void InsertAtStored(InsertGeom point, bool refreshView = true)
     {
-      UpdateInsert(point);
+      UpdateInsert(point, refreshView);
+    }
+
+    /// <summary>Batch insert in one write + one regen (anti-flicker).</summary>
+    public static int InsertManyAtStored(IEnumerable<InsertGeom> inserts)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument
+        ?? throw new InvalidOperationException("Нет активного чертежа nanoCAD.");
+      InsertGeom[] list = (inserts ?? Enumerable.Empty<InsertGeom>())
+        .Where(p => p != null && p.Enabled && !string.IsNullOrWhiteSpace(p.Name))
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return 0;
+      }
+
+      InterfaceConf ui = InterfaceConf.Load();
+      double diameter = Math.Max(ui.InsertCircleDiameterM, 0.1);
+      double font = Math.Max(ui.LabelFontHeightM, 0.1);
+
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        foreach (InsertGeom point in list)
+        {
+          EraseNamed(tr, model, point.Name);
+          AddCircle(tr, model, db, point, diameter);
+          AddLabel(tr, model, db, point, diameter, font);
+        }
+      });
+      TryRegen(doc);
+      return list.Length;
+    }
+
+    /// <summary>Erase named врезка entities from the drawing.</summary>
+    public static void RemoveByNames(IEnumerable<string> names)
+    {
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null)
+      {
+        return;
+      }
+
+      string[] list = (names ?? Enumerable.Empty<string>())
+        .Where(n => !string.IsNullOrWhiteSpace(n))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+      if (list.Length == 0)
+      {
+        return;
+      }
+
+      RunWrite(doc, (tr, model, db) =>
+      {
+        EnsureLayer(tr, db, unlockForWrite: true);
+        foreach (string name in list)
+        {
+          EraseNamed(tr, model, name);
+        }
+      });
+      TryRegen(doc);
     }
 
     /// <summary>Inserts currently on the drawing. Empty if none.</summary>
@@ -648,10 +707,8 @@ namespace NcTestRibbon.Cad
       }
 
       var record = (LayerTableRecord)tr.GetObject(layerId, OpenMode.ForWrite);
-      if (unlockForWrite)
-      {
-        record.IsLocked = false;
-      }
+      // Never lock placement layers — grips/MOVE/ROTATE must work.
+      record.IsLocked = false;
     }
 
     private static void LockLayer(Transaction tr, Database db)

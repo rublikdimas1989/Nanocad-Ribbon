@@ -27,10 +27,12 @@ namespace NcTestRibbon.Shell
     private readonly DrawingObjectsCadPanel _nodes;
     private readonly DrawingObjectsCadPanel _inserts;
     private readonly Button _addButton;
+    private readonly Button _deleteButton;
     private readonly Button _saveButton;
     private readonly Button _loadButton;
     private readonly Button _refreshButton;
     private bool _closePromptDone;
+    private bool _suppressCadRefresh;
 
     public DrawingObjectsWindow(DrawingObjectsTab initialTab = DrawingObjectsTab.Pads)
     {
@@ -63,9 +65,16 @@ namespace NcTestRibbon.Shell
       root.Controls.Add(toolbar, 0, 0);
 
       _addButton = MakeToolButton(toolbar, "Добавить", OnAdd);
+      _deleteButton = MakeToolButton(toolbar, "Удалить", OnDelete);
       _saveButton = MakeToolButton(toolbar, "Сохранить в исходные", OnSave);
       _loadButton = MakeToolButton(toolbar, "Загрузить из исходных", OnLoad);
-      _refreshButton = MakeToolButton(toolbar, "Обновить с чертежа", () => ActivePanel().RefreshFromCad());
+      _refreshButton = MakeToolButton(toolbar, "Обновить с чертежа", () =>
+      {
+        if (!_suppressCadRefresh)
+        {
+          ActivePanel().RefreshFromCad();
+        }
+      });
 
       _tabs = new TabControl
       {
@@ -86,11 +95,20 @@ namespace NcTestRibbon.Shell
       _tabs.SelectedIndexChanged += (_, __) =>
       {
         UpdateToolbarLabels();
-        ActivePanel().RefreshFromCad();
+        if (!_suppressCadRefresh)
+        {
+          ActivePanel().RefreshFromCad();
+        }
       };
 
       FormClosing += OnFormClosing;
-      Shown += (_, __) => ActivePanel().RefreshFromCad();
+      Shown += (_, __) =>
+      {
+        if (!_suppressCadRefresh)
+        {
+          ActivePanel().RefreshFromCad();
+        }
+      };
       SelectTab(initialTab);
       UpdateToolbarLabels();
     }
@@ -257,23 +275,49 @@ namespace NcTestRibbon.Shell
     {
       Guard(() =>
       {
-        switch (ActiveTab)
+        _suppressCadRefresh = true;
+        try
         {
-          case DrawingObjectsTab.Buos:
-            CadPlaceFromExcel.PlaceBuosFromCatalog(this);
-            break;
-          case DrawingObjectsTab.Nodes:
-            CadPlaceFromExcel.PlaceNodeFromCatalog(this);
-            break;
-          case DrawingObjectsTab.Inserts:
-            CadPlaceFromExcel.PlaceInsert(this);
-            break;
-          default:
-            CadPlaceFromExcel.PlacePad(this);
-            break;
+          switch (ActiveTab)
+          {
+            case DrawingObjectsTab.Buos:
+              CadPlaceFromExcel.PlaceBuosFromCatalog(this);
+              break;
+            case DrawingObjectsTab.Nodes:
+              CadPlaceFromExcel.PlaceNodeFromCatalog(this);
+              break;
+            case DrawingObjectsTab.Inserts:
+              CadPlaceFromExcel.PlaceInsert(this);
+              break;
+            default:
+              CadPlaceFromExcel.PlacePad(this);
+              break;
+          }
+        }
+        finally
+        {
+          _suppressCadRefresh = false;
         }
 
+        // One refresh after the whole add (no per-item reopen/flicker).
         ActivePanel().RefreshFromCad();
+      });
+    }
+
+    private void OnDelete()
+    {
+      Guard(() =>
+      {
+        int removed = ActivePanel().DeleteSelectedFromCad();
+        if (removed == 0)
+        {
+          MessageBox.Show(
+            this,
+            "Выберите строки для удаления с чертежа.",
+            Text,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+        }
       });
     }
 
