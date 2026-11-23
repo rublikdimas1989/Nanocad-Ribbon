@@ -3,6 +3,7 @@ namespace NcTestRibbon.Shell
   using System;
   using System.Collections.Generic;
   using System.ComponentModel;
+  using System.Diagnostics;
   using System.Drawing;
   using System.Globalization;
   using System.IO;
@@ -240,8 +241,12 @@ namespace NcTestRibbon.Shell
 
       if (confirm)
       {
+        // MessageBox owner = CAD hwnd when host is DrawingObjects (avoid modal-on-self).
+        IWin32Window msgOwner = CadMainWindowOwner()
+          ?? (IWin32Window)FindForm()
+          ?? this;
         DialogResult ok = MessageBox.Show(
-          FindForm() ?? (IWin32Window)this,
+          msgOwner,
           confirmTitle + "?",
           confirmTitle,
           MessageBoxButtons.YesNo,
@@ -369,8 +374,11 @@ namespace NcTestRibbon.Shell
     {
       if (confirm)
       {
+        IWin32Window msgOwner = CadMainWindowOwner()
+          ?? (IWin32Window)FindForm()
+          ?? this;
         DialogResult ok = MessageBox.Show(
-          FindForm() ?? (IWin32Window)this,
+          msgOwner,
           confirmTitle + " и обновить объекты на чертеже?",
           confirmTitle,
           MessageBoxButtons.YesNo,
@@ -833,6 +841,33 @@ namespace NcTestRibbon.Shell
       public double X { get; }
       public double Y { get; }
       public double Angle { get; }
+    }
+
+    private static IWin32Window CadMainWindowOwner()
+    {
+      try
+      {
+        IntPtr hwnd = Process.GetCurrentProcess().MainWindowHandle;
+        if (hwnd != IntPtr.Zero)
+        {
+          return new NativeWindowOwner(hwnd);
+        }
+      }
+      catch
+      {
+      }
+
+      return null;
+    }
+
+    private sealed class NativeWindowOwner : IWin32Window
+    {
+      public NativeWindowOwner(IntPtr handle)
+      {
+        Handle = handle;
+      }
+
+      public IntPtr Handle { get; }
     }
 
     private sealed class CadRow

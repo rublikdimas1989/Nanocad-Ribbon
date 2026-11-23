@@ -181,6 +181,7 @@ namespace NcTestRibbon.Shell
 
     /// <summary>
     /// Force the modeless window back on screen after CAD pick / nanoCAD focus steal.
+    /// Never uses ShowDialog — this form is modeless-only.
     /// </summary>
     public void EnsureVisible()
     {
@@ -196,9 +197,18 @@ namespace NcTestRibbon.Shell
           WindowState = FormWindowState.Normal;
         }
 
+        // Modeless only. Do not call ShowDialog — throws if already displayed.
         if (!Visible)
         {
-          Show();
+          if (!IsHandleCreated)
+          {
+            Show();
+          }
+          else
+          {
+            Visible = true;
+            Show();
+          }
         }
 
         BringToFront();
@@ -209,6 +219,39 @@ namespace NcTestRibbon.Shell
       catch
       {
       }
+    }
+
+    /// <summary>
+    /// Close without DirtyCoords ShowDialog — used when replacing a stuck singleton.
+    /// </summary>
+    public void CloseSilent()
+    {
+      _closePromptDone = true;
+      try
+      {
+        if (!IsDisposed)
+        {
+          Close();
+        }
+      }
+      catch
+      {
+        try { Dispose(); }
+        catch { }
+      }
+    }
+
+    // Hide Form.ShowDialog — this window must stay modeless. Callers get EnsureVisible.
+    public new DialogResult ShowDialog()
+    {
+      EnsureVisible();
+      return DialogResult.None;
+    }
+
+    public new DialogResult ShowDialog(IWin32Window owner)
+    {
+      EnsureVisible();
+      return DialogResult.None;
     }
 
     public void SelectPadByName(string name)
@@ -475,8 +518,22 @@ namespace NcTestRibbon.Shell
         return;
       }
 
+      // Owner = CAD main hwnd, never ShowDialog(this) — avoids modal-on-self issues.
+      IWin32Window owner = null;
+      try
+      {
+        IntPtr hwnd = System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+        if (hwnd != IntPtr.Zero)
+        {
+          owner = new NativeWindowOwner(hwnd);
+        }
+      }
+      catch
+      {
+      }
+
       DirtyCoordsAction action = DirtyCoordsDialog.ShowPrompt(
-        this,
+        owner,
         "Объекты чертежа",
         "Есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
         dirty);
@@ -522,6 +579,16 @@ namespace NcTestRibbon.Shell
       content.Dock = DockStyle.Fill;
       page.Controls.Add(content);
       return page;
+    }
+
+    private sealed class NativeWindowOwner : IWin32Window
+    {
+      public NativeWindowOwner(IntPtr handle)
+      {
+        Handle = handle;
+      }
+
+      public IntPtr Handle { get; }
     }
   }
 }

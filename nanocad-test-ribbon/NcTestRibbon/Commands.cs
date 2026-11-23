@@ -577,14 +577,13 @@ namespace NcTestRibbon
 
 
     /// <summary>
-    /// Usable singleton: not disposed and currently Visible.
-    /// Invisible/disposed instances are cleared so the next open recreates them.
+    /// Singleton still has a live HWND (may be !Visible after CAD pick).
     /// </summary>
-    private static bool IsDrawingObjectsReusable(DrawingObjectsWindow form)
+    private static bool IsDrawingObjectsHandleAlive(DrawingObjectsWindow form)
     {
       try
       {
-        return form != null && !form.IsDisposed && form.Visible;
+        return form != null && !form.IsDisposed && form.IsHandleCreated;
       }
       catch
       {
@@ -593,7 +592,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// If singleton is disposed or not Visible, dispose leftovers and null it out.
+    /// Drop disposed / handle-less singleton. Never ShowDialog; silent close only.
     /// </summary>
     private static void ClearDeadDrawingObjectsSingleton()
     {
@@ -605,7 +604,7 @@ namespace NcTestRibbon
           return;
         }
 
-        if (IsDrawingObjectsReusable(live))
+        if (IsDrawingObjectsHandleAlive(live))
         {
           return;
         }
@@ -614,7 +613,7 @@ namespace NcTestRibbon
         {
           if (!live.IsDisposed)
           {
-            live.Dispose();
+            live.CloseSilent();
           }
         }
         catch
@@ -634,7 +633,6 @@ namespace NcTestRibbon
         EnsureVisualStyles(ed);
         EnsureWpfApplication(ed);
 
-        // Stuck after CAD pick: «already open» but !Visible → clear and recreate.
         ClearDeadDrawingObjectsSingleton();
 
         lock (DrawingObjectsGate)
@@ -642,25 +640,29 @@ namespace NcTestRibbon
           long now = DateTime.UtcNow.Ticks;
           DrawingObjectsWindow live = _drawingObjectsLive;
 
-          if (_drawingObjectsOpening
-              || (now - _lastDrawingObjectsOpenTicks < TimeSpan.TicksPerMillisecond * 750
-                  && IsDrawingObjectsReusable(live)))
-          {
-            if (IsDrawingObjectsReusable(live))
-            {
-              live.SelectTab(tab);
-              live.EnsureVisible();
-            }
-
-            ed?.WriteMessage("\n" + label + ": debounce → reuse Объекты чертежа (" + tab + ").");
-            return;
-          }
-
-          if (IsDrawingObjectsReusable(live))
+          // Reuse any living HWND — Show+Activate (modeless). Never ShowDialog.
+          if (IsDrawingObjectsHandleAlive(live))
           {
             live.SelectTab(tab);
             live.EnsureVisible();
-            ed?.WriteMessage("\n" + label + ": already open → Show+Activate tab " + tab + ".");
+            ed?.WriteMessage(
+              "\n" + label + ": reuse Объекты чертежа → Show+Activate tab " + tab
+              + (live.Visible ? "." : " (was hidden)."));
+            _lastDrawingObjectsOpenTicks = now;
+            return;
+          }
+
+          if (_drawingObjectsOpening
+              || (now - _lastDrawingObjectsOpenTicks < TimeSpan.TicksPerMillisecond * 750
+                  && IsDrawingObjectsHandleAlive(_drawingObjectsLive)))
+          {
+            if (IsDrawingObjectsHandleAlive(_drawingObjectsLive))
+            {
+              _drawingObjectsLive.SelectTab(tab);
+              _drawingObjectsLive.EnsureVisible();
+            }
+
+            ed?.WriteMessage("\n" + label + ": debounce → reuse Объекты чертежа (" + tab + ").");
             return;
           }
 
@@ -676,9 +678,9 @@ namespace NcTestRibbon
           form = new DrawingObjectsWindow(tab);
           lock (DrawingObjectsGate)
           {
-            if (IsDrawingObjectsReusable(_drawingObjectsLive))
+            if (IsDrawingObjectsHandleAlive(_drawingObjectsLive))
             {
-              try { form.Dispose(); }
+              try { form.CloseSilent(); }
               catch { }
 
               _drawingObjectsLive.SelectTab(tab);
@@ -700,6 +702,7 @@ namespace NcTestRibbon
             };
           }
 
+          // Modeless Show only — never ShowDialog on this singleton.
           if (hwnd != IntPtr.Zero)
           {
             form.Show(new WindowWrapper(hwnd));

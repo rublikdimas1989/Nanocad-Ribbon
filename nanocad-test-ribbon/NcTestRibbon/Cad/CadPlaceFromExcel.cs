@@ -82,11 +82,13 @@ namespace NcTestRibbon.Cad
     public static void PlaceBuosFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
+      // Modal child dialogs use CAD main hwnd — never ShowDialog(DrawingObjectsWindow).
+      IWin32Window dialogOwner = TryMainWindow() ?? owner;
       // Placement file first — never write catalog «БУОС».
-      PlacementWorkbookPaths.Ensure(owner, buos: true);
+      PlacementWorkbookPaths.Ensure(dialogOwner, buos: true);
 
       PickFromTypicalCatalogDialog.CatalogPickRow pick =
-        PickFromTypicalCatalogDialog.ShowPick(owner, buos: true);
+        PickFromTypicalCatalogDialog.ShowPick(dialogOwner, buos: true);
       if (pick == null)
       {
         return;
@@ -137,11 +139,12 @@ namespace NcTestRibbon.Cad
     public static void PlaceNodeFromCatalog(IWin32Window owner = null)
     {
       owner ??= TryMainWindow();
+      IWin32Window dialogOwner = TryMainWindow() ?? owner;
       // Placement file first — never write catalog «Узлы».
-      PlacementWorkbookPaths.Ensure(owner, buos: false);
+      PlacementWorkbookPaths.Ensure(dialogOwner, buos: false);
 
       PickFromTypicalCatalogDialog.CatalogPickRow pick =
-        PickFromTypicalCatalogDialog.ShowPick(owner, buos: false);
+        PickFromTypicalCatalogDialog.ShowPick(dialogOwner, buos: false);
       if (pick == null)
       {
         return;
