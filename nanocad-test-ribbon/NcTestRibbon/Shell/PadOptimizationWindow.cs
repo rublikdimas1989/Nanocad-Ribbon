@@ -30,13 +30,23 @@ namespace NcTestRibbon.Shell
     private readonly CheckBox _showOnDrawing;
     private readonly Button _saveButton;
     private readonly Button _loadButton;
+    private readonly bool _databaseBrowseOnly;
     private PadWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
     private bool _discardingSession;
 
     public PadOptimizationWindow()
+      : this(databaseBrowseOnly: false)
+    {
+    }
+
+    /// <param name="databaseBrowseOnly">
+    /// «База данных»: Excel browse only — hide Show/Save/Load CAD controls.
+    /// </param>
+    public PadOptimizationWindow(bool databaseBrowseOnly)
     {
       // Hosted in SourceDataWindow; closing host discards unsaved place/rotate.
+      _databaseBrowseOnly = databaseBrowseOnly;
       Text = "Кустовые площадки";
       Dock = DockStyle.Fill;
       AppPaths paths = AppPaths.Load();
@@ -143,7 +153,7 @@ namespace NcTestRibbon.Shell
       };
       _showOnDrawing.CheckedChanged += (_, __) =>
       {
-        if (_suppressShowToggle)
+        if (_suppressShowToggle || _databaseBrowseOnly)
         {
           return;
         }
@@ -184,10 +194,19 @@ namespace NcTestRibbon.Shell
 
       MakeButton(cadRow, "Загрузить из исходных", () => ReloadFromSource(confirm: true), out _loadButton);
       _loadButton.Enabled = false;
+      if (_databaseBrowseOnly)
+      {
+        cadRow.Visible = false;
+        _showOnDrawing.Visible = false;
+        _saveButton.Visible = false;
+        _loadButton.Visible = false;
+      }
 
       top.Controls.Add(new Label
       {
-        Text = "Таблица только для просмотра (поля из Excel). Размещение новых КП — лента «Добавить Кустовую». Положение/угол: MOVE/ROTATE/grip, затем «Сохранить положение». Открытие окна само по себе ничего не рисует.",
+        Text = _databaseBrowseOnly
+          ? "Просмотр таблиц КП из Excel (Обзор…). Размещение и сохранение положений — в «Объекты чертежа»."
+          : "Таблица только для просмотра (поля из Excel). Размещение новых КП — лента «Добавить Кустовую». Положение/угол: MOVE/ROTATE/grip, затем «Сохранить положение». Открытие окна само по себе ничего не рисует.",
         AutoSize = true,
         MaximumSize = new Size(1080, 0),
         ForeColor = Color.DimGray,
@@ -267,9 +286,8 @@ namespace NcTestRibbon.Shell
         Log("Откройте таблицы КП (xlsx) через «Обзор…».");
       }
 
-      // Restore checkbox only — do NOT draw on open (ribbon «Исходные данные» is view-only;
-      // placement is via «Добавить Кустовую»). User must toggle «Показывать на чертеже» to draw.
-      if (paths.ShowPadsOnDrawing)
+      // Restore checkbox only — do NOT draw on open. Skip in «База данных» browse-only mode.
+      if (!_databaseBrowseOnly && paths.ShowPadsOnDrawing)
       {
         _suppressShowToggle = true;
         try

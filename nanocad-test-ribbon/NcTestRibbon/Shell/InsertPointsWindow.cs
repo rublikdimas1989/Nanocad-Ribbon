@@ -25,12 +25,20 @@ namespace NcTestRibbon.Shell
     private readonly CheckBox _showOnDrawing;
     private readonly Button _saveButton;
     private readonly Button _loadButton;
+    private readonly bool _databaseBrowseOnly;
     private InsertWorkbookLoader.WorkbookData _book;
     private bool _suppressShowToggle;
     private bool _discarding;
 
     public InsertPointsWindow()
+      : this(databaseBrowseOnly: false)
     {
+    }
+
+    /// <param name="databaseBrowseOnly">«База данных»: hide Show/Save/Load CAD controls.</param>
+    public InsertPointsWindow(bool databaseBrowseOnly)
+    {
+      _databaseBrowseOnly = databaseBrowseOnly;
       Text = "Точки врезки";
       Dock = DockStyle.Fill;
       AppPaths paths = AppPaths.Load();
@@ -60,8 +68,10 @@ namespace NcTestRibbon.Shell
 
       top.Controls.Add(new Label
       {
-        Text = "Мировые X/Y в метрах. Положение — MOVE/grip на чертеже, затем «Сохранить положение». "
-          + "Поля среды / давления / лимита — из Excel (лист «Врезки»). Макс. приём нефти — т/сут; пусто = без лимита.",
+        Text = _databaseBrowseOnly
+          ? "Просмотр точек врезки из Excel (Обзор…). Размещение и сохранение — в «Объекты чертежа»."
+          : "Мировые X/Y в метрах. Положение — MOVE/grip на чертеже, затем «Сохранить положение». "
+            + "Поля среды / давления / лимита — из Excel (лист «Врезки»). Макс. приём нефти — т/сут; пусто = без лимита.",
         AutoSize = true,
         MaximumSize = new Size(1120, 0),
         Margin = new Padding(3, 0, 3, 8)
@@ -93,7 +103,7 @@ namespace NcTestRibbon.Shell
       };
       _showOnDrawing.CheckedChanged += (_, __) =>
       {
-        if (_suppressShowToggle)
+        if (_suppressShowToggle || _databaseBrowseOnly)
         {
           return;
         }
@@ -125,6 +135,13 @@ namespace NcTestRibbon.Shell
       _saveButton.Enabled = false;
       _loadButton = MakeButton(cadRow, "Загрузить из исходных", () => ReloadFromSource(confirm: true));
       _loadButton.Enabled = false;
+      if (_databaseBrowseOnly)
+      {
+        cadRow.Visible = false;
+        _showOnDrawing.Visible = false;
+        _saveButton.Visible = false;
+        _loadButton.Visible = false;
+      }
 
       _grid = new DataGridView
       {
@@ -189,8 +206,8 @@ namespace NcTestRibbon.Shell
         Log("Откройте xlsx с листом «Врезки» через «Обзор…».");
       }
 
-      // Checkbox restore only — opening SourceData must not mutate the drawing.
-      if (paths.ShowInsertsOnDrawing)
+      // Checkbox restore only when CAD controls are shown (not «База данных» browse-only).
+      if (!_databaseBrowseOnly && paths.ShowInsertsOnDrawing)
       {
         _suppressShowToggle = true;
         try { _showOnDrawing.Checked = true; }

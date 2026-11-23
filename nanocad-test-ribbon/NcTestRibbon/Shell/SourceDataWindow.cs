@@ -16,16 +16,16 @@ namespace NcTestRibbon.Shell
   }
 
   /// <summary>
-  /// Modeless host: Кустовые / Врезки / placement БУОС / placement Узлы.
-  /// Catalog variants live in Settings (after tracing tab).
+  /// «База данных»: Кустовые / Врезки (Excel browse) + БУОС типовые / Узлы типовые (catalogs).
+  /// No Show/Save/Load CAD controls — placement is «Объекты чертежа».
   /// </summary>
   public sealed class SourceDataWindow : Form
   {
     private readonly TabControl _tabs;
     private readonly PadOptimizationWindow _pads;
     private readonly InsertPointsWindow _inserts;
-    private readonly SitePlacementWindow _buos;
-    private readonly SitePlacementWindow _nodes;
+    private readonly BuosVariantsWindow _buosTypical;
+    private readonly NodeVariantsWindow _nodesTypical;
     private bool _closePromptDone;
 
     public SourceDataWindow(SourceDataTab initialTab = SourceDataTab.Pads)
@@ -45,15 +45,15 @@ namespace NcTestRibbon.Shell
       };
       Controls.Add(_tabs);
 
-      _pads = new PadOptimizationWindow();
-      _inserts = new InsertPointsWindow();
-      _buos = new SitePlacementWindow(SitePlacementKind.Buos);
-      _nodes = new SitePlacementWindow(SitePlacementKind.Nodes);
+      _pads = new PadOptimizationWindow(databaseBrowseOnly: true);
+      _inserts = new InsertPointsWindow(databaseBrowseOnly: true);
+      _buosTypical = new BuosVariantsWindow();
+      _nodesTypical = new NodeVariantsWindow();
 
       _tabs.TabPages.Add(MakePage("Кустовые площадки", _pads));
       _tabs.TabPages.Add(MakePage("Врезки", _inserts));
-      _tabs.TabPages.Add(MakePage("БУОС", _buos));
-      _tabs.TabPages.Add(MakePage("Узлы", _nodes));
+      _tabs.TabPages.Add(MakePage("БУОС типовые", _buosTypical));
+      _tabs.TabPages.Add(MakePage("Узлы типовые", _nodesTypical));
 
       FormClosing += OnFormClosing;
 
@@ -75,16 +75,13 @@ namespace NcTestRibbon.Shell
     }
 
     public bool HasAnyDirtyCoords =>
-      _pads.HasDirtyCoords || _inserts.HasDirtyCoords
-      || _buos.HasDirtyCoords || _nodes.HasDirtyCoords;
+      _pads.HasDirtyCoords || _inserts.HasDirtyCoords;
 
     public List<DirtyCoordItem> CollectDirtyItems()
     {
       var items = new List<DirtyCoordItem>();
       items.AddRange(_pads.EnumerateDirtyItems());
       items.AddRange(_inserts.EnumerateDirtyItems());
-      items.AddRange(_buos.EnumerateDirtyItems());
-      items.AddRange(_nodes.EnumerateDirtyItems());
       foreach (string name in CadPadInteraction.PendingPadNames)
       {
         if (items.Any(i => i.Group == "Кустовые"
@@ -121,7 +118,7 @@ namespace NcTestRibbon.Shell
     public void SelectPadByName(string name)
     {
       SelectTab(SourceDataTab.Pads);
-      try { System.Windows.Forms.Application.DoEvents(); }
+      try { Application.DoEvents(); }
       catch { }
 
       _pads.TrySelectPadByName(name);
@@ -130,7 +127,7 @@ namespace NcTestRibbon.Shell
     public void ApplyPadCadPose(string name, double x, double y, double rotationDeg, bool saveExcel)
     {
       SelectTab(SourceDataTab.Pads);
-      try { System.Windows.Forms.Application.DoEvents(); }
+      try { Application.DoEvents(); }
       catch { }
 
       _pads.TrySelectPadByName(name);
@@ -139,46 +136,22 @@ namespace NcTestRibbon.Shell
 
     public PadOptimizationWindow PadsPanel => _pads;
 
-    /// <summary>
-    /// Ribbon «Добавить Кустовую» / «Добавить БУОС»: open tab and insert at stored pose.
-    /// </summary>
+    /// <summary>Legacy: placement is in «Объекты чертежа», not База данных.</summary>
     public void BeginPlaceForTab(SourceDataTab tab)
     {
       SelectTab(tab);
-      try { System.Windows.Forms.Application.DoEvents(); }
-      catch { }
-
-      if (tab == SourceDataTab.Pads)
-      {
-        _pads.BeginPlaceSelected();
-        return;
-      }
-
-      if (tab == SourceDataTab.Buos)
-      {
-        _buos.BeginPlaceSelected();
-        return;
-      }
-
-      if (tab == SourceDataTab.Nodes)
-      {
-        _nodes.BeginPlaceSelected();
-        return;
-      }
-
       throw new InvalidOperationException(
-        "Размещение с ленты поддерживается для вкладок Кустовые, БУОС и Узлы.");
+        "Размещение выполняется в «Объекты чертежа», не в «База данных».");
     }
 
-
-    /// <summary>Save dirty coords for all tabs (+ flush CAD pending pads). Optional confirm.</summary>
+    /// <summary>Save dirty coords for Кустовые/Врезки only (+ flush CAD pending pads).</summary>
     public void SaveAllToSource(bool confirm)
     {
       if (confirm)
       {
         DialogResult ok = MessageBox.Show(
           this,
-          "Сохранить изменённые положения во все открытые исходные Excel?",
+          "Сохранить изменённые положения КП/Врезок в исходные Excel?",
           "Сохранить в исходные",
           MessageBoxButtons.YesNo,
           MessageBoxIcon.Question);
@@ -195,22 +168,19 @@ namespace NcTestRibbon.Shell
 
       _pads.SaveDirtyCoords(confirm: false);
       _inserts.SaveDirtyCoords(confirm: false);
-      _buos.SaveDirtyCoords(confirm: false);
-      _nodes.SaveDirtyCoords(confirm: false);
     }
 
-    /// <summary>Reload every tab from its Excel (or only the active tab).</summary>
+    /// <summary>Reload Кустовые/Врезки from Excel.</summary>
     public void LoadFromSource(bool confirm, bool activeTabOnly)
     {
       if (confirm)
       {
         string scope = activeTabOnly
           ? "активной вкладки («" + ActiveTabLabel() + "»)"
-          : "всех вкладок";
+          : "вкладок Кустовые/Врезки";
         DialogResult ok = MessageBox.Show(
           this,
-          "Загрузить положения из исходных Excel для " + scope
-            + " и сбросить изменения на чертеже?",
+          "Загрузить положения из исходных Excel для " + scope + "?",
           "Загрузить из исходных",
           MessageBoxButtons.YesNo,
           MessageBoxIcon.Question);
@@ -230,8 +200,6 @@ namespace NcTestRibbon.Shell
 
       ReloadTab(SourceDataTab.Pads, confirm: false);
       ReloadTab(SourceDataTab.Inserts, confirm: false);
-      ReloadTab(SourceDataTab.Buos, confirm: false);
-      ReloadTab(SourceDataTab.Nodes, confirm: false);
     }
 
     public void ReloadActiveTabFromSource(bool confirm)
@@ -261,12 +229,6 @@ namespace NcTestRibbon.Shell
       try { _inserts.NotifyHostClosing(); }
       catch { }
 
-      try { _buos.NotifyHostClosing(); }
-      catch { }
-
-      try { _nodes.NotifyHostClosing(); }
-      catch { }
-
       if (_closePromptDone)
       {
         return;
@@ -286,17 +248,10 @@ namespace NcTestRibbon.Shell
       _closePromptDone = true;
       if (action == DirtyCoordsAction.Cancel)
       {
-        // Same as old No: discard CAD previews back to last Excel.
         try { _pads.DiscardDirtyCoords(); }
         catch { }
 
         try { _inserts.DiscardDirtyCoords(); }
-        catch { }
-
-        try { _buos.DiscardDirtyCoords(); }
-        catch { }
-
-        try { _nodes.DiscardDirtyCoords(); }
         catch { }
 
         CadPadInteraction.ClearPending();
@@ -316,12 +271,6 @@ namespace NcTestRibbon.Shell
         case SourceDataTab.Inserts:
           _inserts.ReloadFromSource(confirm);
           break;
-        case SourceDataTab.Buos:
-          _buos.ReloadFromSource(confirm);
-          break;
-        case SourceDataTab.Nodes:
-          _nodes.ReloadFromSource(confirm);
-          break;
       }
     }
 
@@ -330,8 +279,8 @@ namespace NcTestRibbon.Shell
       return ActiveTab switch
       {
         SourceDataTab.Inserts => "Врезки",
-        SourceDataTab.Buos => "БУОС",
-        SourceDataTab.Nodes => "Узлы",
+        SourceDataTab.Buos => "БУОС типовые",
+        SourceDataTab.Nodes => "Узлы типовые",
         _ => "Кустовые"
       };
     }
