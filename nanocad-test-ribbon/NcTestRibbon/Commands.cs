@@ -576,6 +576,55 @@ namespace NcTestRibbon
     }
 
 
+    /// <summary>
+    /// Usable singleton: not disposed and currently Visible.
+    /// Invisible/disposed instances are cleared so the next open recreates them.
+    /// </summary>
+    private static bool IsDrawingObjectsReusable(DrawingObjectsWindow form)
+    {
+      try
+      {
+        return form != null && !form.IsDisposed && form.Visible;
+      }
+      catch
+      {
+        return false;
+      }
+    }
+
+    /// <summary>
+    /// If singleton is disposed or not Visible, dispose leftovers and null it out.
+    /// </summary>
+    private static void ClearDeadDrawingObjectsSingleton()
+    {
+      lock (DrawingObjectsGate)
+      {
+        DrawingObjectsWindow live = _drawingObjectsLive;
+        if (live == null)
+        {
+          return;
+        }
+
+        if (IsDrawingObjectsReusable(live))
+        {
+          return;
+        }
+
+        try
+        {
+          if (!live.IsDisposed)
+          {
+            live.Dispose();
+          }
+        }
+        catch
+        {
+        }
+
+        _drawingObjectsLive = null;
+      }
+    }
+
     private void OpenDrawingObjectsForm(DrawingObjectsTab tab, string label)
     {
       Document doc = CadApp.DocumentManager.MdiActiveDocument;
@@ -585,29 +634,37 @@ namespace NcTestRibbon
         EnsureVisualStyles(ed);
         EnsureWpfApplication(ed);
 
+        // Stuck after CAD pick: «already open» but !Visible → clear and recreate.
+        ClearDeadDrawingObjectsSingleton();
+
         lock (DrawingObjectsGate)
         {
           long now = DateTime.UtcNow.Ticks;
+          DrawingObjectsWindow live = _drawingObjectsLive;
+
           if (_drawingObjectsOpening
               || (now - _lastDrawingObjectsOpenTicks < TimeSpan.TicksPerMillisecond * 750
-                  && _drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed))
+                  && IsDrawingObjectsReusable(live)))
           {
-            if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+            if (IsDrawingObjectsReusable(live))
             {
-              _drawingObjectsLive.SelectTab(tab);
+              live.SelectTab(tab);
+              live.EnsureVisible();
             }
 
             ed?.WriteMessage("\n" + label + ": debounce → reuse Объекты чертежа (" + tab + ").");
             return;
           }
 
-          if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+          if (IsDrawingObjectsReusable(live))
           {
-            _drawingObjectsLive.SelectTab(tab);
-            ed?.WriteMessage("\n" + label + ": already open → tab " + tab + ".");
+            live.SelectTab(tab);
+            live.EnsureVisible();
+            ed?.WriteMessage("\n" + label + ": already open → Show+Activate tab " + tab + ".");
             return;
           }
 
+          _drawingObjectsLive = null;
           _drawingObjectsOpening = true;
           _lastDrawingObjectsOpenTicks = now;
         }
@@ -619,12 +676,13 @@ namespace NcTestRibbon
           form = new DrawingObjectsWindow(tab);
           lock (DrawingObjectsGate)
           {
-            if (_drawingObjectsLive != null && !_drawingObjectsLive.IsDisposed)
+            if (IsDrawingObjectsReusable(_drawingObjectsLive))
             {
               try { form.Dispose(); }
               catch { }
 
               _drawingObjectsLive.SelectTab(tab);
+              _drawingObjectsLive.EnsureVisible();
               ed?.WriteMessage("\n" + label + ": singleton race → reuse Объекты чертежа.");
               return;
             }
@@ -651,6 +709,7 @@ namespace NcTestRibbon
             form.Show();
           }
 
+          form.EnsureVisible();
           ed?.WriteMessage("\n" + label + ": Объекты чертежа open → " + tab + ".");
         }
         finally

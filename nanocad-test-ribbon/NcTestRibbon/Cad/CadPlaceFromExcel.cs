@@ -126,7 +126,8 @@ namespace NcTestRibbon.Cad
       }
 
       CadBuosPlacementOverlay.InsertAtStored(geom);
-      // No zoom-to — stay on current view.
+      // Immediately re-show owner after pick (nanoCAD can leave it invisible).
+      RestoreOwnerAfterPlace(owner);
     }
 
     /// <summary>
@@ -179,6 +180,7 @@ namespace NcTestRibbon.Cad
       }
 
       CadNodePlacementOverlay.InsertAtStored(geom);
+      RestoreOwnerAfterPlace(owner);
     }
 
     /// <summary>
@@ -272,17 +274,56 @@ namespace NcTestRibbon.Cad
     private static IDisposable HideOwnerForCadPick(IWin32Window owner)
     {
       Form form = owner as Form;
-      if (form == null || !form.Visible)
+      if (form == null || form.IsDisposed)
       {
         return NullScope.Instance;
       }
 
-      // Do not Hide/Opacity=0 — that flickers «Объекты чертежа». Only disable input.
+      // Soft-disable only — never Hide/Close/Dispose the owner during CAD pick.
+      // nanoCAD focus steal can leave the form non-Visible; restore must Show+Activate.
       bool wasEnabled = form.Enabled;
+      bool wasVisible = form.Visible;
       try { form.Enabled = false; }
       catch { }
 
-      return new RestoreFormScope(form, wasEnabled);
+      return new RestoreFormScope(form, wasEnabled, wasVisible);
+    }
+
+    /// <summary>After place click: bring «Объекты чертежа» back immediately.</summary>
+    private static void RestoreOwnerAfterPlace(IWin32Window owner)
+    {
+      Form form = owner as Form;
+      if (form == null || form.IsDisposed)
+      {
+        return;
+      }
+
+      try
+      {
+        form.Enabled = true;
+        if (form.WindowState == FormWindowState.Minimized)
+        {
+          form.WindowState = FormWindowState.Normal;
+        }
+
+        if (!form.Visible)
+        {
+          form.Show();
+        }
+
+        form.BringToFront();
+        form.Activate();
+        try { form.Focus(); }
+        catch { }
+
+        if (form is DrawingObjectsWindow drawing)
+        {
+          drawing.EnsureVisible();
+        }
+      }
+      catch
+      {
+      }
     }
 
     private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)
@@ -353,12 +394,14 @@ namespace NcTestRibbon.Cad
     {
       private readonly Form _form;
       private readonly bool _wasEnabled;
+      private readonly bool _wasVisible;
       private bool _done;
 
-      public RestoreFormScope(Form form, bool wasEnabled)
+      public RestoreFormScope(Form form, bool wasEnabled, bool wasVisible)
       {
         _form = form;
         _wasEnabled = wasEnabled;
+        _wasVisible = wasVisible;
       }
 
       public void Dispose()
@@ -371,8 +414,33 @@ namespace NcTestRibbon.Cad
         _done = true;
         try
         {
+          if (_form == null || _form.IsDisposed)
+          {
+            return;
+          }
+
           _form.Enabled = _wasEnabled;
-          // No Show/BringToFront — window never left; avoids blink.
+          // Always Show+Activate after CAD pick — form may have gone invisible.
+          if (_wasVisible || !_form.Visible)
+          {
+            if (_form.WindowState == FormWindowState.Minimized)
+            {
+              _form.WindowState = FormWindowState.Normal;
+            }
+
+            if (!_form.Visible)
+            {
+              _form.Show();
+            }
+
+            _form.BringToFront();
+            _form.Activate();
+          }
+
+          if (_form is DrawingObjectsWindow drawing)
+          {
+            drawing.EnsureVisible();
+          }
         }
         catch
         {

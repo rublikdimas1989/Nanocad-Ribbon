@@ -176,8 +176,39 @@ namespace NcTestRibbon.Shell
 
       _tabs.SelectedIndex = index;
       UpdateToolbarLabels();
-      BringToFront();
-      Activate();
+      EnsureVisible();
+    }
+
+    /// <summary>
+    /// Force the modeless window back on screen after CAD pick / nanoCAD focus steal.
+    /// </summary>
+    public void EnsureVisible()
+    {
+      if (IsDisposed)
+      {
+        return;
+      }
+
+      try
+      {
+        if (WindowState == FormWindowState.Minimized)
+        {
+          WindowState = FormWindowState.Normal;
+        }
+
+        if (!Visible)
+        {
+          Show();
+        }
+
+        BringToFront();
+        Activate();
+        try { Focus(); }
+        catch { }
+      }
+      catch
+      {
+      }
     }
 
     public void SelectPadByName(string name)
@@ -355,6 +386,8 @@ namespace NcTestRibbon.Shell
 
         // One refresh after the whole add (no per-item reopen/flicker).
         ActivePanel().RefreshFromCad();
+        // CAD pick can leave this form invisible — force Show+Activate now.
+        EnsureVisible();
       });
     }
 
