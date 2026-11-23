@@ -89,6 +89,77 @@ namespace NcTestRibbon.Cad
       TryUpdateScreen(doc);
     }
 
+    /// <summary>Draw at stored X/Y/angle — no place jig.</summary>
+    public static void InsertAtStored(SiteGeom pad)
+    {
+      UpdatePad(pad);
+    }
+
+    /// <summary>Zoom to one or many sites (union extents). Never throws.</summary>
+    public static void ZoomToPads(IEnumerable<SiteGeom> pads)
+    {
+      try
+      {
+        Document doc = CadApp.DocumentManager.MdiActiveDocument;
+        Editor ed = doc?.Editor;
+        if (ed == null || doc == null)
+        {
+          return;
+        }
+
+        SiteGeom[] list = (pads ?? Enumerable.Empty<SiteGeom>())
+          .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+          .ToArray();
+        if (list.Length == 0)
+        {
+          return;
+        }
+
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+        bool any = false;
+        var ids = new List<ObjectId>();
+        foreach (SiteGeom pad in list)
+        {
+          ids.AddRange(FindPadIdsReadOnly(doc, pad.Name));
+        }
+
+        if (ids.Count > 0
+          && TryGetEntityExtents(doc, ids.ToArray(), out minX, out minY, out maxX, out maxY))
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+          return;
+        }
+
+        foreach (SiteGeom pad in list)
+        {
+          if (!TryGetGeomExtents(pad, out double a, out double b, out double c, out double d))
+          {
+            continue;
+          }
+
+          minX = Math.Min(minX, a);
+          minY = Math.Min(minY, b);
+          maxX = Math.Max(maxX, c);
+          maxY = Math.Max(maxY, d);
+          any = true;
+        }
+
+        if (any)
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+        }
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
     public static bool TryPlace(SiteGeom pad, out double x, out double y)
     {
       x = pad?.X ?? 0;

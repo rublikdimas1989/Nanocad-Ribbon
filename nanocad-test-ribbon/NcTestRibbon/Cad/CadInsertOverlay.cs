@@ -105,6 +105,73 @@ namespace NcTestRibbon.Cad
       TryRegen(doc);
     }
 
+    /// <summary>Draw insert at stored X/Y — no point pick jig.</summary>
+    public static void InsertAtStored(InsertGeom point)
+    {
+      UpdateInsert(point);
+    }
+
+    /// <summary>Zoom to one or many inserts (union extents). Never throws.</summary>
+    public static void ZoomToInserts(IEnumerable<InsertGeom> points)
+    {
+      try
+      {
+        Document doc = CadApp.DocumentManager.MdiActiveDocument;
+        Editor ed = doc?.Editor;
+        if (ed == null || doc == null)
+        {
+          return;
+        }
+
+        InsertGeom[] list = (points ?? Enumerable.Empty<InsertGeom>())
+          .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+          .ToArray();
+        if (list.Length == 0)
+        {
+          return;
+        }
+
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+        bool any = false;
+        var ids = new List<ObjectId>();
+        foreach (InsertGeom p in list)
+        {
+          ids.AddRange(FindInsertIdsReadOnly(doc, p.Name));
+        }
+
+        if (ids.Count > 0
+          && TryGetEntityExtents(doc, ids.ToArray(), out minX, out minY, out maxX, out maxY))
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+          return;
+        }
+
+        foreach (InsertGeom p in list)
+        {
+          double pad = 25;
+          minX = Math.Min(minX, p.X - pad);
+          minY = Math.Min(minY, p.Y - pad);
+          maxX = Math.Max(maxX, p.X + pad);
+          maxY = Math.Max(maxY, p.Y + pad);
+          any = true;
+        }
+
+        if (any)
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+        }
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
     public static bool TryPlace(InsertGeom point, out double x, out double y)
     {
       x = point?.X ?? 0;

@@ -100,6 +100,81 @@ namespace NcTestRibbon.Cad
       TryUpdateScreen(doc);
     }
 
+    /// <summary>
+    /// Draw KP at stored X/Y/angle — no place jig. Prefer ribbon Add for new objects.
+    /// </summary>
+    public static void InsertAtStored(PadGeom pad)
+    {
+      UpdatePad(pad);
+    }
+
+    /// <summary>Zoom to one or many pads (union extents). Never throws.</summary>
+    public static void ZoomToPads(IEnumerable<PadGeom> pads)
+    {
+      try
+      {
+        Document doc = CadApp.DocumentManager.MdiActiveDocument;
+        Editor ed = doc?.Editor;
+        if (ed == null || doc == null)
+        {
+          return;
+        }
+
+        PadGeom[] list = (pads ?? Enumerable.Empty<PadGeom>())
+          .Where(p => p != null && !string.IsNullOrWhiteSpace(p.Name))
+          .ToArray();
+        if (list.Length == 0)
+        {
+          return;
+        }
+
+        double minX = double.PositiveInfinity;
+        double minY = double.PositiveInfinity;
+        double maxX = double.NegativeInfinity;
+        double maxY = double.NegativeInfinity;
+        bool any = false;
+
+        // Prefer live entities; fall back to stored geom extents.
+        var ids = new List<ObjectId>();
+        foreach (PadGeom pad in list)
+        {
+          ids.AddRange(FindPadIdsReadOnly(doc, pad.Name));
+        }
+
+        if (ids.Count > 0
+          && TryGetEntityExtents(doc, ids.ToArray(), out minX, out minY, out maxX, out maxY))
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+          return;
+        }
+
+        foreach (PadGeom pad in list)
+        {
+          if (!TryGetGeomExtents(pad, out double a, out double b, out double c, out double d))
+          {
+            continue;
+          }
+
+          minX = Math.Min(minX, a);
+          minY = Math.Min(minY, b);
+          maxX = Math.Max(maxX, c);
+          maxY = Math.Max(maxY, d);
+          any = true;
+        }
+
+        if (any)
+        {
+          ApplyViewExtentsSafe(ed, minX, minY, maxX, maxY);
+        }
+      }
+      catch (Exception)
+      {
+      }
+      catch
+      {
+      }
+    }
+
     /// <summary>Public XData name reader for CAD interaction hooks.</summary>
     public static string ReadPadNamePublic(Entity entity)
     {

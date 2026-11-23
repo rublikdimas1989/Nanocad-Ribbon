@@ -30,7 +30,7 @@ namespace NcTestRibbon.Shell
 
     public SourceDataWindow(SourceDataTab initialTab = SourceDataTab.Pads)
     {
-      Text = "Исходные данные";
+      Text = "База данных";
       Width = 1180;
       Height = 740;
       MinimumSize = new Size(800, 520);
@@ -140,7 +140,7 @@ namespace NcTestRibbon.Shell
     public PadOptimizationWindow PadsPanel => _pads;
 
     /// <summary>
-    /// Ribbon «Добавить Кустовую» / «Добавить БУОС»: open tab and start CAD place jig.
+    /// Ribbon «Добавить Кустовую» / «Добавить БУОС»: open tab and insert at stored pose.
     /// </summary>
     public void BeginPlaceForTab(SourceDataTab tab)
     {
@@ -280,7 +280,7 @@ namespace NcTestRibbon.Shell
 
       DirtyCoordsAction action = DirtyCoordsDialog.ShowPrompt(
         this,
-        "Исходные данные",
+        "База данных",
         "Есть изменённые положения (жёлтые). Сохранить в исходные или загрузить из Excel?",
         dirty);
       _closePromptDone = true;

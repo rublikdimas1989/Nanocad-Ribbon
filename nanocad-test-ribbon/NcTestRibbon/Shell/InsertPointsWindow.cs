@@ -353,23 +353,17 @@ namespace NcTestRibbon.Shell
       var geom = ToGeom(row);
       RunWithCadFocus(() =>
       {
-        if (!CadInsertOverlay.TryPlace(geom, out double x, out double y))
-        {
-          Log("Размещение «" + row.Name + "» отменено.");
-          return;
-        }
-
-        row.ApplyPreviewPose(x, y);
+        CadInsertOverlay.InsertAtStored(geom);
+        CadInsertOverlay.ZoomToInserts(new[] { geom });
         if (!_showOnDrawing.Checked)
         {
-          _showOnDrawing.Checked = true;
-        }
-        else
-        {
-          CadInsertOverlay.UpdateInsert(ToGeom(row));
+          _suppressShowToggle = true;
+          try { _showOnDrawing.Checked = true; }
+          finally { _suppressShowToggle = false; }
+          AppPaths.Set(p => p.ShowInsertsOnDrawing = true);
         }
 
-        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y);
+        Log("Вставлено «" + row.Name + "» из базы: X=" + row.X + "; Y=" + row.Y);
       });
       RefreshRow(row);
       UpdateButtons();

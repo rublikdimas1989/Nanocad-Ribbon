@@ -2,29 +2,29 @@
   "commands": [
     {
       "intername": "NcTestSourceData",
-      "displayName": "Исходные данные",
-      "tooltip": "Кустовые / Врезки / размещение БУОС / Узлы — одно окно с вкладками.",
+      "displayName": "База данных",
+      "tooltip": "Кустовые / Врезки / размещение БУОС / Узлы — одно окно с вкладками (без отрисовки на чертеже).",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.source_data.ico"
     },
     {
       "intername": "NcTestAddPad",
       "displayName": "Добавить Кустовую",
-      "tooltip": "Исходные данные → Кустовые: CAD place jig для выбранной/первой КП.",
+      "tooltip": "Excel multi-select → вставка по X/Y/углу из базы (без jig) → zoom к объекту/группе.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.add_pad.ico"
     },
     {
       "intername": "NcTestAddBuos",
       "displayName": "Добавить БУОС",
-      "tooltip": "Исходные данные → БУОС: CAD place jig для выбранной/первой площадки.",
+      "tooltip": "Excel multi-select → вставка по X/Y/углу из базы (без jig) → zoom к объекту/группе.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.add_buos.ico"
     },
     {
       "intername": "NcTestAddNode",
       "displayName": "Добавить Узел",
-      "tooltip": "Исходные данные → Узлы: CAD place jig для выбранного/первого узла.",
+      "tooltip": "Excel multi-select → вставка по X/Y/углу из базы (без jig) → zoom к объекту/группе.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.add_node.ico"
     },
@@ -101,9 +101,16 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Настройки: трассировка + траншея/дорога. Кэш Tracing_cache\\Settings.",
+      "tooltip": "Flyout настроек (Типовые объекты и далее).",
       "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.http.ico"
+      "iconResource": "NC_ICONS.settings.ico"
+    },
+    {
+      "intername": "NcTestTypicalObjects",
+      "displayName": "Типовые объекты",
+      "tooltip": "Каталоги БУОС и Узлы (типовые объекты).",
+      "iconAssembly": "NC_TestRibbon.dll",
+      "iconResource": "NC_ICONS.add_buos.ico"
     },
     {
       "intername": "NcTestInterface",
@@ -167,7 +174,7 @@
       "name": "Исходные",
       "buttons": [
         {
-          "text": "Исходные данные",
+          "text": "База данных",
           "command": "NcTestSourceData",
           "style": "large"
         },
@@ -196,6 +203,18 @@
             {
               "text": "Загрузить из исходных",
               "command": "NcTestLoadSources"
+            }
+          ]
+        },
+        {
+          "type": "flyout",
+          "text": "Настройки",
+          "command": "NcTestSettings",
+          "style": "large",
+          "items": [
+            {
+              "text": "Типовые объекты",
+              "command": "NcTestTypicalObjects"
             }
           ]
         }

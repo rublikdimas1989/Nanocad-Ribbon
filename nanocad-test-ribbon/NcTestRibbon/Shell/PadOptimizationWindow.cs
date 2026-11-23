@@ -296,14 +296,14 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// Ribbon «Добавить Кустовую»: select first row if needed, then CAD place jig.
+    /// Insert selected KP at stored X/Y/angle (no place jig), then zoom.
     /// </summary>
     public void BeginPlaceSelected()
     {
       if (_pads.Count == 0)
       {
         throw new InvalidOperationException(
-          "Нет КП в таблице. Откройте таблицы КП (xlsx) во «Исходные данные» → Кустовые.");
+          "Нет КП в таблице. Откройте таблицы КП (xlsx) в «База данных» → Кустовые.");
       }
 
       if (SelectedPad()?.Record == null)
@@ -641,24 +641,17 @@ namespace NcTestRibbon.Shell
       var geom = ToGeom(row);
       RunWithCadFocus(() =>
       {
-        if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
-        {
-          Log("Размещение «" + row.Name + "» отменено.");
-          return;
-        }
-
-        row.ApplyPreviewPose(x, y, row.RotationDeg);
-
+        CadPadOverlay.InsertAtStored(geom);
+        CadPadOverlay.ZoomToPads(new[] { geom });
         if (!_showOnDrawing.Checked)
         {
-          _showOnDrawing.Checked = true;
-        }
-        else
-        {
-          CadPadOverlay.UpdatePad(ToGeom(row));
+          _suppressShowToggle = true;
+          try { _showOnDrawing.Checked = true; }
+          finally { _suppressShowToggle = false; }
+          AppPaths.Set(p => p.ShowPadsOnDrawing = true);
         }
 
-        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+        Log("Вставлено «" + row.Name + "» из базы: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
       });
       RefreshPadRow(row);

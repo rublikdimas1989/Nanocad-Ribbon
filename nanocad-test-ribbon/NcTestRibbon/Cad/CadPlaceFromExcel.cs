@@ -12,8 +12,8 @@ namespace NcTestRibbon.Cad
   using NcTestRibbon.Shell;
 
   /// <summary>
-  /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel pick (multi-select) → place ONLY selected.
-  /// Does not open SourceData and does not redraw the full set.
+  /// Ribbon «Добавить Кустовую/БУОС/Узел»: Excel multi-select → insert at stored X/Y/angle
+  /// (no place jig). Zoom to object or group extents. No SourceData / no draw-all.
   /// </summary>
   public static class CadPlaceFromExcel
   {
@@ -37,7 +37,7 @@ namespace NcTestRibbon.Cad
       PadWorkbookLoader.WorkbookData book = PadWorkbookLoader.LoadWorkbook(path);
       AppPaths.Set(p => p.PadsWorkbook = path);
 
-      var placed = new List<PadWorkbookLoader.PadRecord>();
+      var geoms = new List<CadPadOverlay.PadGeom>();
       foreach (PickFromExcelItem item in picked)
       {
         string name = item.Tag as string ?? item.Name;
@@ -57,24 +57,11 @@ namespace NcTestRibbon.Cad
           LengthM = pad.LengthM > 0 ? pad.LengthM : 250,
           RotationDeg = pad.RotationDeg
         };
-
-        if (!CadPadOverlay.TryPlace(geom, out double x, out double y))
-        {
-          break;
-        }
-
-        pad.X = x;
-        pad.Y = y;
-        geom.X = x;
-        geom.Y = y;
-        CadPadOverlay.UpdatePad(geom);
-        placed.Add(pad);
+        CadPadOverlay.InsertAtStored(geom);
+        geoms.Add(geom);
       }
 
-      if (placed.Count > 0)
-      {
-        PadWorkbookLoader.SavePadCoordinates(path, placed);
-      }
+      CadPadOverlay.ZoomToPads(geoms);
     }
 
     public static void PlaceBuos(IWin32Window owner = null)
@@ -125,70 +112,73 @@ namespace NcTestRibbon.Cad
         SitePlacementWorkbookLoader.LoadWorkbook(path, sheetName);
       rememberPath(path);
 
-      var placed = new List<SitePlacementWorkbookLoader.PlacementRecord>();
-      foreach (PickFromExcelItem item in picked)
+      if (buos)
       {
-        string name = item.Tag as string ?? item.Name;
-        SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
-          string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
-        if (site == null)
+        var geoms = new List<CadBuosPlacementOverlay.SiteGeom>();
+        foreach (PickFromExcelItem item in picked)
         {
-          throw new InvalidOperationException(
-            "«" + name + "» нет в " + Path.GetFileName(path) + " («" + sheetName + "»).");
+          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
+          var geom = ToBuosGeom(site);
+          CadBuosPlacementOverlay.InsertAtStored(geom);
+          geoms.Add(geom);
         }
 
-        double x;
-        double y;
-        if (buos)
+        CadBuosPlacementOverlay.ZoomToPads(geoms);
+      }
+      else
+      {
+        var geoms = new List<CadNodePlacementOverlay.SiteGeom>();
+        foreach (PickFromExcelItem item in picked)
         {
-          var geom = new CadBuosPlacementOverlay.SiteGeom
-          {
-            Name = site.Name,
-            X = site.X,
-            Y = site.Y,
-            WidthM = site.WidthM > 0 ? site.WidthM : 150,
-            LengthM = site.LengthM > 0 ? site.LengthM : 250,
-            RotationDeg = site.AngleDeg
-          };
-          if (!CadBuosPlacementOverlay.TryPlace(geom, out x, out y))
-          {
-            break;
-          }
-
-          geom.X = x;
-          geom.Y = y;
-          CadBuosPlacementOverlay.UpdatePad(geom);
-        }
-        else
-        {
-          var geom = new CadNodePlacementOverlay.SiteGeom
-          {
-            Name = site.Name,
-            X = site.X,
-            Y = site.Y,
-            WidthM = site.WidthM > 0 ? site.WidthM : 150,
-            LengthM = site.LengthM > 0 ? site.LengthM : 250,
-            RotationDeg = site.AngleDeg
-          };
-          if (!CadNodePlacementOverlay.TryPlace(geom, out x, out y))
-          {
-            break;
-          }
-
-          geom.X = x;
-          geom.Y = y;
-          CadNodePlacementOverlay.UpdatePad(geom);
+          SitePlacementWorkbookLoader.PlacementRecord site = FindSite(book, item);
+          var geom = ToNodeGeom(site);
+          CadNodePlacementOverlay.InsertAtStored(geom);
+          geoms.Add(geom);
         }
 
-        site.X = x;
-        site.Y = y;
-        placed.Add(site);
+        CadNodePlacementOverlay.ZoomToPads(geoms);
+      }
+    }
+
+    private static SitePlacementWorkbookLoader.PlacementRecord FindSite(
+      SitePlacementWorkbookLoader.WorkbookData book,
+      PickFromExcelItem item)
+    {
+      string name = item.Tag as string ?? item.Name;
+      SitePlacementWorkbookLoader.PlacementRecord site = book.Sites.Find(s =>
+        string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
+      if (site == null)
+      {
+        throw new InvalidOperationException("«" + name + "» нет в выбранном Excel.");
       }
 
-      if (placed.Count > 0)
+      return site;
+    }
+
+    private static CadBuosPlacementOverlay.SiteGeom ToBuosGeom(SitePlacementWorkbookLoader.PlacementRecord site)
+    {
+      return new CadBuosPlacementOverlay.SiteGeom
       {
-        SitePlacementWorkbookLoader.SavePlacementPose(path, sheetName, placed);
-      }
+        Name = site.Name,
+        X = site.X,
+        Y = site.Y,
+        WidthM = site.WidthM > 0 ? site.WidthM : 150,
+        LengthM = site.LengthM > 0 ? site.LengthM : 250,
+        RotationDeg = site.AngleDeg
+      };
+    }
+
+    private static CadNodePlacementOverlay.SiteGeom ToNodeGeom(SitePlacementWorkbookLoader.PlacementRecord site)
+    {
+      return new CadNodePlacementOverlay.SiteGeom
+      {
+        Name = site.Name,
+        X = site.X,
+        Y = site.Y,
+        WidthM = site.WidthM > 0 ? site.WidthM : 150,
+        LengthM = site.LengthM > 0 ? site.LengthM : 250,
+        RotationDeg = site.AngleDeg
+      };
     }
 
     private static PickFromExcelItem ToPickItem(PadWorkbookLoader.PadRecord p)
@@ -202,7 +192,7 @@ namespace NcTestRibbon.Cad
           ? "X=" + p.X.ToString("0.###", CultureInfo.CurrentCulture)
             + "; Y=" + p.Y.ToString("0.###", CultureInfo.CurrentCulture)
             + "; угол=" + p.RotationDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
-          : "координаты не заданы",
+          : "координаты не заданы (вставка в 0;0)",
         Tag = p.Name
       };
     }
@@ -218,7 +208,7 @@ namespace NcTestRibbon.Cad
           ? "X=" + s.X.ToString("0.###", CultureInfo.CurrentCulture)
             + "; Y=" + s.Y.ToString("0.###", CultureInfo.CurrentCulture)
             + "; угол=" + s.AngleDeg.ToString("0.###", CultureInfo.CurrentCulture) + "°"
-          : "координаты не заданы",
+          : "координаты не заданы (вставка в 0;0)",
         Tag = s.Name
       };
     }

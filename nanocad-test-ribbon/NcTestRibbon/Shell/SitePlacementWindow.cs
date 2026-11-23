@@ -226,7 +226,7 @@ namespace NcTestRibbon.Shell
     }
 
     /// <summary>
-    /// Ribbon «Добавить БУОС» / similar: select first row if needed, then CAD place jig.
+    /// Ribbon «Добавить БУОС» / similar: select first row if needed, insert at stored pose.
     /// </summary>
     public void BeginPlaceSelected()
     {
@@ -511,34 +511,28 @@ namespace NcTestRibbon.Shell
 
       RunWithCadFocus(() =>
       {
-        bool ok;
-        double x, y;
         if (_kind == SitePlacementKind.Buos)
         {
-          ok = CadBuosPlacementOverlay.TryPlace(ToBuosGeom(row), out x, out y);
+          var geom = ToBuosGeom(row);
+          CadBuosPlacementOverlay.InsertAtStored(geom);
+          CadBuosPlacementOverlay.ZoomToPads(new[] { geom });
         }
         else
         {
-          ok = CadNodePlacementOverlay.TryPlace(ToNodeGeom(row), out x, out y);
+          var geom = ToNodeGeom(row);
+          CadNodePlacementOverlay.InsertAtStored(geom);
+          CadNodePlacementOverlay.ZoomToPads(new[] { geom });
         }
 
-        if (!ok)
-        {
-          Log("Размещение «" + row.Name + "» отменено.");
-          return;
-        }
-
-        row.ApplyPreviewPose(x, y, row.RotationDeg);
         if (!_showOnDrawing.Checked)
         {
-          _showOnDrawing.Checked = true;
-        }
-        else
-        {
-          UpdateOverlay(row);
+          _suppressShowToggle = true;
+          try { _showOnDrawing.Checked = true; }
+          finally { _suppressShowToggle = false; }
+          PersistShowFlag(true);
         }
 
-        Log("Новые координаты «" + row.Name + "»: X=" + row.X + "; Y=" + row.Y
+        Log("Вставлено «" + row.Name + "» из базы: X=" + row.X + "; Y=" + row.Y
           + "; угол=" + row.RotationText + "°");
       });
       RefreshRow(row);

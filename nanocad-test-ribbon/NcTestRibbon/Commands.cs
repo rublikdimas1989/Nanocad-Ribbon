@@ -237,14 +237,26 @@ namespace NcTestRibbon
       OpenWpfWindow(ed: null, "NcTestWpf", () => new MainWindow());
     }
 
-    /// <summary>Opens Settings WPF shell (tracing + trench/road tabs).</summary>
+    /// <summary>
+    /// Ribbon flyout parent «Настройки» (MenuMacroID / icon). Opens full Settings shell.
+    /// Prefer flyout items (e.g. Типовые объекты) for focused UIs.
+    /// </summary>
     [CommandMethod("NcTestSettings")]
     public void NcTestSettings()
     {
       OpenWpfWindow(ed: null, "NcTestSettings", () => new SettingsWindow());
     }
 
-    /// <summary>Alias for NcTestSettings (legacy name).</summary>
+    /// <summary>
+    /// Settings flyout → «Типовые объекты»: catalogs БУОС + Узлы.
+    /// </summary>
+    [CommandMethod("NcTestTypicalObjects")]
+    public void NcTestTypicalObjects()
+    {
+      OpenWpfWindow(ed: null, "NcTestTypicalObjects", () => new TypicalObjectsWindow());
+    }
+
+    /// <summary>Alias → NcTestSourceData / «База данных».</summary>
     [CommandMethod("NcTestInitialData")]
     public void NcTestInitialData()
     {
@@ -252,7 +264,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// «Исходные данные» — Кустовые / Врезки / placement БУОС / Узлы (default: pads).
+    /// «База данных» — Кустовые / Врезки / placement БУОС / Узлы (view only; no draw on open).
     /// </summary>
     [CommandMethod("NcTestSourceData")]
     public void NcTestSourceData()
@@ -261,7 +273,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Display-only KP table tab inside «Исходные данные».
+    /// Display-only KP table tab inside «База данных».
     /// </summary>
     [CommandMethod("NcTestPadOpt")]
     public void NcTestPadOpt()
@@ -433,7 +445,7 @@ namespace NcTestRibbon
 
     /// <summary>
     /// Ribbon flyout «Площадные объекты» → Добавить Кустовую
-    /// (Excel pick → place ONLY selected KP; no SourceData / no full redraw).
+    /// (Excel multi-select → insert at stored X/Y/angle, zoom; no jig / no SourceData).
     /// </summary>
     [CommandMethod("NcTestAddPad")]
     public void NcTestAddPad()
@@ -442,7 +454,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить БУОС (single object only).
+    /// Ribbon flyout «Площадные объекты» → Добавить БУОС (insert at stored pose + zoom).
     /// </summary>
     [CommandMethod("NcTestAddBuos")]
     public void NcTestAddBuos()
@@ -451,7 +463,7 @@ namespace NcTestRibbon
     }
 
     /// <summary>
-    /// Ribbon flyout «Площадные объекты» → Добавить Узел (single object only).
+    /// Ribbon flyout «Площадные объекты» → Добавить Узел (insert at stored pose + zoom).
     /// </summary>
     [CommandMethod("NcTestAddNode")]
     public void NcTestAddNode()
@@ -466,7 +478,7 @@ namespace NcTestRibbon
       try
       {
         place();
-        ed?.WriteMessage("\n" + label + ": placed selected row(s) only (no SourceData / no draw-all).");
+        ed?.WriteMessage("\n" + label + ": insert at stored pose + zoom (no jig / no SourceData).");
       }
       catch (System.Exception ex)
       {
