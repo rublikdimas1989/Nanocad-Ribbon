@@ -115,14 +115,7 @@
     {
       "intername": "NcTestSettings",
       "displayName": "Настройки",
-      "tooltip": "Полные настройки (команда; на ленте — «Типовые объекты»).",
-      "iconAssembly": "NC_TestRibbon.dll",
-      "iconResource": "NC_ICONS.settings.ico"
-    },
-    {
-      "intername": "NcTestTypicalObjects",
-      "displayName": "Типовые объекты",
-      "tooltip": "Каталоги БУОС и Узлы (типовые объекты).",
+      "tooltip": "Полные настройки трассировки, каталоги и траншея/дорога.",
       "iconAssembly": "NC_TestRibbon.dll",
       "iconResource": "NC_ICONS.settings.ico"
     },
@@ -195,11 +188,6 @@
         {
           "text": "Объекты чертежа",
           "command": "NcTestDrawingObjects",
-          "style": "large"
-        },
-        {
-          "text": "Типовые объекты",
-          "command": "NcTestTypicalObjects",
           "style": "large"
         }
       ]

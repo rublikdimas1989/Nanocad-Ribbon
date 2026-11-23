@@ -269,21 +269,12 @@ namespace NcTestRibbon
 
     /// <summary>
     /// Ribbon flyout parent «Настройки» (MenuMacroID / icon). Opens full Settings shell.
-    /// Prefer flyout items (e.g. Типовые объекты) for focused UIs.
+    /// Prefer focused catalog UIs under «База данных» tabs.
     /// </summary>
     [CommandMethod("NcTestSettings")]
     public void NcTestSettings()
     {
       OpenWpfWindow(ed: null, "NcTestSettings", () => new SettingsWindow());
-    }
-
-    /// <summary>
-    /// Ribbon «Типовые объекты»: catalogs БУОС + Узлы.
-    /// </summary>
-    [CommandMethod("NcTestTypicalObjects")]
-    public void NcTestTypicalObjects()
-    {
-      OpenWpfWindow(ed: null, "NcTestTypicalObjects", () => new TypicalObjectsWindow());
     }
 
     /// <summary>Alias → NcTestSourceData / «База данных».</summary>

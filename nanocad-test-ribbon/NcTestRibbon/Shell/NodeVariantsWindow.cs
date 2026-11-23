@@ -7,7 +7,6 @@ namespace NcTestRibbon.Shell
   using System.Globalization;
   using System.IO;
   using System.Windows.Forms;
-  using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
 
@@ -186,11 +185,8 @@ namespace NcTestRibbon.Shell
           Name = v.Name,
           LengthText = v.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
           WidthText = v.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
-          LengthM = v.LengthM,
-          WidthM = v.WidthM
         };
         ApplyPrice(row);
-        ApplyCadGeom(row);
         _rows.Add(row);
       }
 
@@ -216,15 +212,7 @@ namespace NcTestRibbon.Shell
       foreach (NodeRow row in _rows)
       {
         ApplyPrice(row);
-        ApplyCadGeom(row);
       }
-    }
-
-    private static void ApplyCadGeom(NodeRow row)
-    {
-      CadNodePlacementOverlay.TryGetCadGeomFlags(row.Name, out bool hasPl, out bool hasText);
-      // Row red if габарит polyline or Текст is missing on the drawing for this type name.
-      row.CadGeomMissing = !hasPl || !hasText;
     }
 
     private void ApplyPrice(NodeRow row)
@@ -259,20 +247,9 @@ namespace NcTestRibbon.Shell
         }
       }
 
-      int cadMissing = 0;
-      foreach (NodeRow row in _rows)
-      {
-        if (row.CadGeomMissing)
-        {
-          cadMissing++;
-        }
-      }
-
       Log("Цены: " + Path.GetFileName(_priceFile) + ", лист «" + TopologyElementPrices.SheetName
         + "», записей: " + _prices.Count
-        + (missing > 0 ? "; без цены: " + missing : "; все цены найдены")
-        + (cadMissing > 0 ? "; без polyline/Текст: " + cadMissing + " (красные)" : "; CAD габарит/Текст OK")
-        + ".");
+        + (missing > 0 ? "; без цены: " + missing + " (красные)" : "; все цены найдены") + ".");
     }
 
     private void OnCellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -283,7 +260,7 @@ namespace NcTestRibbon.Shell
       }
 
       NodeRow row = _rows[e.RowIndex];
-      if (!(row.CostMissing || row.CadGeomMissing))
+      if (!row.CostMissing)
       {
         return;
       }
@@ -328,10 +305,7 @@ namespace NcTestRibbon.Shell
       public string LengthText { get; set; } = string.Empty;
       public string WidthText { get; set; } = string.Empty;
       public string CostText { get; set; } = TopologyElementPrices.MissingHint;
-      public double LengthM { get; set; }
-      public double WidthM { get; set; }
       public bool CostMissing { get; set; } = true;
-      public bool CadGeomMissing { get; set; } = true;
     }
   }
 }

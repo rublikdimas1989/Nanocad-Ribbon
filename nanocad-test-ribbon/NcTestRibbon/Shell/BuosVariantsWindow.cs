@@ -7,7 +7,6 @@ namespace NcTestRibbon.Shell
   using System.Globalization;
   using System.IO;
   using System.Windows.Forms;
-  using NcTestRibbon.Cad;
   using NcTestRibbon.Configuration;
   using NcTestRibbon.Rates;
 
@@ -192,11 +191,8 @@ namespace NcTestRibbon.Shell
           GasText = v.GasCapacity.ToString("0.###", CultureInfo.CurrentCulture),
           LengthText = v.LengthM.ToString("0.###", CultureInfo.CurrentCulture),
           WidthText = v.WidthM.ToString("0.###", CultureInfo.CurrentCulture),
-          LengthM = v.LengthM,
-          WidthM = v.WidthM
         };
         ApplyPrice(row);
-        ApplyCadGeom(row);
         _rows.Add(row);
       }
 
@@ -222,7 +218,6 @@ namespace NcTestRibbon.Shell
       foreach (BuosRow row in _rows)
       {
         ApplyPrice(row);
-        ApplyCadGeom(row);
       }
     }
 
@@ -238,13 +233,6 @@ namespace NcTestRibbon.Shell
         row.CostMissing = true;
         row.CostText = TopologyElementPrices.MissingHint;
       }
-    }
-
-    private static void ApplyCadGeom(BuosRow row)
-    {
-      CadBuosPlacementOverlay.TryGetCadGeomFlags(row.Name, out bool hasPl, out bool hasText);
-      // Row red if габарит polyline or Текст is missing on the drawing for this type name.
-      row.CadGeomMissing = !hasPl || !hasText;
     }
 
     private void LogPriceStatus()
@@ -265,20 +253,9 @@ namespace NcTestRibbon.Shell
         }
       }
 
-      int cadMissing = 0;
-      foreach (BuosRow row in _rows)
-      {
-        if (row.CadGeomMissing)
-        {
-          cadMissing++;
-        }
-      }
-
       Log("Цены: " + Path.GetFileName(_priceFile) + ", лист «" + TopologyElementPrices.SheetName
         + "», записей: " + _prices.Count
-        + (missing > 0 ? "; без цены: " + missing : "; все цены найдены")
-        + (cadMissing > 0 ? "; без polyline/Текст: " + cadMissing + " (красные)" : "; CAD габарит/Текст OK")
-        + ".");
+        + (missing > 0 ? "; без цены: " + missing + " (красные)" : "; все цены найдены") + ".");
     }
 
     private void OnCellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -289,8 +266,7 @@ namespace NcTestRibbon.Shell
       }
 
       BuosRow row = _rows[e.RowIndex];
-      bool highlight = row.CostMissing || row.CadGeomMissing;
-      if (!highlight)
+      if (!row.CostMissing)
       {
         return;
       }
@@ -337,10 +313,7 @@ namespace NcTestRibbon.Shell
       public string LengthText { get; set; } = string.Empty;
       public string WidthText { get; set; } = string.Empty;
       public string CostText { get; set; } = TopologyElementPrices.MissingHint;
-      public double LengthM { get; set; }
-      public double WidthM { get; set; }
       public bool CostMissing { get; set; } = true;
-      public bool CadGeomMissing { get; set; } = true;
     }
   }
 }

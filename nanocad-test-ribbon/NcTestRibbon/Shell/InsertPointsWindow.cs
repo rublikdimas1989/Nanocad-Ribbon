@@ -156,7 +156,6 @@ namespace NcTestRibbon.Shell
         BackgroundColor = SystemColors.Window,
         AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
       };
-      _grid.Columns.Add(CheckCol("Включена", nameof(InsertRow.Enabled), 70));
       _grid.Columns.Add(TextCol("Имя", nameof(InsertRow.Name), 120));
       _grid.Columns.Add(TextCol("X, м", nameof(InsertRow.X), 110));
       _grid.Columns.Add(TextCol("Y, м", nameof(InsertRow.Y), 110));
@@ -595,18 +594,6 @@ namespace NcTestRibbon.Shell
     private static DataGridViewTextBoxColumn TextCol(string header, string prop, int fill)
     {
       return new DataGridViewTextBoxColumn
-      {
-        HeaderText = header,
-        DataPropertyName = prop,
-        Name = prop,
-        ReadOnly = true,
-        FillWeight = fill
-      };
-    }
-
-    private static DataGridViewCheckBoxColumn CheckCol(string header, string prop, int fill)
-    {
-      return new DataGridViewCheckBoxColumn
       {
         HeaderText = header,
         DataPropertyName = prop,

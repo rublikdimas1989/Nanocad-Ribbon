@@ -12,7 +12,7 @@ namespace NcTestRibbon.Shell
   using NcTestRibbon.Rates;
 
   /// <summary>
-  /// Pick БУОС/Узел from Типовые объекты catalog. First column «Имя» = instance name.
+  /// Pick БУОС/Узел from База данных typical catalog. First column «Имя» = instance name.
   /// </summary>
   public sealed class PickFromTypicalCatalogDialog : Form
   {
@@ -161,7 +161,7 @@ namespace NcTestRibbon.Shell
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
           throw new InvalidOperationException(
-            "Нет каталога БУОС (paths.json → buosWorkbook). Откройте «Типовые объекты» и укажите Excel.");
+            "Нет каталога БУОС (paths.json → buosWorkbook). Откройте «База данных» → вкладку каталога и укажите Excel.");
         }
 
         BuosWorkbookLoader.WorkbookData book = BuosWorkbookLoader.LoadWorkbook(path);
@@ -183,7 +183,7 @@ namespace NcTestRibbon.Shell
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
           throw new InvalidOperationException(
-            "Нет каталога Узлы (paths.json → nodesWorkbook). Откройте «Типовые объекты» и укажите Excel.");
+            "Нет каталога Узлы (paths.json → nodesWorkbook). Откройте «База данных» → вкладку каталога и укажите Excel.");
         }
 
         NodesWorkbookLoader.WorkbookData book = NodesWorkbookLoader.LoadWorkbook(path);

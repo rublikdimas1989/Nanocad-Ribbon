@@ -3,9 +3,9 @@
 Минимальный плагин **.NET 6 / Windows** для nanoCAD 24: три команды и манифест панели «Тест».
 Сервер ASDC **не нужен** для локальной проверки команд. Раздача через ASDC — отдельный следующий шаг.
 
-Актуальный **slim** zip (версия **1.2.90**): `nanocad-test-ribbon-v1.2.90.zip`  
-https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.90.zip  
-Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.90/nanocad-test-ribbon-v1.2.90.zip  
+Актуальный **slim** zip (версия **1.2.91**): `nanocad-test-ribbon-v1.2.91.zip`  
+https://raw.githubusercontent.com/rublikdimas1989/Nanocad-Ribbon/main/nanocad-test-ribbon-v1.2.91.zip  
+Release: https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/download/v1.2.91/nanocad-test-ribbon-v1.2.91.zip  
 
 GDAL natives (один раз): [`nanocad-gdal-runtime-3.12.1`](https://github.com/rublikdimas1989/Nanocad-Ribbon/releases/tag/gdal-runtime-3.12.1) — или оставьте `LoadFile\gdal` от v1.2.48.
 
@@ -37,19 +37,18 @@ Sample узлы: [`Topology_Nodes.xlsx`](https://github.com/rublikdimas1989/Nano
 
 ### Быстрая пересборка
 
-1. Скачайте **v1.2.90 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
+1. Скачайте **v1.2.91 slim**, распакуйте в **НОВУЮ** пустую папку (не поверх старой — иначе CS0101/CS0111).
 2. GDAL: уже стоит от v1.2.48 **или** один раз `nanocad-gdal-runtime-3.12.1` → `INSTALL-GDAL-RUNTIME.bat`.
 3. (Опционально ECW OEM) `ecw_encode.conf` → `Tracing_cache\Settings\` (из `installer/ecw_encode.conf.example`).
 4. `installer\INSTALL.bat` — `dotnet build`, pre-write ribbon UI (группы Исходные/Коридоры/Расчёт), при успехе один запуск nanoCAD.
 5. Опционально `installer\VERIFY.bat`
-6. Stamp `NcTestRibbon 1.2.90+UniqueSiteNames` — unique non-empty Имя for БУОС/Узел on add; zip без `.xlsx`.
+6. Stamp `NcTestRibbon 1.2.91+NoTypicalRibbon` — no Типовые ribbon/window; no catalog polyline/Текст red; Врезки without Включена; zip без `.xlsx`.
 
 | Команда | Что делает |
 |---------|------------|
 | `NcTestHello` | Сообщение «Тест 1: Hello» |
 | `NcTestHttp` | WinForms HTTP GET |
 | `NcTestWpf` | **WPF-оболочка** `MainWindow` (End-variant UI; клики stub → MessageBox) |
-| `NcTestTypicalObjects` | Лента: «Типовые объекты» — каталоги БУОС / Узлы |
 | `NcTestSettings` | Полные настройки (команда, без кнопки ленты) |
 | `NcTestInitialData` | alias → `NcTestSourceData` |
 | `NcTestSourceData` | Лента: «База данных» — Кустовые/Врезки (Excel) + БУОС/Узлы типовые; без Show/Save/Load |
@@ -159,7 +158,7 @@ NcTestBlink
 
 `NcTestInserts` — как End «Топология — точки врезки / сброса после БУОС»:
 
-- Лист Excel **«Врезки»**: Имя, Включена, X, Y, Среда, P противодавления, Макс. приём нефти **т/сут** (**без Id**; ключ = уникальное Имя)
+- Лист Excel **«Врезки»**: Имя, X, Y, Среда, P противодавления, Макс. приём нефти **т/сут** (**без Id**; ключ = уникальное Имя; колонка «Включена» в UI База не показывается)
 - Дубликат имён при загрузке → ошибка
 - Таблица display-only; положение только **Задать положение вручную** (CAD); zoom к врезке
 - «Показывать на чертеже» → слой `NC_INSERTS` (круг + подпись); persist `paths.json`
@@ -173,7 +172,7 @@ NcTestBlink
 ### База данных (v1.2.83)
 
 Окно **«База данных»** (бывш. «Исходные данные»): Кустовые / Врезки / **размещение БУОС** / **размещение Узлы**.  
-Открытие окна **не** рисует объекты. Каталоги размеров — лента **Типовые объекты** (и команда полных «Настройки»).
+Открытие окна **не** рисует объекты. Каталоги размеров — вкладки **БУОС типовые** / **Узлы типовые** (и полные «Настройки»).
 
 **Добавить Кустовую/БУОС/Узел** (и кнопка размещения во вкладках, в т.ч. врезки): вставка по X/Y/углу из Excel **без** place jig; zoom к объекту или к группе при multi-select.  
 Если файл размещения БУОС/Узлы не задан: диалог **Создать новый файл** / **Открыть существующий** → `paths.json`.
@@ -187,7 +186,7 @@ NcTestBlink
 
 ### Каталог БУОС / Узлы в Настройках (v1.2.71+)
 
-Вкладки **Типовые объекты → БУОС** / **Узлы** (и полные Настройки):
+Вкладки **База данных → БУОС типовые** / **Узлы типовые** (и полные Настройки):
 
 - Лист **«БУОС»**: Имя, жидкость/ПНГ, длина/ширина; цена из Price «Элементы топологии»
 - Лист **«Узлы»**: Имя, длина/ширина; цена из Price
