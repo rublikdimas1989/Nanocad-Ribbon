@@ -7,7 +7,7 @@ namespace NcTestRibbon.Shell
     public static void Notify(DependencyObject owner, string action)
     {
       Window win = Window.GetWindow(owner);
-      MessageBox.Show(
+      System.Windows.MessageBox.Show(
         win,
         "Действие: " + action + "\n\nЛогика расчёта будет на сервере. Сейчас только UI-оболочка.",
         "NcTestRibbon UI",
