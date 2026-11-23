@@ -211,6 +211,7 @@ namespace NcTestRibbon.Cad
           continue;
         }
 
+        TryReadPadSize(name, out double lengthM, out double widthM);
         result.Add(new SiteGeom
         {
           Name = name,
@@ -218,12 +219,56 @@ namespace NcTestRibbon.Cad
           X = x,
           Y = y,
           RotationDeg = rot,
-          LengthM = 250,
-          WidthM = 150
+          LengthM = lengthM > 0 ? lengthM : 20,
+          WidthM = widthM > 0 ? widthM : 20
         });
       }
 
       return result;
+    }
+
+    /// <summary>
+    /// Length = edge p0→p1, Width = edge p1→p2 (same as AddRectangle at 0°).
+    /// </summary>
+    private static void TryReadPadSize(string padName, out double lengthM, out double widthM)
+    {
+      lengthM = 0;
+      widthM = 0;
+      Document doc = CadApp.DocumentManager.MdiActiveDocument;
+      if (doc == null || string.IsNullOrWhiteSpace(padName))
+      {
+        return;
+      }
+
+      double len = 0;
+      double wid = 0;
+      try
+      {
+        RunWrite(doc, (tr, model, db) =>
+        {
+          foreach (ObjectId id in FindNamedPadIds(tr, model, padName))
+          {
+            DbPolyline pl = tr.GetObject(id, OpenMode.ForRead) as DbPolyline;
+            if (pl == null || pl.NumberOfVertices < 3)
+            {
+              continue;
+            }
+
+            Point2d p0 = pl.GetPoint2dAt(0);
+            Point2d p1 = pl.GetPoint2dAt(1);
+            Point2d p2 = pl.GetPoint2dAt(2);
+            len = Math.Sqrt((p1.X - p0.X) * (p1.X - p0.X) + (p1.Y - p0.Y) * (p1.Y - p0.Y));
+            wid = Math.Sqrt((p2.X - p1.X) * (p2.X - p1.X) + (p2.Y - p1.Y) * (p2.Y - p1.Y));
+            break;
+          }
+        });
+      }
+      catch
+      {
+      }
+
+      lengthM = len;
+      widthM = wid;
     }
 
     /// <summary>Zoom to one or many sites (union extents). Never throws.</summary>
@@ -560,24 +605,47 @@ namespace NcTestRibbon.Cad
           tr.AddNewlyCreatedDBObject(record, true);
         }
 
-        if (!string.IsNullOrWhiteSpace(typeName))
-        {
-          entity.XData = new ResultBuffer(
-            new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
-            new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty),
-            new TypedValue((int)DxfCode.ExtendedDataAsciiString, typeName.Trim()));
-        }
-        else
-        {
-          entity.XData = new ResultBuffer(
-            new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
-            new TypedValue((int)DxfCode.ExtendedDataAsciiString, name ?? string.Empty));
-        }
+        // Single AsciiString: "Имя" or "Имя\tТип" (dual AsciiString is unreliable in nanoCAD).
+        entity.XData = new ResultBuffer(
+          new TypedValue((int)DxfCode.ExtendedDataRegAppName, app),
+          new TypedValue((int)DxfCode.ExtendedDataAsciiString, EncodeIdentity(name, typeName)));
       }
       catch
       {
         // XData optional — erase-by-layer still works for full refresh.
       }
+    }
+
+    private const char IdentitySep = '\t';
+
+    private static string EncodeIdentity(string name, string typeName)
+    {
+      string n = name ?? string.Empty;
+      if (string.IsNullOrWhiteSpace(typeName))
+      {
+        return n;
+      }
+
+      return n + IdentitySep + typeName.Trim();
+    }
+
+    private static void DecodeIdentity(string payload, out string name, out string typeName)
+    {
+      name = payload ?? string.Empty;
+      typeName = string.Empty;
+      if (string.IsNullOrEmpty(payload))
+      {
+        return;
+      }
+
+      int i = payload.IndexOf(IdentitySep);
+      if (i < 0)
+      {
+        return;
+      }
+
+      name = payload.Substring(0, i);
+      typeName = i + 1 < payload.Length ? payload.Substring(i + 1) : string.Empty;
     }
 
     private static string ReadPadName(Entity entity)
@@ -594,7 +662,8 @@ namespace NcTestRibbon.Cad
         {
           if (tv.TypeCode == (int)DxfCode.ExtendedDataAsciiString)
           {
-            return Convert.ToString(tv.Value);
+            DecodeIdentity(Convert.ToString(tv.Value), out string name, out _);
+            return name;
           }
         }
       }
@@ -615,7 +684,6 @@ namespace NcTestRibbon.Cad
           return string.Empty;
         }
 
-        int seen = 0;
         foreach (TypedValue tv in data)
         {
           if (tv.TypeCode != (int)DxfCode.ExtendedDataAsciiString)
@@ -623,11 +691,8 @@ namespace NcTestRibbon.Cad
             continue;
           }
 
-          seen++;
-          if (seen == 2)
-          {
-            return Convert.ToString(tv.Value) ?? string.Empty;
-          }
+          DecodeIdentity(Convert.ToString(tv.Value), out _, out string type);
+          return type ?? string.Empty;
         }
       }
       catch
